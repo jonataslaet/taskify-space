@@ -1,0 +1,96 @@
+package com.jonataslaet.taskifyspace.controllers;
+
+import com.fasterxml.jackson.annotation.JsonView;
+import com.jonataslaet.taskifyspace.controllers.dtos.StandardError;
+import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
+import com.jonataslaet.taskifyspace.services.SpaceService;
+import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import org.jspecify.annotations.NonNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/spaces")
+public class SpaceController {
+
+    private final SpaceService spaceService;
+
+    public SpaceController(SpaceService spaceService) {
+        this.spaceService = spaceService;
+    }
+
+    @Operation(
+        summary = "List Spaces",
+        description = "Returns a paginated list of Spaces with optional filters"
+    )
+    @Parameters({
+        @Parameter(name = "name", description = "Filter by name (case insensitive)"),
+        @Parameter(name = "active", description = "Filter by active (true or false)"),
+
+        @Parameter(name = "page", description = "Page number (0-based)", example = "0"),
+        @Parameter(name = "size", description = "Page size", example = "10"),
+        @Parameter(name = "sort", description = "Sort criteria (e.g. description,asc)")
+    })
+    @GetMapping
+    public ResponseEntity<@NonNull Page<@NonNull SpaceRecordDTO>> readAllSpaces(
+        @Parameter(hidden = true) SpecificationTemplate.SpaceSpecification SpaceSpecification,
+        @Parameter(hidden = true) Pageable pageable) {
+        Page<@NonNull SpaceRecordDTO> SpaceModelPage = spaceService.findAll(SpaceSpecification, pageable);
+        return ResponseEntity.status(HttpStatus.OK).body(SpaceModelPage);
+    }
+
+    @Operation(
+        summary = "Create a Space",
+        description = "Creates a new Space in the system"
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Space created successfully"),
+        @ApiResponse(responseCode = "422", description = "Invalid request payload"),
+        @ApiResponse(responseCode = "400", description = "Bad request")
+    })
+    @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
+    @PostMapping
+    public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(
+        @RequestBody @JsonView(SpaceRecordDTO.SpaceView.CreateSpace.class) SpaceRecordDTO spaceRecordDTO){
+        return ResponseEntity.status(HttpStatus.CREATED).body(spaceService.createSpace(spaceRecordDTO));
+    }
+
+    @Operation(
+        summary = "Get Space by ID",
+        description = "Returns a Space by its identifier"
+    )
+    @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
+    @GetMapping("/{spaceId}")
+    public ResponseEntity<@NonNull SpaceRecordDTO> getSpaceById(@PathVariable("spaceId") Long spaceId) {
+        SpaceRecordDTO foundSpace = spaceService.getSpaceById(spaceId);
+        return ResponseEntity.ok(foundSpace);
+    }
+
+    @PutMapping("/{spaceId}")
+    public ResponseEntity<@NonNull SpaceRecordDTO> updateSpace(
+        @PathVariable("spaceId") Long spaceId, @RequestBody
+        @JsonView(SpaceRecordDTO.SpaceView.UpdateSpace.class) SpaceRecordDTO spaceRecordDTO) {
+
+        SpaceRecordDTO updatedSpace = spaceService.updateSpace(spaceId, spaceRecordDTO);
+        return ResponseEntity.ok(updatedSpace);
+    }
+
+    @DeleteMapping("/{spaceId}")
+    public ResponseEntity<@NonNull Void> deleteSpace(
+        @PathVariable("spaceId") Long spaceId) {
+
+        spaceService.deleteSpace(spaceId);
+        return ResponseEntity.noContent().build();
+    }
+}
