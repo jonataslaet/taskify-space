@@ -1,16 +1,15 @@
 package com.jonataslaet.taskifyspace.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.jonataslaet.taskifyspace.controllers.dtos.StandardError;
+import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
+import com.jonataslaet.taskifyspace.entities.SpaceMembership;
+import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.SpaceService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.jspecify.annotations.NonNull;
@@ -18,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -61,9 +61,26 @@ public class SpaceController {
     })
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
     @PostMapping
-    public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(
+    public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(@AuthenticationPrincipal User authenticatedUser,
         @RequestBody @JsonView(SpaceRecordDTO.SpaceView.CreateSpace.class) SpaceRecordDTO spaceRecordDTO){
-        return ResponseEntity.status(HttpStatus.CREATED).body(spaceService.createSpace(spaceRecordDTO));
+        return ResponseEntity.status(HttpStatus.CREATED).body(spaceService.createSpace(spaceRecordDTO, authenticatedUser));
+    }
+
+    @PostMapping("/{spaceId}/participations")
+    public ResponseEntity<@NonNull SpaceRecordDTO> requestParticipation(@PathVariable("spaceId") Long spaceId,
+        @AuthenticationPrincipal User authenticatedUser) {
+        spaceService.requestParticipation(spaceId, authenticatedUser);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{spaceId}/participations")
+    public ResponseEntity<@NonNull Page<@NonNull SpaceMembershipRecordDTO>> readParticipations(
+        @Parameter(hidden = true) SpecificationTemplate.SpaceMembershipSpecification spaceSpecification,
+        @Parameter(hidden = true) Pageable pageable, @PathVariable("spaceId") Long spaceId,
+        @AuthenticationPrincipal User authenticatedUser) {
+        Page<@NonNull SpaceMembershipRecordDTO> pagedSpacememberships =
+            spaceService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser);
+        return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
     }
 
     @Operation(
@@ -91,6 +108,12 @@ public class SpaceController {
         @PathVariable("spaceId") Long spaceId) {
 
         spaceService.deleteSpace(spaceId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{spaceId}")
+    public ResponseEntity<@NonNull Void> toggleActiveSpace(@PathVariable("spaceId") Long spaceId) {
+        spaceService.toggleActiveSpace(spaceId);
         return ResponseEntity.noContent().build();
     }
 }

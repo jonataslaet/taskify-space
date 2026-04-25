@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
 @Schema(description = "Standard API error response")
-public class StandardError {
+public class StandardErrorRecordDTO {
 
     @Schema(example = "2026-02-08T12:00:00Z")
     private Instant timestamp;
@@ -22,7 +22,7 @@ public class StandardError {
     @Schema(example = "/tasks/1")
     private String path;
 
-    public StandardError() {
+    public StandardErrorRecordDTO() {
     }
 
     public Instant getTimestamp() {

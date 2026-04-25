@@ -10,3 +10,15 @@ spring:
     username: ${DATABASE_USER}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
+security:
+  email:
+    root: ${EMAIL_ROOT}
+  password:
+    root: ${PASSWORD_ROOT}
+  jwt:
+    secret: ${JWT_SECRET:seu-secret-jwt}
+    ttl:
+      token:
+        access: ${TTL_ACCESS_TOKEN:900000}
+        refresh: ${TTL_REFRESH_TOKEN:604800000}

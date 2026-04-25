@@ -1,0 +1,125 @@
+package com.jonataslaet.taskifyspace.services;
+
+import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
+import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
+import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
+import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
+import com.jonataslaet.taskifyspace.mappers.UserMapper;
+import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
+
+@Service
+@Transactional(readOnly = true)
+public class UserService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Transactional
+    public UserRecordDTO createUser(UserRecordDTO userRecordDTO) {
+        if (userRepository.existsByEmail(userRecordDTO.email())) {
+            throw new DuplicationException("Email already exists");
+        }
+
+        if(userRecordDTO.role().equals(UserRoleEnum.ROLE_ADMIN)){
+            throw new ForbiddenException("Role admin is not allowed");
+        }
+
+        UserRoleEnum.validateExistence(userRecordDTO.role());
+        User user = UserMapper.toEntity(userRecordDTO);
+
+        user.setStatus(UserStatusEnum.ACTIVE);
+        user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
+        return UserMapper.toUserRecordDTO(userRepository.save(user));
+    }
+
+    public Page<@NonNull UserRecordDTO> findAll(Specification<@NonNull User> userSpecification , Pageable pageable) {
+        logger.info("Fetching all users with filters: {} and pageable: {}", userSpecification, pageable);
+        return userRepository.findAll(userSpecification, pageable).map(UserMapper::toUserRecordDTO);
+    }
+
+    public UserRecordDTO findById(Long userId) {
+        logger.info("Fetching user with ID {}", userId);
+        return UserMapper.toUserRecordDTO(findUserById(userId));
+    }
+
+    @Transactional
+    public void deleteById(Long userId) {
+        logger.info("Attempting to delete user with ID {}", userId);
+        try {
+            userRepository.deleteById(userId);
+            logger.info("User with ID {} deleted successfully", userId);
+        } catch (RuntimeException e) {
+            logger.warn("Attempt to delete user with ID {} failed: {}", userId, e.getMessage());
+            throw new ResourceNotFoundException("User not found");
+        }
+    }
+
+
+    @Transactional
+    public void updateUser(Long userId, UserRecordDTO userRecordDto) {
+        logger.info("Updating user with ID {}", userId);
+        User user = findUserById(userId);
+        String password = user.getPassword();
+
+        logger.debug("Copying DTO properties into user entity for ID {}", userId);
+        BeanUtils.copyProperties(userRecordDto, user);
+        user.setPassword(password);
+
+        userRepository.save(user);
+        logger.info("User with ID {} updated successfully", userId);
+    }
+
+    @Transactional
+    public void updatePassword(Long userId, UserRecordDTO userRecordDTO) {
+        logger.info("Updating password for user with ID {}", userId);
+
+        User user = findUserById(userId);
+
+        if (!passwordEncoder.matches(userRecordDTO.oldPassword(), user.getPassword())) {
+            logger.warn("Password mismatch for user ID {}", userId);
+            throw new InvalidCredentialsException("Old password does not match");
+        }
+
+        logger.debug("Old password validated for user ID {}", userId);
+        user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
+        userRepository.save(user);
+
+        logger.info("Password updated successfully for user ID {}", userId);
+    }
+
+    public User findUserById(Long userId) {
+        logger.debug("Finding user with ID {}", userId);
+        return userRepository.findById(userId)
+            .orElseThrow(() -> {
+                logger.warn("User with ID {} not found", userId);
+                return new ResourceNotFoundException("User not found");
+            });
+    }
+
+    public Set<User> getExecutorsByIds(Set<Long> executorsIds) {
+        return userRepository.findUsersByIds(executorsIds);
+    }
+}

@@ -1,15 +1,11 @@
 package com.jonataslaet.taskifyspace.entities;
 
-import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import jakarta.persistence.*;
 
 @Entity
-@Table(
-    name = "space_memberships",
-    uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "space_id"})
-    }
-)
+@Table(name = "space_memberships")
 public class SpaceMembership {
 
     @Id
@@ -26,14 +22,18 @@ public class SpaceMembership {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private UserRoleEnum role;
+    private SpaceUserRoleEnum spaceUserRole;
 
-    protected SpaceMembership() {}
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private SpaceMembershipStatusEnum spaceMembershipStatusEnum;
 
-    public SpaceMembership(User user, Space space, UserRoleEnum role) {
+    public SpaceMembership() {}
+
+    public SpaceMembership(User user, Space space, SpaceUserRoleEnum role) {
         this.user = user;
         this.space = space;
-        this.role = role;
+        this.spaceUserRole = role;
     }
 
     public Long getId() { return id; }
@@ -42,7 +42,15 @@ public class SpaceMembership {
 
     public Space getSpace() { return space; }
 
-    public UserRoleEnum getRole() { return role; }
+    public SpaceUserRoleEnum getSpaceUserRole() { return spaceUserRole; }
 
-    public void setRole(UserRoleEnum role) { this.role = role; }
+    public void setSpaceUserRole(SpaceUserRoleEnum spaceUserRole) { this.spaceUserRole = spaceUserRole; }
+
+    public SpaceMembershipStatusEnum getSpaceMembershipStatusEnum() {
+        return spaceMembershipStatusEnum;
+    }
+
+    public void setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum spaceMembershipStatusEnum) {
+        this.spaceMembershipStatusEnum = spaceMembershipStatusEnum;
+    }
 }

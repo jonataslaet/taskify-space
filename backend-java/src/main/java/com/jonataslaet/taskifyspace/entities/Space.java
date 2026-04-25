@@ -20,8 +20,8 @@ public class Space {
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<SpaceMembership> spaceMemberships = new HashSet<>();
 
-    @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<SpaceTask> spaceTasks = new HashSet<>();
+    @OneToMany(mappedBy = "space")
+    private Set<TaskExecution> taskExecutions = new HashSet<>();
 
     public Space() {}
 
@@ -35,8 +35,6 @@ public class Space {
 
     public Set<SpaceMembership> getSpaceMemberships() { return spaceMemberships; }
 
-    public Set<SpaceTask> getSpaceTasks() { return spaceTasks; }
-
     public void setName(String name) { this.name = name; }
 
     public Boolean getActive() {
@@ -45,5 +43,21 @@ public class Space {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setSpaceMemberships(Set<SpaceMembership> spaceMemberships) {
+        this.spaceMemberships = spaceMemberships;
+    }
+
+    public Set<TaskExecution> getTaskExecutions() {
+        return taskExecutions;
+    }
+
+    public void setTaskExecutions(Set<TaskExecution> taskExecutions) {
+        this.taskExecutions = taskExecutions;
     }
 }

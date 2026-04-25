@@ -1,8 +1,9 @@
 package com.jonataslaet.taskifyspace.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.jonataslaet.taskifyspace.controllers.dtos.StandardError;
+import com.jonataslaet.taskifyspace.controllers.dtos.StandardErrorRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
+import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.TaskService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,7 +19,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Set;
 
 @RestController
 @RequestMapping("/tasks")
@@ -67,7 +71,7 @@ public class TaskController {
             description = "Essa tarefa já existe",
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = StandardError.class),
+                schema = @Schema(implementation = StandardErrorRecordDTO.class),
                 examples = @ExampleObject(
                     name = "DuplicateDescription",
                     summary = "Task description already exists",
@@ -88,9 +92,17 @@ public class TaskController {
     })
     @JsonView(TaskRecordDTO.TaskView.ReadTask.class)
     @PostMapping
-    public ResponseEntity<@NonNull TaskRecordDTO> createTask(
+    public ResponseEntity<@NonNull TaskRecordDTO> createTask(@AuthenticationPrincipal User authenticatedUser,
         @RequestBody @JsonView(TaskRecordDTO.TaskView.CreateTask.class) TaskRecordDTO taskRecordDTO){
-        return ResponseEntity.status(HttpStatus.CREATED).body(taskService.createTask(taskRecordDTO));
+        return ResponseEntity.status(HttpStatus.CREATED).body(taskService.createTask(authenticatedUser, taskRecordDTO));
+    }
+
+    @PostMapping("/{taskId}/spaces/{spaceId}")
+    public ResponseEntity<@NonNull Void> finishTask(@AuthenticationPrincipal User authenticatedUser,
+        @PathVariable("taskId") Long taskId, @PathVariable("spaceId") Long spaceId,
+        @RequestParam(value = "usersIds", required = false) Set<Long> usersIds){
+        taskService.finishTask(taskId, spaceId, authenticatedUser, usersIds);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(
@@ -118,6 +130,14 @@ public class TaskController {
         @PathVariable("taskId") Long taskId) {
 
         taskService.deleteTask(taskId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{taskId}")
+    public ResponseEntity<@NonNull Void> toggleActiveTask(
+        @PathVariable("taskId") Long taskId) {
+
+        taskService.toggleActiveTask(taskId);
         return ResponseEntity.noContent().build();
     }
 }

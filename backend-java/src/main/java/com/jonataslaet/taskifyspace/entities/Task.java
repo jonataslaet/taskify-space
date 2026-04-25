@@ -31,6 +31,10 @@ public class Task {
     private Boolean active;
 
     @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User creator;
+
+    @ManyToOne
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;
 
@@ -82,5 +86,13 @@ public class Task {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public User getCreator() {
+        return creator;
+    }
+
+    public void setCreator(User creator) {
+        this.creator = creator;
     }
 }

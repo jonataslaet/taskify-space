@@ -1,0 +1,24 @@
+package com.jonataslaet.taskifyspace.repositories;
+
+import com.jonataslaet.taskifyspace.entities.User;
+import org.jspecify.annotations.NonNull;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+import java.util.Set;
+
+@Repository
+public interface UserRepository extends JpaRepository<@NonNull User, @NonNull Long>, JpaSpecificationExecutor<@NonNull User> {
+
+    boolean existsByEmail(String email);
+
+    @Query("SELECT u FROM User u WHERE u.email = :username")
+    Optional<User> findByEmail(@Param("username") String username);
+
+    @Query("SELECT u FROM User u WHERE u.id in (:ids)")
+    Set<User> findUsersByIds(@Param("ids") Set<Long> executorsIds);
+}

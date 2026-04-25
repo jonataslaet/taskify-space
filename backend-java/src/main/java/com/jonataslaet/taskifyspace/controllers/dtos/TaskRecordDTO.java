@@ -33,7 +33,11 @@ public record TaskRecordDTO(
 
     @JsonView({TaskView.ReadTask.class})
     @Schema(example = "true")
-    Boolean active
+    Boolean active,
+
+    @JsonView({TaskView.ReadTask.class})
+    @Schema(example = "Jonatas Blendo dos Santos Laet")
+    String creatorName
 ) {
     public interface TaskView {
         interface CreateTask {}

@@ -1,7 +1,8 @@
 package com.jonataslaet.taskifyspace.handlers;
 
-import com.jonataslaet.taskifyspace.controllers.dtos.StandardError;
+import com.jonataslaet.taskifyspace.controllers.dtos.StandardErrorRecordDTO;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
+import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
@@ -16,10 +17,26 @@ import java.time.Instant;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<StandardErrorRecordDTO> handleForbiddenException(
+        ForbiddenException ex,
+        HttpServletRequest request) {
+
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.FORBIDDEN.value());
+        error.setError("Acesso negado");
+        error.setMessage(ex.getMessage());
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<@NonNull StandardError> handleHttpMessageNotReadableException(
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleHttpMessageNotReadableException(
         HttpMessageNotReadableException ex, HttpServletRequest request) {
-        StandardError error = new StandardError();
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
         error.setTimestamp(Instant.now());
         error.setStatus(HttpStatus.BAD_REQUEST.value());
         error.setError("Erro de requisição");
@@ -30,28 +47,28 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<@NonNull StandardError> handleResourceNotFoundException(ResourceNotFoundException ex,
-        HttpServletRequest httpServletRequest) {
-        StandardError standardError = new StandardError();
-        standardError.setTimestamp(Instant.now());
-        standardError.setStatus(HttpStatus.NOT_FOUND.value());
-        standardError.setError("Recurso não encontrado");
-        standardError.setMessage(ex.getMessage());
-        standardError.setPath(httpServletRequest.getRequestURI());
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleResourceNotFoundException(ResourceNotFoundException ex,
+                                                                                           HttpServletRequest httpServletRequest) {
+        StandardErrorRecordDTO standardErrorRecordDTO = new StandardErrorRecordDTO();
+        standardErrorRecordDTO.setTimestamp(Instant.now());
+        standardErrorRecordDTO.setStatus(HttpStatus.NOT_FOUND.value());
+        standardErrorRecordDTO.setError("Recurso não encontrado");
+        standardErrorRecordDTO.setMessage(ex.getMessage());
+        standardErrorRecordDTO.setPath(httpServletRequest.getRequestURI());
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND.value()).body(standardError);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND.value()).body(standardErrorRecordDTO);
     }
 
     @ExceptionHandler(DuplicationException.class)
-    public ResponseEntity<@NonNull StandardError> handleDuplicationException(
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleDuplicationException(
         DuplicationException ex, HttpServletRequest httpServletRequest) {
-        StandardError standardError = new StandardError();
-        standardError.setTimestamp(Instant.now());
-        standardError.setStatus(HttpStatus.CONFLICT.value());
-        standardError.setError("Erro de requisição");
-        standardError.setMessage(ex.getMessage());
-        standardError.setPath(httpServletRequest.getRequestURI());
+        StandardErrorRecordDTO standardErrorRecordDTO = new StandardErrorRecordDTO();
+        standardErrorRecordDTO.setTimestamp(Instant.now());
+        standardErrorRecordDTO.setStatus(HttpStatus.CONFLICT.value());
+        standardErrorRecordDTO.setError("Erro de requisição");
+        standardErrorRecordDTO.setMessage(ex.getMessage());
+        standardErrorRecordDTO.setPath(httpServletRequest.getRequestURI());
 
-        return ResponseEntity.status(HttpStatus.CONFLICT.value()).body(standardError);
+        return ResponseEntity.status(HttpStatus.CONFLICT.value()).body(standardErrorRecordDTO);
     }
 }

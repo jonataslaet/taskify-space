@@ -1,14 +1,22 @@
 package com.jonataslaet.taskifyspace.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import jakarta.persistence.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,13 +32,20 @@ public class User {
 
     private LocalDate birthDate;
 
+    @Enumerated(EnumType.STRING)
+    private UserStatusEnum status;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private UserRoleEnum role;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<SpaceMembership> memberships = new HashSet<>();
 
     @ManyToMany(mappedBy = "executors")
-    private Set<SpaceTask> assignedTasks = new HashSet<>();
+    private Set<TaskExecution> executions = new HashSet<>();
 
-    protected User() {}
+    public User() {}
 
     public User(String name, String email, String password, LocalDate birthDate) {
         this.name = name;
@@ -51,7 +66,21 @@ public class User {
 
     public Set<SpaceMembership> getMemberships() { return memberships; }
 
-    public Set<SpaceTask> getAssignedTasks() { return assignedTasks; }
+    public Set<TaskExecution> getExecutions() {
+        return executions;
+    }
+
+    public void setExecutions(Set<TaskExecution> executions) {
+        this.executions = executions;
+    }
+
+    public void setMemberships(Set<SpaceMembership> memberships) {
+        this.memberships = memberships;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public void setName(String name) { this.name = name; }
 
@@ -60,4 +89,57 @@ public class User {
     public void setPassword(String password) { this.password = password; }
 
     public void setBirthDate(LocalDate birthDate) { this.birthDate = birthDate; }
+
+    public UserStatusEnum getStatus() {
+        return status;
+    }
+
+    public void setStatus(UserStatusEnum status) {
+        this.status = status;
+    }
+
+    @JsonIgnore
+    public UserRoleEnum getRole() {
+        return role;
+    }
+
+    public void setRole(UserRoleEnum role) {
+        this.role = role;
+    }
+
+    @Override
+    @JsonIgnore
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return Collections.singletonList(new SimpleGrantedAuthority(this.role.toString()));
+    }
+
+    @JsonIgnore
+    @Override
+    public String getUsername() {
+        return this.email;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean isEnabled() {
+        return status.equals(UserStatusEnum.ACTIVE);
+    }
 }
