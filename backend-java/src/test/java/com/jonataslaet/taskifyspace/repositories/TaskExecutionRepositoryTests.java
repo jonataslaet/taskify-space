@@ -1,0 +1,136 @@
+package com.jonataslaet.taskifyspace.repositories;
+
+import com.jonataslaet.taskifyspace.entities.Space;
+import com.jonataslaet.taskifyspace.entities.SpaceMembership;
+import com.jonataslaet.taskifyspace.entities.Task;
+import com.jonataslaet.taskifyspace.entities.TaskExecution;
+import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest(properties = {
+    "spring.datasource.url=jdbc:h2:mem:taskify-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
+    "spring.datasource.driver-class-name=org.h2.Driver",
+    "spring.datasource.username=sa",
+    "spring.datasource.password=",
+    "spring.jpa.hibernate.ddl-auto=create-drop"
+})
+@Import(ParticipantRepository.class)
+class TaskExecutionRepositoryTests {
+
+    @Autowired
+    private TaskExecutionRepository taskExecutionRepository;
+
+    @Autowired
+    private ParticipantRepository participantRepository;
+
+    @Autowired
+    private SpaceMembershipRepository spaceMembershipRepository;
+
+    @Autowired
+    private TaskRepository taskRepository;
+
+    @Autowired
+    private SpaceRepository spaceRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void sumsParticipantScoreDividingTaskScoreByExecutionExecutorCount() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user1 = userRepository.save(createUser("User 1", "user1@email.com"));
+        User user2 = userRepository.save(createUser("User 2", "user2@email.com"));
+
+        Task sharedTask = taskRepository.save(createTask(space, "Shared task", "90.0"));
+        Task singleTask = taskRepository.save(createTask(space, "Single task", "30.0"));
+
+        taskExecutionRepository.save(new TaskExecution(sharedTask, space, Set.of(user1, user2)));
+        taskExecutionRepository.save(new TaskExecution(singleTask, space, Set.of(user1)));
+
+        Map<Long, BigDecimal> scoresByUserId = taskExecutionRepository
+            .sumParticipantScoresBySpaceIdAndUserIds(space.getId(), Set.of(user1.getId(), user2.getId()))
+            .stream()
+            .collect(Collectors.toMap(
+                TaskExecutionRepository.ParticipantScoreProjection::getUserId,
+                TaskExecutionRepository.ParticipantScoreProjection::getScore));
+
+        assertThat(scoresByUserId.get(user1.getId())).isEqualByComparingTo("75.0");
+        assertThat(scoresByUserId.get(user2.getId())).isEqualByComparingTo("45.0");
+    }
+
+    @Test
+    void sortsParticipantsByScoreDescending() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user1 = userRepository.save(createUser("User 1", "score1@email.com"));
+        User user2 = userRepository.save(createUser("User 2", "score2@email.com"));
+        User user3 = userRepository.save(createUser("User 3", "score3@email.com"));
+
+        saveApprovedParticipant(space, user1);
+        saveApprovedParticipant(space, user2);
+        saveApprovedParticipant(space, user3);
+
+        Task sharedTask = taskRepository.save(createTask(space, "Shared task", "90.0"));
+        Task singleTask = taskRepository.save(createTask(space, "Single task", "30.0"));
+
+        taskExecutionRepository.save(new TaskExecution(sharedTask, space, Set.of(user1, user2)));
+        taskExecutionRepository.save(new TaskExecution(singleTask, space, Set.of(user1)));
+
+        List<Long> participantIds = participantRepository
+            .findParticipantsWithScores(
+                space.getId(),
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "score")))
+            .getContent()
+            .stream()
+            .map(participant -> participant.id())
+            .toList();
+
+        assertThat(participantIds).containsExactly(user1.getId(), user2.getId(), user3.getId());
+    }
+
+    private User createUser(String name, String email) {
+        User user = new User(name, email, "password", LocalDate.of(2000, 1, 1));
+        user.setRole(UserRoleEnum.ROLE_USER);
+        user.setStatus(UserStatusEnum.ACTIVE);
+        return user;
+    }
+
+    private Task createTask(Space space, String description, String score) {
+        Task task = new Task();
+        task.setSpace(space);
+        task.setDescription(description);
+        task.setScore(new BigDecimal(score));
+        task.setActive(true);
+        return task;
+    }
+
+    private void saveApprovedParticipant(Space space, User user) {
+        SpaceMembership spaceMembership =
+            new SpaceMembership(user, space, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+        spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
+        spaceMembershipRepository.save(spaceMembership);
+    }
+}

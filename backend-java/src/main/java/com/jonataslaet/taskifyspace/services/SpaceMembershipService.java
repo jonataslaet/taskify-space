@@ -8,8 +8,8 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
-import com.jonataslaet.taskifyspace.mappers.ParticipantMapper;
 import com.jonataslaet.taskifyspace.mappers.SpaceMembershipMapper;
+import com.jonataslaet.taskifyspace.repositories.ParticipantRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.specifications.SpaceMembershipSpecification;
 import org.jspecify.annotations.NonNull;
@@ -27,9 +27,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SpaceMembershipService {
 
     private final SpaceMembershipRepository spaceMembershipRepository;
+    private final ParticipantRepository participantRepository;
 
-    public SpaceMembershipService(SpaceMembershipRepository spaceMembershipRepository) {
+    public SpaceMembershipService(
+        SpaceMembershipRepository spaceMembershipRepository,
+        ParticipantRepository participantRepository) {
         this.spaceMembershipRepository = spaceMembershipRepository;
+        this.participantRepository = participantRepository;
     }
 
     @Transactional
@@ -111,11 +115,6 @@ public class SpaceMembershipService {
             throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
         }
 
-        Specification<@NonNull SpaceMembership> finalSpec =
-            Specification.where(SpaceMembershipSpecification.spaceId(spaceId))
-                .and(SpaceMembershipSpecification.role(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT))
-                .and(SpaceMembershipSpecification.status(SpaceMembershipStatusEnum.APPROVED));
-
-        return spaceMembershipRepository.findAll(finalSpec, pageable).map(ParticipantMapper::toDTO);
+        return participantRepository.findParticipantsWithScores(spaceId, pageable);
     }
 }

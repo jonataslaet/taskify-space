@@ -70,15 +70,16 @@ public class TaskService {
         Task task = getTaskEntity(taskId);
         validActiveTask(task);
 
-        includeAuthenticatedUser(authenticatedUser, executorsIds);
+        executorsIds = includeAuthenticatedUser(authenticatedUser, executorsIds);
 
         TaskExecution taskExecution = getTaskExecution(task, space, executorsIds);
         taskExecutionRepository.save(taskExecution);
     }
 
-    private void includeAuthenticatedUser(User authenticatedUser, Set<Long> executorsIds) {
+    private Set<Long> includeAuthenticatedUser(User authenticatedUser, Set<Long> executorsIds) {
         if (Objects.isNull(executorsIds)) executorsIds = new HashSet<>();
         executorsIds.add(authenticatedUser.getId());
+        return executorsIds;
     }
 
     private TaskExecution getTaskExecution(Task task, Space space, Set<Long> usersIds) {
