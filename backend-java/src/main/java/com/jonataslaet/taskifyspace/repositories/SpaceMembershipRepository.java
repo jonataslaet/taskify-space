@@ -2,6 +2,7 @@ package com.jonataslaet.taskifyspace.repositories;
 
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,4 +31,10 @@ public interface SpaceMembershipRepository extends JpaRepository<
     Set<SpaceMembership> findBySpaceIdUsersIds(@Param("spaceId") Long spaceId, @Param("usersIds") Set<Long> usersIds);
 
     boolean existsBySpaceIdAndUserIdAndSpaceUserRoleIn(Long spaceId, Long userId, Set<SpaceUserRoleEnum> roles);
+
+    boolean existsBySpaceIdAndUserIdAndSpaceUserRoleInAndSpaceMembershipStatusEnum(
+        Long spaceId,
+        Long userId,
+        Set<SpaceUserRoleEnum> roles,
+        SpaceMembershipStatusEnum status);
 }

@@ -16,6 +16,10 @@ public record SpaceRecordDTO(
     @Schema(example = "Minha casa")
     String name,
 
+    @JsonView({SpaceView.CreateSpace.class, SpaceView.ReadSpace.class, SpaceView.UpdateSpace.class})
+    @Schema(example = "Minha casa")
+    String spaceAdminName,
+
     @JsonView({SpaceView.ReadSpace.class})
     @Schema(example = "true")
     Boolean active

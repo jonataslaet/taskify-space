@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
@@ -80,6 +81,15 @@ public class SpaceController {
         @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull SpaceMembershipRecordDTO> pagedSpacememberships =
             spaceService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser);
+        return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
+    }
+
+    @GetMapping("/{spaceId}/participants")
+    public ResponseEntity<@NonNull Page<@NonNull ParticipantDTO>> readParticipants(
+        @Parameter(hidden = true) Pageable pageable, @PathVariable("spaceId") Long spaceId,
+        @AuthenticationPrincipal User authenticatedUser) {
+        Page<@NonNull ParticipantDTO> pagedSpacememberships =
+            spaceService.readParticipants(pageable, spaceId, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
     }
 

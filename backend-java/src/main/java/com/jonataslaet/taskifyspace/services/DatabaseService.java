@@ -62,12 +62,12 @@ public class DatabaseService {
     }
 
     private User createAdmin2() {
-        User createdAdmin = userRepository.findByEmail("x".concat(this.emailRoot)).orElse(new User());
+        User createdAdmin = userRepository.findByEmail("blendolaet@gmail.com").orElse(new User());
         if (ObjectUtils.isEmpty(createdAdmin.getEmail())) {
             createdAdmin.setRole(UserRoleEnum.ROLE_ADMIN);
-            createdAdmin.setEmail("x".concat(this.emailRoot));
+            createdAdmin.setEmail("blendolaet@gmail.com");
             createdAdmin.setPassword(passwordEncoder.encode(this.passwordRoot));
-            createdAdmin.setName("Jonatas Laet2");
+            createdAdmin.setName("Blendo Laet");
             createdAdmin.setStatus(UserStatusEnum.ACTIVE);
             userRepository.save(createdAdmin);
         }
@@ -75,13 +75,13 @@ public class DatabaseService {
     }
 
     private User createUser() {
-        final String userEmail = "testeuser@gmail.com";
+        final String userEmail = "santoslaet@gmail.com";
         User createdUser = userRepository.findByEmail(userEmail).orElse(new User());
         if (ObjectUtils.isEmpty(createdUser.getEmail())) {
             createdUser.setRole(UserRoleEnum.ROLE_USER);
             createdUser.setEmail(userEmail);
             createdUser.setPassword(passwordEncoder.encode(this.passwordRoot));
-            createdUser.setName("Joice Laet");
+            createdUser.setName("Santos Laet");
             createdUser.setStatus(UserStatusEnum.ACTIVE);
             userRepository.save(createdUser);
         }

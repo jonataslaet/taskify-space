@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
@@ -93,5 +94,10 @@ public class SpaceService {
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
         Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authenticatedUser) {
         return spaceMembershipService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser.getId());
+    }
+
+    public Page<@NonNull ParticipantDTO> readParticipants(
+         Pageable pageable, Long spaceId, User authenticatedUser) {
+        return spaceMembershipService.readParticipants(pageable, spaceId, authenticatedUser.getId());
     }
 }

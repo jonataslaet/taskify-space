@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
@@ -7,6 +8,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.mappers.ParticipantMapper;
 import com.jonataslaet.taskifyspace.mappers.SpaceMembershipMapper;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.specifications.SpaceMembershipSpecification;
@@ -37,6 +39,7 @@ public class SpaceMembershipService {
             spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
         else
             spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.PENDING);
+        space.getSpaceMemberships().add(spaceMembership);
         spaceMembershipRepository.save(spaceMembership);
     }
 
@@ -92,5 +95,27 @@ public class SpaceMembershipService {
             Specification.where(SpaceMembershipSpecification.spaceId(spaceId)).and(spaceSpecification);
 
         return spaceMembershipRepository.findAll(finalSpec, pageable).map(SpaceMembershipMapper::toDTO);
+    }
+
+    public Page<@NonNull ParticipantDTO> readParticipants(Pageable pageable, Long spaceId, Long authUserId) {
+
+        boolean currentUserParticipatesInThisSpaceAsParticipant =
+            spaceMembershipRepository
+                .existsBySpaceIdAndUserIdAndSpaceUserRoleInAndSpaceMembershipStatusEnum(
+                    spaceId,
+                    authUserId,
+                    Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT),
+                    SpaceMembershipStatusEnum.APPROVED);
+
+        if (!currentUserParticipatesInThisSpaceAsParticipant) {
+            throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
+        }
+
+        Specification<@NonNull SpaceMembership> finalSpec =
+            Specification.where(SpaceMembershipSpecification.spaceId(spaceId))
+                .and(SpaceMembershipSpecification.role(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT))
+                .and(SpaceMembershipSpecification.status(SpaceMembershipStatusEnum.APPROVED));
+
+        return spaceMembershipRepository.findAll(finalSpec, pageable).map(ParticipantMapper::toDTO);
     }
 }
