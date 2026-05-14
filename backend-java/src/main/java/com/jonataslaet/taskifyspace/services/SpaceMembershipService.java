@@ -38,6 +38,11 @@ public class SpaceMembershipService {
 
     @Transactional
     public void setSpaceMembership(Space space, User user, SpaceUserRoleEnum role) {
+        boolean membershipAlreadyExists = spaceMembershipRepository
+            .existsBySpaceIdAndUserIdAndSpaceUserRoleIn(space.getId(), user.getId(), Set.of(role));
+
+        if (membershipAlreadyExists) return;
+
         SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
         if (role.equals(SpaceUserRoleEnum.ROLE_SPACE_ADMIN))
             spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);

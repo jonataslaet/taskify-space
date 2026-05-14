@@ -74,6 +74,14 @@ public class SpaceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{spaceId}/addParticipant")
+    public ResponseEntity<@NonNull Void> addParticipant(
+        @PathVariable("spaceId") Long spaceId,
+        @RequestParam("email") String email) {
+        spaceService.addParticipant(spaceId, email);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{spaceId}/participations")
     public ResponseEntity<@NonNull Page<@NonNull SpaceMembershipRecordDTO>> readParticipations(
         @Parameter(hidden = true) SpecificationTemplate.SpaceMembershipSpecification spaceSpecification,

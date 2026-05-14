@@ -13,6 +13,7 @@ import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
 import com.jonataslaet.taskifyspace.mappers.SpaceMembershipMapper;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
+import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
@@ -29,12 +30,14 @@ public class SpaceService {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final SpaceRepository spaceRepository;
+    private final UserRepository userRepository;
     private final SpaceMembershipService spaceMembershipService;
 
     public SpaceService(CustomUserDetailsService customUserDetailsService, SpaceRepository spaceRepository,
-                        SpaceMembershipService spaceMembershipService) {
+                        UserRepository userRepository, SpaceMembershipService spaceMembershipService) {
         this.customUserDetailsService = customUserDetailsService;
         this.spaceRepository = spaceRepository;
+        this.userRepository = userRepository;
         this.spaceMembershipService = spaceMembershipService;
     }
 
@@ -81,6 +84,13 @@ public class SpaceService {
     public void requestParticipation(Long spaceId, User authenticatedUser) {
         Space space = getSpaceEntity(spaceId);
         spaceMembershipService.setSpaceMembership(space, authenticatedUser, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+    }
+
+    @Transactional
+    public void addParticipant(Long spaceId, String email) {
+        Space space = getSpaceEntity(spaceId);
+        userRepository.findByEmail(email).ifPresent(user ->
+            spaceMembershipService.setSpaceMembership(space, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
     }
 
     @Transactional
