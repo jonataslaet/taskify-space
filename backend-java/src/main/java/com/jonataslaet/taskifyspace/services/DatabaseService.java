@@ -117,12 +117,12 @@ public class DatabaseService {
 
         spaceService.requestParticipation(space.id(), user);
         spaceService.requestParticipation(space.id(), admin1);
-        spaceService.requestParticipation(space.id(), admin2);
+//        spaceService.requestParticipation(space.id(), admin2);
 
         Set<Long> usersToBeApproved = new HashSet<>();
         usersToBeApproved.add(user.getId());
         usersToBeApproved.add(admin1.getId());
-        usersToBeApproved.add(admin2.getId());
+//        usersToBeApproved.add(admin2.getId());
         spaceMembershipService.aproveSpaceMemberships(space.id(), admin1, usersToBeApproved);
 
         return true;

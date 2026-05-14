@@ -46,8 +46,9 @@ public class SpaceController {
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull SpaceRecordDTO>> readAllSpaces(
         @Parameter(hidden = true) SpecificationTemplate.SpaceSpecification SpaceSpecification,
-        @Parameter(hidden = true) Pageable pageable) {
-        Page<@NonNull SpaceRecordDTO> SpaceModelPage = spaceService.findAll(SpaceSpecification, pageable);
+        @Parameter(hidden = true) Pageable pageable, @AuthenticationPrincipal User authenticatedUser) {
+        Page<@NonNull SpaceRecordDTO> SpaceModelPage =
+            spaceService.findAll(SpaceSpecification, pageable, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(SpaceModelPage);
     }
 

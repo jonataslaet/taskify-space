@@ -69,8 +69,17 @@ public class SpaceService {
         spaceRepository.deleteById(SpaceId);
     }
 
-    public Page<@NonNull SpaceRecordDTO> findAll(Specification<@NonNull Space> SpaceSpecification, Pageable pageable) {
-        return spaceRepository.findAll(SpaceSpecification, pageable).map(SpaceMapper::toDTO);
+    public Page<@NonNull SpaceRecordDTO> findAll(
+        Specification<@NonNull Space> SpaceSpecification, Pageable pageable, User authenticatedUser) {
+        Specification<@NonNull Space> authenticatedUserSpaces = (root, query, criteriaBuilder) -> {
+            query.distinct(true);
+            return criteriaBuilder.equal(
+                root.join("spaceMemberships").get("user").get("id"),
+                authenticatedUser.getId()
+            );
+        };
+        return spaceRepository.findAll(
+            Specification.where(authenticatedUserSpaces).and(SpaceSpecification), pageable).map(SpaceMapper::toDTO);
     }
 
     @Transactional
