@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonView;
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
-import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.SpaceService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
@@ -18,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,6 +62,7 @@ public class SpaceController {
         @ApiResponse(responseCode = "400", description = "Bad request")
     })
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(@AuthenticationPrincipal User authenticatedUser,
         @RequestBody @JsonView(SpaceRecordDTO.SpaceView.CreateSpace.class) SpaceRecordDTO spaceRecordDTO){
@@ -75,6 +76,7 @@ public class SpaceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PostMapping("/{spaceId}/addParticipant")
     public ResponseEntity<@NonNull Void> addParticipant(
         @PathVariable("spaceId") Long spaceId,
@@ -113,6 +115,7 @@ public class SpaceController {
         return ResponseEntity.ok(foundSpace);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PutMapping("/{spaceId}")
     public ResponseEntity<@NonNull SpaceRecordDTO> updateSpace(
         @PathVariable("spaceId") Long spaceId, @RequestBody
@@ -122,6 +125,7 @@ public class SpaceController {
         return ResponseEntity.ok(updatedSpace);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @DeleteMapping("/{spaceId}")
     public ResponseEntity<@NonNull Void> deleteSpace(
         @PathVariable("spaceId") Long spaceId) {

@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -91,6 +92,7 @@ public class TaskController {
         @ApiResponse(responseCode = "400", description = "Bad request")
     })
     @JsonView(TaskRecordDTO.TaskView.ReadTask.class)
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<@NonNull TaskRecordDTO> createTask(@AuthenticationPrincipal User authenticatedUser,
         @RequestBody @JsonView(TaskRecordDTO.TaskView.CreateTask.class) TaskRecordDTO taskRecordDTO){
@@ -116,6 +118,7 @@ public class TaskController {
         return ResponseEntity.ok(foundTask);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PutMapping("/{taskId}")
     public ResponseEntity<@NonNull TaskRecordDTO> updateTask(
         @PathVariable("taskId") Long taskId, @RequestBody
@@ -125,6 +128,7 @@ public class TaskController {
         return ResponseEntity.ok(updatedTask);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @DeleteMapping("/{taskId}")
     public ResponseEntity<@NonNull Void> deleteTask(
         @PathVariable("taskId") Long taskId) {
@@ -133,6 +137,7 @@ public class TaskController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PatchMapping("/{taskId}")
     public ResponseEntity<@NonNull Void> toggleActiveTask(
         @PathVariable("taskId") Long taskId) {
