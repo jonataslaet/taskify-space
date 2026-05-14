@@ -70,7 +70,7 @@ public class SpaceService {
     }
 
     public Page<@NonNull SpaceRecordDTO> findAll(
-        Specification<@NonNull Space> SpaceSpecification, Pageable pageable, User authenticatedUser) {
+        Specification<@NonNull Space> spaceSpecification, Pageable pageable, User authenticatedUser) {
         Specification<@NonNull Space> authenticatedUserSpaces = (root, query, criteriaBuilder) -> {
             query.distinct(true);
             return criteriaBuilder.equal(
@@ -79,7 +79,8 @@ public class SpaceService {
             );
         };
         return spaceRepository.findAll(
-            Specification.where(authenticatedUserSpaces).and(SpaceSpecification), pageable).map(SpaceMapper::toDTO);
+            Specification.where(authenticatedUserSpaces).and(spaceSpecification), pageable)
+            .map(space -> SpaceMapper.toDTO(space, authenticatedUser));
     }
 
     @Transactional

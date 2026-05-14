@@ -37,7 +37,9 @@ public class SpecificationTemplate {
 
     @And({
         @Spec(path = "name", spec = LikeIgnoreCase.class),
-        @Spec(path = "active", params = "active", spec = Equal.class)
+        @Spec(path = "active", params = "active", spec = Equal.class),
+        @Spec(path = "spaceMemberships.spaceUserRole", params = "spaceUserRole", spec = Equal.class),
+        @Spec(path = "spaceMemberships.spaceMembershipStatusEnum", params = "spaceMembershipStatus", spec = Equal.class)
     })
     public interface SpaceSpecification extends Specification<@NonNull Space> {}
 
