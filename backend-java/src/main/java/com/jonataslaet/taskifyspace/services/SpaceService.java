@@ -5,13 +5,10 @@ import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
-import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
-import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
-import com.jonataslaet.taskifyspace.mappers.SpaceMembershipMapper;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.jspecify.annotations.NonNull;
@@ -22,20 +19,16 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
-
 @Service
 @Transactional(readOnly = true)
 public class SpaceService {
 
-    private final CustomUserDetailsService customUserDetailsService;
     private final SpaceRepository spaceRepository;
     private final UserRepository userRepository;
     private final SpaceMembershipService spaceMembershipService;
 
-    public SpaceService(CustomUserDetailsService customUserDetailsService, SpaceRepository spaceRepository,
-                        UserRepository userRepository, SpaceMembershipService spaceMembershipService) {
-        this.customUserDetailsService = customUserDetailsService;
+    public SpaceService(
+        SpaceRepository spaceRepository, UserRepository userRepository, SpaceMembershipService spaceMembershipService) {
         this.spaceRepository = spaceRepository;
         this.userRepository = userRepository;
         this.spaceMembershipService = spaceMembershipService;
