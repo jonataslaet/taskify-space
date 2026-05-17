@@ -2,6 +2,7 @@ package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.entities.*;
+import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
@@ -17,10 +18,12 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
 
 @Service
 @Transactional(readOnly = true)
@@ -31,21 +34,24 @@ public class TaskService {
     private final SpaceService spaceService;
     private final SpaceMembershipService spaceMembershipService;
     private final TaskExecutionRepository taskExecutionRepository;
+    private final FeatureAccessService featureAccessService;
 
     public TaskService(TaskRepository taskRepository, UserService userService,
                        SpaceService spaceService, SpaceMembershipService spaceMembershipService,
-                       TaskExecutionRepository taskExecutionRepository) {
+                       TaskExecutionRepository taskExecutionRepository, FeatureAccessService featureAccessService) {
         this.taskRepository = taskRepository;
         this.userService = userService;
         this.spaceService = spaceService;
         this.spaceMembershipService = spaceMembershipService;
         this.taskExecutionRepository = taskExecutionRepository;
+        this.featureAccessService = featureAccessService;
     }
 
     @Transactional
     public TaskRecordDTO createTask(User authenticatedUser, TaskRecordDTO taskRecordDTO) {
         Space space = spaceService.getSpaceEntity(taskRecordDTO.spaceId());
-        validActiveSpace(space);
+        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.CREATE_TASK, space);
+        spaceService.validActiveSpace(space);
         if (!hasPermissionToCreateTask(authenticatedUser, space)) {
             throw new ForbiddenException("Esse usuário não tem permissão para criar tarefa nesse espaço");
         }
@@ -63,23 +69,35 @@ public class TaskService {
     public void finishTask(Long taskId, Long spaceId, User authenticatedUser, Set<Long> executorsIds) {
 
         Space space = spaceService.getSpaceEntity(spaceId);
-        validActiveSpace(space);
+        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.FINISH_TASK, space);
+        spaceService.validActiveSpace(space);
+        spaceService.validateActiveParticipation(
+            authenticatedUser, space, Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
 
-        validateParticipation(authenticatedUser, space);
+        includeExecutorsIds(executorsIds, Set.of(authenticatedUser.getId()));
+        Set<SpaceMembership> approvedSpaceMemberships = getApprovedSpaceMemberships(space.getSpaceMemberships());
 
         Task task = getTaskEntity(taskId);
         validActiveTask(task);
 
-        executorsIds = includeAuthenticatedUser(authenticatedUser, executorsIds);
-
-        TaskExecution taskExecution = getTaskExecution(task, space, executorsIds);
+        TaskExecution taskExecution = getTaskExecution(task, space,
+            getApprovedExecutors(executorsIds, approvedSpaceMemberships));
         taskExecutionRepository.save(taskExecution);
     }
 
-    private Set<Long> includeAuthenticatedUser(User authenticatedUser, Set<Long> executorsIds) {
-        if (Objects.isNull(executorsIds)) executorsIds = new HashSet<>();
-        executorsIds.add(authenticatedUser.getId());
-        return executorsIds;
+    private Set<Long> getApprovedExecutors(Set<Long> executorsIds, Set<SpaceMembership> approvedSpaceMemberships) {
+        return approvedSpaceMemberships
+            .stream().filter(s -> executorsIds.contains(s.getUser().getId()))
+            .map(s -> s.getUser().getId()).collect(Collectors.toSet());
+    }
+
+    private Set<SpaceMembership> getApprovedSpaceMemberships(Set<SpaceMembership> spaceMembershipsExecutors) {
+        return spaceMembershipsExecutors.stream().filter(
+            s -> s.getSpaceMembershipStatusEnum().equals(APPROVED)).collect(Collectors.toSet());
+    }
+
+    private void includeExecutorsIds(Set<Long> executorsIds, Set<Long> usersIdsToBeAdded) {
+        if (Objects.nonNull(executorsIds)) executorsIds.addAll(usersIdsToBeAdded);
     }
 
     private TaskExecution getTaskExecution(Task task, Space space, Set<Long> usersIds) {
@@ -91,20 +109,6 @@ public class TaskService {
         if (!task.isActive()) {
             throw new ForbiddenException("Essa tarefa está inativa no momento");
         }
-    }
-
-    private void validActiveSpace(Space task) {
-        if (!task.getActive()) {
-            throw new ForbiddenException("Esse espaço está inativo no momento");
-        }
-    }
-
-    private void validateParticipation(User authenticatedUser, Space space) {
-        space.getSpaceMemberships().stream().filter(f ->
-            f.getSpaceUserRole().equals(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT) &&
-            f.getUser().getId().equals(authenticatedUser.getId())).findFirst().orElseThrow(() ->
-            new ForbiddenException("Esse usuário não participa desse espaço"));
-
     }
 
     private boolean hasPermissionToCreateTask(User authenticatedUser, Space space) {

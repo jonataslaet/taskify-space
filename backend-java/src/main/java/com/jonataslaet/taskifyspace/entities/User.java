@@ -42,6 +42,9 @@ public class User implements UserDetails {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<SpaceMembership> memberships = new HashSet<>();
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Subscription> subscriptions = new HashSet<>();
+
     @ManyToMany(mappedBy = "executors")
     private Set<TaskExecution> executions = new HashSet<>();
 
@@ -66,6 +69,10 @@ public class User implements UserDetails {
 
     public Set<SpaceMembership> getMemberships() { return memberships; }
 
+    public Set<Subscription> getSubscriptions() {
+        return subscriptions;
+    }
+
     public Set<TaskExecution> getExecutions() {
         return executions;
     }
@@ -76,6 +83,10 @@ public class User implements UserDetails {
 
     public void setMemberships(Set<SpaceMembership> memberships) {
         this.memberships = memberships;
+    }
+
+    public void setSubscriptions(Set<Subscription> subscriptions) {
+        this.subscriptions = subscriptions;
     }
 
     public void setId(Long id) {

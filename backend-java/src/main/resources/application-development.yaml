@@ -1,7 +1,13 @@
 spring:
   jpa:
+    show-sql: true
     hibernate:
       ddl-auto: create-drop
   config:
     activate:
       on-profile: development
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

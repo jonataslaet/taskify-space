@@ -9,9 +9,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 @Entity
 @Table(name = "tasks")
@@ -29,6 +31,8 @@ public class Task {
     private TaskCategoryEnum category;
 
     private Boolean active;
+
+    private Instant createdAt;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -84,8 +88,16 @@ public class Task {
         return active;
     }
 
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 
     public User getCreator() {
@@ -94,5 +106,12 @@ public class Task {
 
     public void setCreator(User creator) {
         this.creator = creator;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
     }
 }

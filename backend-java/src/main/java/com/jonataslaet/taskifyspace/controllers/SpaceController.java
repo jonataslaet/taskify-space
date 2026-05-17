@@ -17,7 +17,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,37 +61,10 @@ public class SpaceController {
         @ApiResponse(responseCode = "400", description = "Bad request")
     })
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(@AuthenticationPrincipal User authenticatedUser,
         @RequestBody @JsonView(SpaceRecordDTO.SpaceView.CreateSpace.class) SpaceRecordDTO spaceRecordDTO){
         return ResponseEntity.status(HttpStatus.CREATED).body(spaceService.createSpace(spaceRecordDTO, authenticatedUser));
-    }
-
-    @PostMapping("/{spaceId}/participations")
-    public ResponseEntity<@NonNull SpaceRecordDTO> requestParticipation(@PathVariable("spaceId") Long spaceId,
-        @AuthenticationPrincipal User authenticatedUser) {
-        spaceService.requestParticipation(spaceId, authenticatedUser);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @PostMapping("/{spaceId}/addParticipant")
-    public ResponseEntity<@NonNull Void> addParticipant(
-        @PathVariable("spaceId") Long spaceId,
-        @RequestParam("email") String email) {
-        spaceService.addParticipant(spaceId, email);
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{spaceId}/participations")
-    public ResponseEntity<@NonNull Page<@NonNull SpaceMembershipRecordDTO>> readParticipations(
-        @Parameter(hidden = true) SpecificationTemplate.SpaceMembershipSpecification spaceSpecification,
-        @Parameter(hidden = true) Pageable pageable, @PathVariable("spaceId") Long spaceId,
-        @AuthenticationPrincipal User authenticatedUser) {
-        Page<@NonNull SpaceMembershipRecordDTO> pagedSpacememberships =
-            spaceService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser);
-        return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
     }
 
     @GetMapping("/{spaceId}/participants")
@@ -115,28 +87,26 @@ public class SpaceController {
         return ResponseEntity.ok(foundSpace);
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PutMapping("/{spaceId}")
     public ResponseEntity<@NonNull SpaceRecordDTO> updateSpace(
-        @PathVariable("spaceId") Long spaceId, @RequestBody
-        @JsonView(SpaceRecordDTO.SpaceView.UpdateSpace.class) SpaceRecordDTO spaceRecordDTO) {
+        @PathVariable("spaceId") Long spaceId, @AuthenticationPrincipal User authenticatedUser,
+        @RequestBody @JsonView(SpaceRecordDTO.SpaceView.UpdateSpace.class) SpaceRecordDTO spaceRecordDTO) {
 
-        SpaceRecordDTO updatedSpace = spaceService.updateSpace(spaceId, spaceRecordDTO);
+        SpaceRecordDTO updatedSpace = spaceService.updateSpace(authenticatedUser, spaceId, spaceRecordDTO);
         return ResponseEntity.ok(updatedSpace);
     }
 
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @DeleteMapping("/{spaceId}")
     public ResponseEntity<@NonNull Void> deleteSpace(
-        @PathVariable("spaceId") Long spaceId) {
-
-        spaceService.deleteSpace(spaceId);
+        @AuthenticationPrincipal User authenticatedUser, @PathVariable("spaceId") Long spaceId) {
+        spaceService.deleteSpace(authenticatedUser, spaceId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{spaceId}")
-    public ResponseEntity<@NonNull Void> toggleActiveSpace(@PathVariable("spaceId") Long spaceId) {
-        spaceService.toggleActiveSpace(spaceId);
+    public ResponseEntity<@NonNull Void> toggleActiveSpace(
+        @AuthenticationPrincipal User authenticatedUser, @PathVariable("spaceId") Long spaceId) {
+        spaceService.toggleActiveSpace(authenticatedUser, spaceId);
         return ResponseEntity.noContent().build();
     }
 }

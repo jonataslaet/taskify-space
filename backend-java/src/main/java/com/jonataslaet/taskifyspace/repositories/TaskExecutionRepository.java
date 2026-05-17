@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +36,38 @@ public interface TaskExecutionRepository extends JpaRepository<@NonNull TaskExec
     List<ParticipantScoreProjection> sumParticipantScoresBySpaceIdAndUserIds(
         @Param("spaceId") Long spaceId,
         @Param("userIds") Set<Long> userIds);
+
+    @Query("""
+        SELECT COUNT(te)
+        FROM TaskExecution te
+        JOIN te.executors executor
+        WHERE executor.id = :userId
+          AND te.createdAt >= :periodStart
+          AND te.createdAt < :periodEnd
+        """)
+    long countExecutionsByExecutorInPeriod(
+        @Param("userId") Long userId,
+        @Param("periodStart") Instant periodStart,
+        @Param("periodEnd") Instant periodEnd);
+
+    TaskExecution findBySpaceIdAndTaskId(Long spaceId, Long taskId);
+
+    default void removeExecutorsFromTaskExecution(TaskExecution taskExecution, Set<Long> userIds) {
+        if (taskExecution == null || taskExecution.getExecutors() == null || userIds == null || userIds.isEmpty()) {
+            return;
+        }
+
+        taskExecution.getExecutors().removeIf(executor -> userIds.contains(executor.getId()));
+
+        if (taskExecution.getExecutors().isEmpty()) {
+            delete(taskExecution);
+            return;
+        }
+
+        save(taskExecution);
+    }
+
+    void deleteBySpaceId(Long spaceId);
 
     interface ParticipantScoreProjection {
         Long getUserId();

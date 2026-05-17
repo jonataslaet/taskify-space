@@ -5,7 +5,10 @@ import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "space_memberships")
+@Table(
+    name = "space_memberships",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "space_id", "space_user_role"})
+)
 public class SpaceMembership {
 
     @Id

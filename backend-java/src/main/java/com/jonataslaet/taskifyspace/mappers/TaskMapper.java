@@ -20,7 +20,7 @@ public class TaskMapper {
 
     public static TaskRecordDTO toDTO(Task task) {
         if (Objects.isNull(task)) return null;
-        return new TaskRecordDTO(task.getId(), task.getSpace().getId(), task.getDescription(),
+        return new TaskRecordDTO(task.getId(), Objects.isNull(task.getSpace()) ? null : task.getSpace().getId(), task.getDescription(),
             task.getScore(), task.getCategory(), task.isActive(), Objects.nonNull(task.getCreator()) ?
             task.getCreator().getName() : null);
     }

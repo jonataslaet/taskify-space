@@ -30,7 +30,17 @@ public interface SpaceMembershipRepository extends JpaRepository<
         """)
     Set<SpaceMembership> findBySpaceIdUsersIds(@Param("spaceId") Long spaceId, @Param("usersIds") Set<Long> usersIds);
 
+    Optional<SpaceMembership> findByIdAndSpaceId(Long id, Long spaceId);
+
+    boolean existsBySpaceIdAndUserIdAndSpaceUserRole(Long spaceId, Long userId, SpaceUserRoleEnum spaceUserRoleEnum);
+
     boolean existsBySpaceIdAndUserIdAndSpaceUserRoleIn(Long spaceId, Long userId, Set<SpaceUserRoleEnum> roles);
+
+    boolean existsBySpaceIdAndUserIdAndSpaceUserRoleInAndIdNot(
+        Long spaceId,
+        Long userId,
+        Set<SpaceUserRoleEnum> roles,
+        Long id);
 
     boolean existsBySpaceIdAndUserIdAndSpaceUserRoleInAndSpaceMembershipStatusEnum(
         Long spaceId,

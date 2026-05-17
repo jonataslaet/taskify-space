@@ -2,6 +2,7 @@ package com.jonataslaet.taskifyspace.entities;
 
 import jakarta.persistence.*;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -16,6 +17,12 @@ public class Space {
     private String name;
 
     private Boolean active;
+
+    private Instant createdAt;
+
+    @ManyToOne
+    @JoinColumn(name = "creator_id")
+    private User creator;
 
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<SpaceMembership> spaceMemberships = new HashSet<>();
@@ -35,6 +42,14 @@ public class Space {
 
     public Set<SpaceMembership> getSpaceMemberships() { return spaceMemberships; }
 
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public User getCreator() {
+        return creator;
+    }
+
     public void setName(String name) { this.name = name; }
 
     public Boolean getActive() {
@@ -53,11 +68,26 @@ public class Space {
         this.spaceMemberships = spaceMemberships;
     }
 
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setCreator(User creator) {
+        this.creator = creator;
+    }
+
     public Set<TaskExecution> getTaskExecutions() {
         return taskExecutions;
     }
 
     public void setTaskExecutions(Set<TaskExecution> taskExecutions) {
         this.taskExecutions = taskExecutions;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
     }
 }

@@ -7,7 +7,9 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.SpaceMembershipMapper;
 import com.jonataslaet.taskifyspace.repositories.ParticipantRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
@@ -19,6 +21,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -74,7 +77,43 @@ public class SpaceMembershipService {
     }
 
     public Set<SpaceMembership> getSpaceMemberships(User authenticatedUser, Space space) {
-        return spaceMembershipRepository.findBySpaceIdUsersIds(space.getId(), Set.of(authenticatedUser.getId()));
+        return getSpaceMemberships(space, Set.of(authenticatedUser.getId()));
+    }
+
+    public Set<SpaceMembership> getSpaceMemberships(Space space, Set<Long> usersIds) {
+        return spaceMembershipRepository.findBySpaceIdUsersIds(space.getId(), usersIds);
+    }
+
+    @Transactional
+    public SpaceMembershipRecordDTO updateParticipation(
+        Long spaceId, Long spaceMembershipId, SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole) {
+
+        SpaceMembership spaceMembership = spaceMembershipRepository.findByIdAndSpaceId(spaceMembershipId, spaceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Participação não encontrada"));
+
+        if (Objects.isNull(status) && Objects.isNull(spaceUserRole)) {
+            return SpaceMembershipMapper.toDTO(spaceMembership);
+        }
+
+        SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole)
+            ? spaceUserRole
+            : spaceMembership.getSpaceUserRole();
+        validNotDuplicateParticipation(spaceMembership, targetSpaceUserRole);
+
+        spaceMembership.setSpaceMembershipStatusEnum(status);
+        if (Objects.nonNull(spaceUserRole)) spaceMembership.setSpaceUserRole(targetSpaceUserRole);
+
+        return SpaceMembershipMapper.toDTO(spaceMembershipRepository.save(spaceMembership));
+    }
+
+    private void validNotDuplicateParticipation(
+        SpaceMembership spaceMembership, SpaceUserRoleEnum targetSpaceUserRole) {
+        boolean isDuplicated = spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceUserRoleInAndIdNot(
+            spaceMembership.getSpace().getId(), spaceMembership.getUser().getId(), Set.of(targetSpaceUserRole),
+            spaceMembership.getId());
+        if (isDuplicated) {
+            throw new DuplicationException("Já existe uma participação exatamente assim neste espaço");
+        }
     }
 
     public Set<User> getParticipantsBySpaceAndUsersIds(Space space, Set<Long> usersIds) {
