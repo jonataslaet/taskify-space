@@ -4,6 +4,7 @@ import com.jonataslaet.taskifyspace.configurations.TokenConfiguration;
 import com.jonataslaet.taskifyspace.controllers.dtos.AuthenticationResponseRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.CredentialsRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,14 +34,15 @@ public class AuthenticationService {
         CredentialsRecordDTO credentialsRecordDTO, String deviceId, String userAgent, String ipAddress) {
 
         User user = userRepository.findByEmail(credentialsRecordDTO.username()).orElse(null);
-        if (Objects.nonNull(user) && isMatchedPassword(credentialsRecordDTO, user.getPassword())) {
+        if (Objects.nonNull(user) && isMatchedPassword(credentialsRecordDTO, user.getPassword()) && user.isEnabled()) {
             String accessToken = tokenConfiguration.createAccessToken(user);
             String refreshToken = refreshTokenService.issue(user, deviceId, userAgent, ipAddress);
 
             return new AuthenticationResponseRecordDTO(user.getId(), user.getEmail(), user.getName(),
                 accessToken, refreshToken, user.getRole());
         }
-        throw new InvalidAuthenticationException("Email ou senha estão inválidos");
+        throw new InvalidAuthenticationException(
+            "Email ou senha estão inválidos ou este usuário está pendente de avaliação");
     }
 
     @Transactional

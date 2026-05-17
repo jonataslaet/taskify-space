@@ -88,7 +88,7 @@ public class DatabaseService {
             createdAdmin.setEmail(userEmail);
             createdAdmin.setPassword(passwordEncoder.encode(this.passwordRoot));
             createdAdmin.setName("Joice Laet");
-            createdAdmin.setStatus(UserStatusEnum.ACTIVE);
+            createdAdmin.setStatus(UserStatusEnum.PENDING_EVALUATION);
             userRepository.save(createdAdmin);
         }
         return createdAdmin;
@@ -102,7 +102,7 @@ public class DatabaseService {
             createdUser.setEmail(userEmail);
             createdUser.setPassword(passwordEncoder.encode(this.passwordRoot));
             createdUser.setName("Ralph Laet");
-            createdUser.setStatus(UserStatusEnum.ACTIVE);
+            createdUser.setStatus(UserStatusEnum.PENDING_EVALUATION);
             userRepository.save(createdUser);
         }
         return createdUser;
@@ -116,7 +116,7 @@ public class DatabaseService {
             createdUser.setEmail(userEmail);
             createdUser.setPassword(passwordEncoder.encode(this.passwordRoot));
             createdUser.setName("Bella Laet");
-            createdUser.setStatus(UserStatusEnum.ACTIVE);
+            createdUser.setStatus(UserStatusEnum.PENDING_EVALUATION);
             userRepository.save(createdUser);
         }
         return createdUser;
@@ -173,11 +173,18 @@ public class DatabaseService {
         return TaskMapper.toDTO(task);
     }
 
+    private void activateUser(User user) {
+        user.setStatus(UserStatusEnum.ACTIVE);
+        userRepository.save(user);
+    }
     public Boolean initializeDatabase() {
         User adminJonatasLaet = this.createAdminJonatasLaet();
         User userJoiceLaet = this.createUserJoiceLaet();
         User userRalphLaet = this.createUserRalphLaet();
         User userBellaLaet = this.createUserBellaLaet();
+//        activateUser(userJoiceLaet);
+//        activateUser(userRalphLaet);
+//        activateUser(userBellaLaet);
 
         Plan basicPlan = this.createPlan("BASIC", "Basic", "Plano basico para uso individual",
             Set.of(

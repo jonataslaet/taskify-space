@@ -50,7 +50,7 @@ public class UserService {
         UserRoleEnum.validateExistence(userRecordDTO.role());
         User user = UserMapper.toEntity(userRecordDTO);
 
-        user.setStatus(UserStatusEnum.ACTIVE);
+        user.setStatus(UserStatusEnum.PENDING_EVALUATION);
         user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
         return UserMapper.toUserRecordDTO(userRepository.save(user));
     }
@@ -108,6 +108,15 @@ public class UserService {
         userRepository.save(user);
 
         logger.info("Password updated successfully for user ID {}", userId);
+    }
+
+    @Transactional
+    public void activateUser(Long userId) {
+        logger.info("Activating user with ID {}", userId);
+        User user = findUserById(userId);
+        user.setStatus(UserStatusEnum.ACTIVE);
+        userRepository.save(user);
+        logger.info("User with ID {} activated successfully", userId);
     }
 
     public User findUserById(Long userId) {
