@@ -1,32 +1,47 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.configurations.TokenConfiguration;
-import com.jonataslaet.taskifyspace.controllers.dtos.AuthenticationResponseRecordDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.CredentialsRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.*;
+import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.User;
-import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
+import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 @Service
 public class AuthenticationService {
+
+    @Value("${security.email.password-recover.token.minutes}")
+    private Long tokenMinutes;
+
+    @Value("${security.email.password-recover.uri}")
+    private String passwordRecoveryUri;
 
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenConfiguration tokenConfiguration;
+    private final PasswordRecoveryService passwordRecoveryService;
+    private final EmailService emailService;
 
     public AuthenticationService(RefreshTokenService refreshTokenService, UserRepository userRepository,
-                                 PasswordEncoder passwordEncoder, TokenConfiguration tokenConfiguration) {
+        PasswordEncoder passwordEncoder, TokenConfiguration tokenConfiguration,
+        PasswordRecoveryService passwordRecoveryService, EmailService emailService) {
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenConfiguration = tokenConfiguration;
+        this.passwordRecoveryService = passwordRecoveryService;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -71,8 +86,54 @@ public class AuthenticationService {
         refreshTokenService.revoke(rawRefreshToken);
     }
 
+    @Transactional
+    private void saveUserAndPasswordRecovery(PasswordRecovery passwordRecovery, User user) {
+        userRepository.save(user);
+        passwordRecoveryService.savePasswordRecovery(passwordRecovery);
+    }
+
+    @Transactional
+    public void recoveryToken(EmailDTO emailDTO) {
+        User user = userRepository.findByEmail(emailDTO.address())
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        String uuidToken = UUID.randomUUID().toString();
+        PasswordRecovery passwordRecovery = new PasswordRecovery(
+            uuidToken,
+            emailDTO.address(),
+            Instant.now().plusSeconds(60 * tokenMinutes)
+        );
+        passwordRecoveryService.savePasswordRecovery(passwordRecovery);
+        String emailBody = "Clique no seguinte link para resetar sua senha: \n" + passwordRecoveryUri + uuidToken
+            + "\n\n Esse link expirará daqui a 30 minutos. " +
+            "Portanto, se esse email não foi solicitado por você, apenas o ignore.";
+        emailService.sendEmail(new SendingEmailDTO(
+            emailDTO.address(),
+            null,
+            "Resetamento de senha",
+            emailBody
+        ));
+    }
+
     private boolean isMatchedPassword(CredentialsRecordDTO credentialsRecordDTO, String encodedPassword) {
         return passwordEncoder.matches(credentialsRecordDTO.password(), encodedPassword);
     }
 
+    @Transactional
+    public void resetPassword(String uuidToken, PasswordResetDTO passwordRenovationDTO) {
+        validPasswordRenovation(passwordRenovationDTO);
+        List<PasswordRecovery> passwordRecoveries =
+            passwordRecoveryService.getValidPasswordRecoveries(uuidToken, Instant.now());
+        PasswordRecovery validPasswordRecovery = passwordRecoveries.getFirst();
+        User user = userRepository.findByEmail(validPasswordRecovery.getEmail()).orElseThrow(() ->
+            new ResourceNotFoundException("Usuário não encontrado"));
+        validPasswordRecovery.setExpiration(Instant.now());
+        user.setPassword(passwordEncoder.encode(passwordRenovationDTO.newPassword()));
+        saveUserAndPasswordRecovery(validPasswordRecovery, user);
+    }
+
+    private void validPasswordRenovation(PasswordResetDTO passwordRenovationDTO) {
+        if (!passwordRenovationDTO.newPassword().equals(passwordRenovationDTO.newPasswordConfirmation())) {
+            throw new InvalidAuthenticationException("A senha e a confirmação dela devem ser exatamente iguais");
+        }
+    }
 }

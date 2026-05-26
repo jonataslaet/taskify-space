@@ -11,9 +11,25 @@ spring:
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  mail:
+    host: ${EMAIL_HOST:smtp.gmail.com}
+    port: ${EMAIL_PORT:587}
+    username: ${EMAIL_USERNAME:seugmail@gmail.com}
+    password: ${EMAIL_PASSWORD:sua-senha-de-app-no-gmail}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 security:
   email:
     root: ${EMAIL_ROOT}
+    password-recover:
+      uri: ${PASSWORD_RECOVER_URI:http://localhost:5173/new-password/}
+      token:
+        minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES:30000000}
   password:
     root: ${PASSWORD_ROOT}
   jwt:

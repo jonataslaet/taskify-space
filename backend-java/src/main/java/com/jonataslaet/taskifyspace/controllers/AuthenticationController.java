@@ -1,9 +1,8 @@
 package com.jonataslaet.taskifyspace.controllers;
 
-import com.jonataslaet.taskifyspace.controllers.dtos.AuthenticationResponseRecordDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.CredentialsRecordDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.RefreshTokenRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.*;
 import com.jonataslaet.taskifyspace.services.AuthenticationService;
+import jakarta.validation.Valid;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +39,19 @@ public class AuthenticationController {
     @PostMapping("/logout")
     public ResponseEntity<@NonNull Void> logout(@RequestBody RefreshTokenRecordDTO request) {
         authenticationService.logout(request.refreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/recovery-token")
+    public ResponseEntity<?> recoveryToken(@RequestBody @Valid EmailDTO emailDTO) {
+        authenticationService.recoveryToken(emailDTO);
+        return ResponseEntity.ok("Caso esse email exista, será enviado a ele um link para resetar a senha");
+    }
+
+    @PostMapping("/new-password/{token}")
+    public ResponseEntity<?> renewPassword(@PathVariable String token,
+        @RequestBody @Valid PasswordResetDTO passwordResetDTO) {
+        authenticationService.resetPassword(token, passwordResetDTO);
         return ResponseEntity.noContent().build();
     }
 }
