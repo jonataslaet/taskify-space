@@ -5,5 +5,5 @@ public enum SpaceMembershipStatusEnum {
     APPROVED,
     CANCELLED,
     DENIED,
-    SUSPENSED
+    SUSPENDED
 }
