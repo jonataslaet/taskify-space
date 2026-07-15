@@ -156,6 +156,12 @@ public class SpaceService {
         return spaceMembershipService.updateParticipation(spaceId, spaceMembershipId, status, spaceUserRole);
     }
 
+    @Transactional
+    public void blockOwnParticipation(User authenticatedUser, Long spaceId) {
+        Space spaceEntity = getSpaceEntity(spaceId);
+        spaceMembershipService.blockOwnParticipation(spaceEntity, authenticatedUser);
+    }
+
     public Page<@NonNull ParticipantDTO> readParticipants(
          Pageable pageable, Long spaceId, User authenticatedUser) {
         return spaceMembershipService.readParticipants(pageable, spaceId, authenticatedUser.getId());

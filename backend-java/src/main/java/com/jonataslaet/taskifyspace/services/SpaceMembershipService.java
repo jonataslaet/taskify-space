@@ -21,9 +21,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.BLOCKED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 
 @Service
 @Transactional(readOnly = true)
@@ -118,7 +123,30 @@ public class SpaceMembershipService {
 
     public Set<User> getParticipantsBySpaceAndUsersIds(Space space, Set<Long> usersIds) {
         return spaceMembershipRepository.findParticipantsByIds(
-            space.getId(), usersIds, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+            space.getId(), usersIds, ROLE_SPACE_PARTICIPANT);
+    }
+
+    @Transactional
+    public void blockOwnParticipation(Space space, User authenticatedUser) {
+        Set<SpaceMembership> existingMemberships =
+            spaceMembershipRepository.findBySpaceIdAndUserId(space.getId(), authenticatedUser.getId());
+
+        List<SpaceMembership> blockedMemberships = Arrays.stream(SpaceUserRoleEnum.values())
+            .map(role -> getOrCreateBlockedMembership(existingMemberships, space, authenticatedUser, role))
+            .toList();
+
+        spaceMembershipRepository.saveAll(blockedMemberships);
+    }
+
+    private SpaceMembership getOrCreateBlockedMembership(
+        Set<SpaceMembership> existingMemberships, Space space, User authenticatedUser, SpaceUserRoleEnum role) {
+        SpaceMembership spaceMembership = existingMemberships.stream()
+            .filter(existingMembership -> existingMembership.getSpaceUserRole().equals(role))
+            .findFirst()
+            .orElseGet(() -> new SpaceMembership(authenticatedUser, space, role));
+
+        spaceMembership.setSpaceMembershipStatusEnum(BLOCKED);
+        return spaceMembership;
     }
 
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
