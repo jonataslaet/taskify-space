@@ -7,7 +7,6 @@ import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.services.SpaceService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
-import io.swagger.v3.oas.annotations.Parameter;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -42,8 +41,8 @@ public class SpaceMembershipController {
 
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull SpaceMembershipRecordDTO>> readParticipations(
-        @Parameter(hidden = true) SpecificationTemplate.SpaceMembershipSpecification spaceSpecification,
-        @Parameter(hidden = true) Pageable pageable, @PathVariable Long spaceId,
+        SpecificationTemplate.SpaceMembershipSpecification spaceSpecification,
+        Pageable pageable, @PathVariable Long spaceId,
         @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull SpaceMembershipRecordDTO> pagedSpacememberships =
             spaceService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser);

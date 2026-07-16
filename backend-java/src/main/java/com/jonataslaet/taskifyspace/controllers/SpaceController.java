@@ -7,11 +7,6 @@ import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.SpaceService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,36 +25,15 @@ public class SpaceController {
         this.spaceService = spaceService;
     }
 
-    @Operation(
-        summary = "List Spaces",
-        description = "Returns a paginated list of Spaces with optional filters"
-    )
-    @Parameters({
-        @Parameter(name = "name", description = "Filter by name (case insensitive)"),
-        @Parameter(name = "active", description = "Filter by active (true or false)"),
-
-        @Parameter(name = "page", description = "Page number (0-based)", example = "0"),
-        @Parameter(name = "size", description = "Page size", example = "10"),
-        @Parameter(name = "sort", description = "Sort criteria (e.g. description,asc)")
-    })
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull SpaceRecordDTO>> readAllSpaces(
-        @Parameter(hidden = true) SpecificationTemplate.SpaceSpecification spaceSpecification,
-        @Parameter(hidden = true) Pageable pageable, @AuthenticationPrincipal User authenticatedUser) {
+        SpecificationTemplate.SpaceSpecification spaceSpecification,
+        Pageable pageable, @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull SpaceRecordDTO> SpaceModelPage =
             spaceService.findAll(spaceSpecification, pageable, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(SpaceModelPage);
     }
 
-    @Operation(
-        summary = "Create a Space",
-        description = "Creates a new Space in the system"
-    )
-    @ApiResponses({
-        @ApiResponse(responseCode = "201", description = "Space created successfully"),
-        @ApiResponse(responseCode = "422", description = "Invalid request payload"),
-        @ApiResponse(responseCode = "400", description = "Bad request")
-    })
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
     @PostMapping
     public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(@AuthenticationPrincipal User authenticatedUser,
@@ -69,17 +43,13 @@ public class SpaceController {
 
     @GetMapping("/{spaceId}/participants")
     public ResponseEntity<@NonNull Page<@NonNull ParticipantDTO>> readParticipants(
-        @Parameter(hidden = true) Pageable pageable, @PathVariable("spaceId") Long spaceId,
+        Pageable pageable, @PathVariable("spaceId") Long spaceId,
         @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull ParticipantDTO> pagedSpacememberships =
             spaceService.readParticipants(pageable, spaceId, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
     }
 
-    @Operation(
-        summary = "Get Space by ID",
-        description = "Returns a Space by its identifier"
-    )
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
     @GetMapping("/{spaceId}")
     public ResponseEntity<@NonNull SpaceRecordDTO> getSpaceById(@PathVariable("spaceId") Long spaceId) {
