@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -111,12 +112,12 @@ public class UserService {
     }
 
     @Transactional
-    public void activateUser(Long userId) {
-        logger.info("Activating user with ID {}", userId);
+    public void changeStatus(Long userId, UpdateUserStatusRequestDTO updateUserStatusRequestDTO) {
+        logger.info("Changing user status to {}", updateUserStatusRequestDTO.status());
         User user = findUserById(userId);
-        user.setStatus(UserStatusEnum.ACTIVE);
+        user.setStatus(updateUserStatusRequestDTO.status());
         userRepository.save(user);
-        logger.info("User with ID {} activated successfully", userId);
+        logger.info("User status changed successfully to {}", userId);
     }
 
     public User findUserById(Long userId) {

@@ -150,16 +150,15 @@ public class SpaceMembershipService {
     }
 
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
-        Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, Long authUserId) {
+        Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authUser) {
 
         boolean hasPermission =
             spaceMembershipRepository
                 .existsBySpaceIdAndUserIdAndSpaceUserRoleIn(
                     spaceId,
-                    authUserId,
+                    authUser.getId(),
                     Set.of(
-                        SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
-                        SpaceUserRoleEnum.ROLE_SPACE_MANAGER
+                        ROLE_SPACE_PARTICIPANT
                     )
                 );
 

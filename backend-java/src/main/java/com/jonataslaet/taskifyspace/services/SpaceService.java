@@ -138,7 +138,7 @@ public class SpaceService {
 
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
         Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authenticatedUser) {
-        return spaceMembershipService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser.getId());
+        return spaceMembershipService.readParticipations(spaceSpecification, pageable, spaceId, authenticatedUser);
     }
 
     @Transactional

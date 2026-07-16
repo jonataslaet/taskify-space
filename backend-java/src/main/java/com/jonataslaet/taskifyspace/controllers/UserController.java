@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.UserService;
@@ -61,9 +62,12 @@ public class UserController {
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @PatchMapping("/{userId}/activate")
-    public ResponseEntity<@NonNull Void> activateUser(@PathVariable(value = "userId") Long userId){
-        userService.activateUser(userId);
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Void> updateStatus(
+        @PathVariable Long id, @RequestBody UpdateUserStatusRequestDTO request) {
+
+        userService.changeStatus(id, request);
+
         return ResponseEntity.noContent().build();
     }
 
