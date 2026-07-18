@@ -37,8 +37,10 @@ public class TaskController {
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull TaskRecordDTO>> readAllTasks(
         SpecificationTemplate.TaskSpecification taskSpecification,
-        Pageable pageable) {
-        Page<@NonNull TaskRecordDTO> taskModelPage = taskService.findAll(taskSpecification, pageable);
+        Pageable pageable,
+        @AuthenticationPrincipal User authenticatedUser) {
+        Page<@NonNull TaskRecordDTO> taskModelPage = taskService.findAll(
+            taskSpecification, pageable, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(taskModelPage);
     }
 
@@ -59,8 +61,10 @@ public class TaskController {
 
     @JsonView(TaskRecordDTO.TaskView.ReadTask.class)
     @GetMapping("/{taskId}")
-    public ResponseEntity<@NonNull TaskRecordDTO> getTaskById(@PathVariable("taskId") Long taskId) {
-        TaskRecordDTO foundTask = taskService.getTaskById(taskId);
+    public ResponseEntity<@NonNull TaskRecordDTO> getTaskById(
+        @PathVariable("taskId") Long taskId,
+        @AuthenticationPrincipal User authenticatedUser) {
+        TaskRecordDTO foundTask = taskService.getTaskById(authenticatedUser, taskId);
         return ResponseEntity.ok(foundTask);
     }
 

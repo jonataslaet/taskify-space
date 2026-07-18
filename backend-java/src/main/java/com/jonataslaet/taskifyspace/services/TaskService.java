@@ -109,8 +109,9 @@ public class TaskService {
         }
     }
 
-    public TaskRecordDTO getTaskById(Long TaskId) {
+    public TaskRecordDTO getTaskById(User authenticatedUser, Long TaskId) {
         Task task = getTaskEntity(TaskId);
+        spaceService.validateApprovedParticipation(authenticatedUser, task.getSpace());
         return TaskMapper.toDTO(task);
     }
 
@@ -148,7 +149,21 @@ public class TaskService {
         taskRepository.save(task);
     }
 
-    public Page<@NonNull TaskRecordDTO> findAll(Specification<@NonNull Task> TaskSpecification, Pageable pageable) {
-        return taskRepository.findAll(TaskSpecification, pageable).map(TaskMapper::toDTO);
+    public Page<@NonNull TaskRecordDTO> findAll(
+        Specification<@NonNull Task> TaskSpecification, Pageable pageable, User authenticatedUser) {
+        Specification<@NonNull Task> authenticatedUserTasks = (root, query, criteriaBuilder) -> {
+            query.distinct(true);
+            var spaceMembershipJoin = root.join("space").join("spaceMemberships");
+            return criteriaBuilder.and(
+                criteriaBuilder.equal(spaceMembershipJoin.get("user").get("id"), authenticatedUser.getId()),
+                criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED)
+            );
+        };
+        Specification<@NonNull Task> finalSpecification = authenticatedUserTasks;
+        if (Objects.nonNull(TaskSpecification)) {
+            finalSpecification = authenticatedUserTasks.and(TaskSpecification);
+        }
+
+        return taskRepository.findAll(finalSpecification, pageable).map(TaskMapper::toDTO);
     }
 }

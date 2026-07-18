@@ -65,8 +65,9 @@ public class SpaceService {
         return SpaceMapper.toDTO(space);
     }
 
-    public SpaceRecordDTO getSpaceById(Long SpaceId) {
+    public SpaceRecordDTO getSpaceById(User authenticatedUser, Long SpaceId) {
         Space Space = getSpaceEntity(SpaceId);
+        validateApprovedParticipation(authenticatedUser, Space);
         return SpaceMapper.toDTO(Space);
     }
 
@@ -165,6 +166,17 @@ public class SpaceService {
                 "Esse usuário não participa desse espaço como nenhum dos papéis a seguir: "
                     + spaceUserRoleEnums.stream().map(Enum::name).collect(Collectors.joining(", "))
             );
+        }
+    }
+
+    public void validateApprovedParticipation(User authenticatedUser, Space space) {
+        boolean currentUserParticipatesInThisSpace = space.getSpaceMemberships().stream()
+            .anyMatch(spaceMembership ->
+                APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum())
+                    && spaceMembership.getUser().getId().equals(authenticatedUser.getId()));
+
+        if (!currentUserParticipatesInThisSpace) {
+            throw new ForbiddenException("Esse usuario nao participa desse espaco");
         }
     }
 

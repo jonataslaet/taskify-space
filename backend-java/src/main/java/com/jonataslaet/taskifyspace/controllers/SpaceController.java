@@ -52,8 +52,10 @@ public class SpaceController {
 
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
     @GetMapping("/{spaceId}")
-    public ResponseEntity<@NonNull SpaceRecordDTO> getSpaceById(@PathVariable("spaceId") Long spaceId) {
-        SpaceRecordDTO foundSpace = spaceService.getSpaceById(spaceId);
+    public ResponseEntity<@NonNull SpaceRecordDTO> getSpaceById(
+        @PathVariable("spaceId") Long spaceId,
+        @AuthenticationPrincipal User authenticatedUser) {
+        SpaceRecordDTO foundSpace = spaceService.getSpaceById(authenticatedUser, spaceId);
         return ResponseEntity.ok(foundSpace);
     }
 
