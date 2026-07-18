@@ -117,7 +117,7 @@ public class SpaceMembershipService {
                 authenticatedUser, approvalFeature(targetSpaceUserRole), spaceMembership.getSpace());
         }
 
-        spaceMembership.setSpaceMembershipStatusEnum(status);
+        if (Objects.nonNull(status)) spaceMembership.setSpaceMembershipStatusEnum(status);
         if (Objects.nonNull(spaceUserRole)) spaceMembership.setSpaceUserRole(targetSpaceUserRole);
 
         return SpaceMembershipMapper.toDTO(spaceMembershipRepository.save(spaceMembership));
