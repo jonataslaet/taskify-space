@@ -51,11 +51,4 @@ public class SpaceMembershipController {
             spaceId, spaceMembershipId, status, spaceUserRole);
         return ResponseEntity.status(HttpStatus.OK).body(updatedSpaceMembership);
     }
-
-    @PatchMapping("/me/block")
-    public ResponseEntity<@NonNull Void> blockOwnParticipation(@PathVariable Long spaceId,
-        @AuthenticationPrincipal User authenticatedUser) {
-        spaceService.blockOwnParticipation(authenticatedUser, spaceId);
-        return ResponseEntity.noContent().build();
-    }
 }

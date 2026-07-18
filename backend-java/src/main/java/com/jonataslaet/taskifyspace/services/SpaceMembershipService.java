@@ -159,29 +159,6 @@ public class SpaceMembershipService {
             space.getId(), usersIds, ROLE_SPACE_PARTICIPANT);
     }
 
-    @Transactional
-    public void blockOwnParticipation(Space space, User authenticatedUser) {
-        Set<SpaceMembership> existingMemberships =
-            spaceMembershipRepository.findBySpaceIdAndUserId(space.getId(), authenticatedUser.getId());
-
-        List<SpaceMembership> blockedMemberships = Arrays.stream(SpaceUserRoleEnum.values())
-            .map(role -> getOrCreateBlockedMembership(existingMemberships, space, authenticatedUser, role))
-            .toList();
-
-        spaceMembershipRepository.saveAll(blockedMemberships);
-    }
-
-    private SpaceMembership getOrCreateBlockedMembership(
-        Set<SpaceMembership> existingMemberships, Space space, User authenticatedUser, SpaceUserRoleEnum role) {
-        SpaceMembership spaceMembership = existingMemberships.stream()
-            .filter(existingMembership -> existingMembership.getSpaceUserRole().equals(role))
-            .findFirst()
-            .orElseGet(() -> new SpaceMembership(authenticatedUser, space, role));
-
-        spaceMembership.setSpaceMembershipStatusEnum(BLOCKED);
-        return spaceMembership;
-    }
-
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
         Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authUser) {
 
