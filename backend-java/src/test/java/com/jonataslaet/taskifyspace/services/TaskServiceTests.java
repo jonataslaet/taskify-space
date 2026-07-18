@@ -2,22 +2,33 @@ package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
+import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
+import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.Set;
 
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,15 +69,8 @@ class TaskServiceTests {
     @Test
     void getTaskByIdValidatesApprovedParticipationInTaskSpace() {
         User authenticatedUser = createUser(1L);
-        Space space = new Space("Space");
-        space.setId(10L);
-
-        Task task = new Task();
-        task.setId(20L);
-        task.setSpace(space);
-        task.setDescription("Task");
-        task.setScore(BigDecimal.TEN);
-        task.setActive(true);
+        Space space = createSpace(10L);
+        Task task = createTask(20L, space);
 
         when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
 
@@ -74,6 +78,70 @@ class TaskServiceTests {
 
         assertThat(foundTask.id()).isEqualTo(task.getId());
         verify(spaceService).validateApprovedParticipation(authenticatedUser, space);
+    }
+
+    @Test
+    void finishTaskWithNullExecutorIdsIncludesAuthenticatedUser() {
+        User authenticatedUser = createUser(1L);
+        Space space = createSpace(10L);
+        Task task = createTask(20L, space);
+        addApprovedParticipant(space, authenticatedUser);
+
+        when(spaceService.getSpaceEntity(space.getId())).thenReturn(space);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(spaceMembershipService.getParticipantsBySpaceAndUsersIds(
+            eq(space), eq(Set.of(authenticatedUser.getId())))).thenReturn(Set.of(authenticatedUser));
+
+        taskService.finishTask(task.getId(), space.getId(), authenticatedUser, null);
+
+        ArgumentCaptor<TaskExecution> taskExecutionCaptor = ArgumentCaptor.forClass(TaskExecution.class);
+        verify(taskExecutionRepository).save(taskExecutionCaptor.capture());
+        TaskExecution savedTaskExecution = taskExecutionCaptor.getValue();
+
+        assertThat(savedTaskExecution.getTask()).isSameAs(task);
+        assertThat(savedTaskExecution.getSpace()).isSameAs(space);
+        assertThat(savedTaskExecution.getExecutors()).containsExactly(authenticatedUser);
+    }
+
+    @Test
+    void finishTaskPreventsTaskFromAnotherSpace() {
+        User authenticatedUser = createUser(1L);
+        Space requestedSpace = createSpace(10L);
+        Space taskSpace = createSpace(11L);
+        Task task = createTask(20L, taskSpace);
+
+        when(spaceService.getSpaceEntity(requestedSpace.getId())).thenReturn(requestedSpace);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.finishTask(
+            task.getId(), requestedSpace.getId(), authenticatedUser, Set.of()))
+            .isInstanceOf(ResourceNotFoundException.class)
+            .hasMessage("Tarefa nao encontrada nesse espaco");
+
+        verify(taskExecutionRepository, never()).save(any(TaskExecution.class));
+    }
+
+    private Space createSpace(Long id) {
+        Space space = new Space("Space " + id);
+        space.setId(id);
+        space.setActive(true);
+        return space;
+    }
+
+    private Task createTask(Long id, Space space) {
+        Task task = new Task();
+        task.setId(id);
+        task.setSpace(space);
+        task.setDescription("Task " + id);
+        task.setScore(BigDecimal.TEN);
+        task.setActive(true);
+        return task;
+    }
+
+    private void addApprovedParticipant(Space space, User user) {
+        SpaceMembership spaceMembership = new SpaceMembership(user, space, ROLE_SPACE_PARTICIPANT);
+        spaceMembership.setSpaceMembershipStatusEnum(APPROVED);
+        space.getSpaceMemberships().add(spaceMembership);
     }
 
     private User createUser(Long id) {

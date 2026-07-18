@@ -17,6 +17,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -72,14 +73,15 @@ public class TaskService {
         spaceService.validateActiveParticipation(
             authenticatedUser, space, Set.of(ROLE_SPACE_PARTICIPANT));
 
-        includeExecutorsIds(executorsIds, Set.of(authenticatedUser.getId()));
+        Set<Long> executorIds = includeAuthenticatedUserId(executorsIds, authenticatedUser.getId());
         Set<SpaceMembership> approvedSpaceMemberships = getApprovedSpaceMemberships(space.getSpaceMemberships());
 
         Task task = getTaskEntity(taskId);
+        validateTaskBelongsToSpace(task, space);
         validActiveTask(task);
 
         TaskExecution taskExecution = getTaskExecution(task, space,
-            getApprovedExecutors(executorsIds, approvedSpaceMemberships));
+            getApprovedExecutors(executorIds, approvedSpaceMemberships));
         taskExecutionRepository.save(taskExecution);
     }
 
@@ -94,8 +96,17 @@ public class TaskService {
             s -> s.getSpaceMembershipStatusEnum().equals(APPROVED)).collect(Collectors.toSet());
     }
 
-    private void includeExecutorsIds(Set<Long> executorsIds, Set<Long> usersIdsToBeAdded) {
-        if (Objects.nonNull(executorsIds)) executorsIds.addAll(usersIdsToBeAdded);
+    private Set<Long> includeAuthenticatedUserId(Set<Long> executorsIds, Long authenticatedUserId) {
+        Set<Long> executorIds = Objects.nonNull(executorsIds) ? new HashSet<>(executorsIds) : new HashSet<>();
+        executorIds.add(authenticatedUserId);
+        return executorIds;
+    }
+
+    private void validateTaskBelongsToSpace(Task task, Space space) {
+        Long taskSpaceId = Objects.nonNull(task.getSpace()) ? task.getSpace().getId() : null;
+        if (!Objects.equals(taskSpaceId, space.getId())) {
+            throw new ResourceNotFoundException("Tarefa nao encontrada nesse espaco");
+        }
     }
 
     private TaskExecution getTaskExecution(Task task, Space space, Set<Long> usersIds) {
