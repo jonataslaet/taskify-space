@@ -25,13 +25,6 @@ public class SpaceMembershipController {
         this.spaceService = spaceService;
     }
 
-    @PostMapping
-    public ResponseEntity<@NonNull Void> createParticipation(@AuthenticationPrincipal User authenticatedUser,
-        @RequestParam("email") String email, @PathVariable Long spaceId) {
-        spaceService.createParticipation(authenticatedUser, spaceId, email);
-        return ResponseEntity.noContent().build();
-    }
-
     @PostMapping("/request")
     public ResponseEntity<@NonNull SpaceRecordDTO> requestParticipation(@AuthenticationPrincipal User authenticatedUser,
         @PathVariable Long spaceId) {

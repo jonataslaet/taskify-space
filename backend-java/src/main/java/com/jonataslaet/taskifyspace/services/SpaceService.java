@@ -114,15 +114,6 @@ public class SpaceService {
     }
 
     @Transactional
-    public void createParticipation(User authenticatedUser, Long spaceId, String email) {
-        Space spaceEntity = getSpaceEntity(spaceId);
-        validateActiveParticipation(authenticatedUser, spaceEntity,
-            Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
-        userRepository.findByEmail(email).ifPresent(user ->
-            spaceMembershipService.setSpaceMembership(spaceEntity, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
-    }
-
-    @Transactional
     public void toggleActiveSpace(User authenticatedUser, Long spaceId) {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity,
