@@ -3,7 +3,7 @@ spring:
     name: taskify-space
 
   profiles:
-    active: ${APP_PROFILE:development}
+    active: ${APP_PROFILE:production}
 
   datasource:
     url: jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME}
