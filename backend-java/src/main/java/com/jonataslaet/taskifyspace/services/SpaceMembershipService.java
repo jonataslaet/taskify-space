@@ -185,17 +185,14 @@ public class SpaceMembershipService {
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
         Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authUser) {
 
-        boolean hasPermission =
+        boolean currentUserParticipatesInThisSpace =
             spaceMembershipRepository
-                .existsBySpaceIdAndUserIdAndSpaceUserRoleIn(
+                .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
                     spaceId,
                     authUser.getId(),
-                    Set.of(
-                        ROLE_SPACE_PARTICIPANT
-                    )
-                );
+                    SpaceMembershipStatusEnum.APPROVED);
 
-        if (!hasPermission) {
+        if (!currentUserParticipatesInThisSpace) {
             throw new ForbiddenException("Usuário não possui permissão para visualizar as participações desse espaço");
         }
 
@@ -207,15 +204,14 @@ public class SpaceMembershipService {
 
     public Page<@NonNull ParticipantDTO> readParticipants(Pageable pageable, Long spaceId, Long authUserId) {
 
-        boolean currentUserParticipatesInThisSpaceAsParticipant =
+        boolean currentUserParticipatesInThisSpace =
             spaceMembershipRepository
-                .existsBySpaceIdAndUserIdAndSpaceUserRoleInAndSpaceMembershipStatusEnum(
+                .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
                     spaceId,
                     authUserId,
-                    Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT),
                     SpaceMembershipStatusEnum.APPROVED);
 
-        if (!currentUserParticipatesInThisSpaceAsParticipant) {
+        if (!currentUserParticipatesInThisSpace) {
             throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
         }
 

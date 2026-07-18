@@ -42,7 +42,6 @@ public class ParticipantRepository {
             GROUP BY teu.user_id
         ) scores ON scores.user_id = u.id
         WHERE sm.space_id = :spaceId
-        AND sm.space_user_role = 'ROLE_SPACE_PARTICIPANT'
         AND sm.space_membership_status_enum = 'APPROVED'
         """;
 
