@@ -104,23 +104,39 @@ public class FeatureAccessService {
             nullableGrantEnd(granted, periodEnd));
     }
 
-    private long countUsage(User user, FeatureEnum feature, Space space, Instant periodStart, Instant periodEnd) {
+    private long countUsage(
+        User user,
+        FeatureEnum feature,
+        Space space,
+        Instant periodStart,
+        Instant periodEnd
+    ) {
         return switch (feature) {
-            case CREATE_SPACE -> spaceRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                user.getId(), periodStart, periodEnd);
-            case CREATE_TASK -> taskRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                user.getId(), periodStart, periodEnd);
-            case FINISH_TASK -> taskExecutionRepository.countExecutionsByExecutorInPeriod(
-                user.getId(), periodStart, periodEnd);
+            case CREATE_SPACE ->
+                spaceRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    user.getId(),
+                    periodStart,
+                    periodEnd
+                );
+
+            case CREATE_TASK ->
+                taskRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    user.getId(),
+                    periodStart,
+                    periodEnd
+                );
+
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
                  APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER,
-                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT -> Objects.isNull(space)
-                ? Long.MAX_VALUE
-                : spaceMembershipRepository.countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
-                    space.getId(), SpaceMembershipStatusEnum.APPROVED, feature.approvalSpaceUserRole());
-            case READ_SPACE, UPDATE_SPACE, DELETE_SPACE,
-                 ACTIVE_OR_INACTIVE_SPACE,
-                 READ_TASK, UPDATE_TASK, DELETE_TASK -> 0;
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT ->
+                Objects.isNull(space)
+                    ? Long.MAX_VALUE
+                    : spaceMembershipRepository
+                      .countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+                          space.getId(),
+                          SpaceMembershipStatusEnum.APPROVED,
+                          feature.approvalSpaceUserRole()
+                      );
         };
     }
 
