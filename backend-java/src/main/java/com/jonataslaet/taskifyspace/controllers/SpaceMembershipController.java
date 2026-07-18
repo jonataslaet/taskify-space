@@ -51,4 +51,10 @@ public class SpaceMembershipController {
             spaceId, spaceMembershipId, status, spaceUserRole);
         return ResponseEntity.status(HttpStatus.OK).body(updatedSpaceMembership);
     }
+
+    @PatchMapping("/{idParticiption}/block")
+    public ResponseEntity<@NonNull Void> blockParticipation(
+        @PathVariable Long idParticiption, @AuthenticationPrincipal User authenticatedUser) {
+        return null;
+    }
 }
