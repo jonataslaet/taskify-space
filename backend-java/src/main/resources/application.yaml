@@ -33,7 +33,7 @@ security:
   password:
     root: ${PASSWORD_ROOT}
   jwt:
-    secret: ${JWT_SECRET:seu-secret-jwt}
+    secret: ${JWT_SECRET}
     ttl:
       token:
         access: ${TTL_ACCESS_TOKEN:900000}

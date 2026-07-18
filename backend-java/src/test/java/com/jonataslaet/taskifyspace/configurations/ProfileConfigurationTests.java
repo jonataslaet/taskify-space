@@ -17,6 +17,15 @@ class ProfileConfigurationTests {
     }
 
     @Test
+    void jwtSecretMustNotHaveDefaultValue() throws IOException {
+        String applicationYaml = readResource("application.yaml");
+
+        assertThat(applicationYaml).contains("secret: ${JWT_SECRET}");
+        assertThat(applicationYaml).doesNotContain("seu-secret-jwt");
+        assertThat(applicationYaml).doesNotContain("JWT_SECRET:");
+    }
+
+    @Test
     void productionProfileDoesNotCreateOrDropSchema() throws IOException {
         String productionYaml = readResource("application-production.yaml");
 
