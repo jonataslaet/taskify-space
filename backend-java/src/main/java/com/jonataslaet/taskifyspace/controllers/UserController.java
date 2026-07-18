@@ -34,10 +34,13 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<@NonNull UserRecordDTO> getOneUser(@PathVariable(value = "userId") Long userId){
-        return ResponseEntity.status(HttpStatus.OK).body(userService.findById(userId));
+    public ResponseEntity<@NonNull UserRecordDTO> getOneUser(
+        @AuthenticationPrincipal User authenticatedUser,
+        @PathVariable(value = "userId") Long userId){
+        return ResponseEntity.status(HttpStatus.OK).body(userService.findById(authenticatedUser, userId));
     }
 
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull UserRecordDTO>> getAllUsers(
         SpecificationTemplate.UserSpecification userSpecification, Pageable pageable){
@@ -72,8 +75,10 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
-    public ResponseEntity<@NonNull Void> deleteUser(@PathVariable(value = "userId") Long userId){
-        userService.deleteById(userId);
+    public ResponseEntity<@NonNull Void> deleteUser(
+        @AuthenticationPrincipal User authenticatedUser,
+        @PathVariable(value = "userId") Long userId){
+        userService.deleteById(authenticatedUser, userId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

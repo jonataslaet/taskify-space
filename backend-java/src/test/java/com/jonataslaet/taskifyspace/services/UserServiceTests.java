@@ -4,6 +4,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +36,45 @@ class UserServiceTests {
     @BeforeEach
     void setUp() {
         userService = new UserService(userRepository, passwordEncoder);
+    }
+
+    @Test
+    void findByIdAllowsUserToReadOwnProfile() {
+        User authenticatedUser = createUser(1L, UserRoleEnum.ROLE_USER);
+        when(userRepository.findById(authenticatedUser.getId())).thenReturn(Optional.of(authenticatedUser));
+
+        UserRecordDTO foundUser = userService.findById(authenticatedUser, authenticatedUser.getId());
+
+        assertThat(foundUser.id()).isEqualTo(authenticatedUser.getId());
+    }
+
+    @Test
+    void findByIdPreventsUserFromReadingAnotherUserProfile() {
+        User authenticatedUser = createUser(1L, UserRoleEnum.ROLE_USER);
+
+        assertThatThrownBy(() -> userService.findById(authenticatedUser, 2L))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(userRepository, never()).findById(2L);
+    }
+
+    @Test
+    void deleteByIdAllowsAdminToDeleteAnyUser() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+
+        userService.deleteById(admin, 2L);
+
+        verify(userRepository).deleteById(2L);
+    }
+
+    @Test
+    void deleteByIdPreventsUserFromDeletingAnotherUser() {
+        User authenticatedUser = createUser(1L, UserRoleEnum.ROLE_USER);
+
+        assertThatThrownBy(() -> userService.deleteById(authenticatedUser, 2L))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(userRepository, never()).deleteById(2L);
     }
 
     @Test
@@ -67,5 +109,16 @@ class UserServiceTests {
         assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.ACTIVE);
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+    }
+
+    private User createUser(Long id, UserRoleEnum role) {
+        User user = new User();
+        user.setId(id);
+        user.setEmail("user" + id + "@example.com");
+        user.setName("User " + id);
+        user.setRole(role);
+        user.setStatus(UserStatusEnum.ACTIVE);
+        user.setPassword("encoded-password");
+        return user;
     }
 }

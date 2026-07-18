@@ -65,6 +65,11 @@ public class UserService {
         return UserMapper.toUserRecordDTO(findUserById(userId));
     }
 
+    public UserRecordDTO findById(User authenticatedUser, Long userId) {
+        validateAdminOrSelf(authenticatedUser, userId);
+        return findById(userId);
+    }
+
     @Transactional
     public void deleteById(Long userId) {
         logger.info("Attempting to delete user with ID {}", userId);
@@ -75,6 +80,12 @@ public class UserService {
             logger.warn("Attempt to delete user with ID {} failed: {}", userId, e.getMessage());
             throw new ResourceNotFoundException("User not found");
         }
+    }
+
+    @Transactional
+    public void deleteById(User authenticatedUser, Long userId) {
+        validateAdminOrSelf(authenticatedUser, userId);
+        deleteById(userId);
     }
 
 
@@ -129,5 +140,14 @@ public class UserService {
 
     public Set<User> getExecutorsByIds(Set<Long> executorsIds) {
         return userRepository.findUsersByIds(executorsIds);
+    }
+
+    private void validateAdminOrSelf(User authenticatedUser, Long userId) {
+        if (UserRoleEnum.ROLE_ADMIN.equals(authenticatedUser.getRole())
+            || authenticatedUser.getId().equals(userId)) {
+            return;
+        }
+
+        throw new ForbiddenException("Usuario nao possui permissao para acessar esse recurso");
     }
 }
