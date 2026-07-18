@@ -27,12 +27,12 @@ public record UserRecordDTO(
     @JsonView({UserView.CreateUser.class, UserView.UpdateUser.class})
     String name,
 
-    @NotNull(groups = {UserView.CreateUser.class, UserView.UpdateUser.class}, message = "Status is mandatory")
-    @JsonView({UserView.CreateUser.class, UserView.UpdateUser.class})
+    @NotNull(groups = {UserView.CreateUser.class}, message = "Status is mandatory")
+    @JsonView({UserView.CreateUser.class})
     UserStatusEnum status,
 
-    @NotNull(groups = {UserView.CreateUser.class, UserView.UpdateUser.class}, message = "Role is mandatory")
-    @JsonView({UserView.CreateUser.class, UserView.UpdateUser.class})
+    @NotNull(groups = {UserView.CreateUser.class}, message = "Role is mandatory")
+    @JsonView({UserView.CreateUser.class})
     UserRoleEnum role,
 
     @NotBlank(groups = {UserView.CreateUser.class, UserView.PasswordPut.class}, message = "Password is mandatory")

@@ -14,7 +14,6 @@ import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -83,11 +82,10 @@ public class UserService {
     public void updateUser(Long userId, UserRecordDTO userRecordDto) {
         logger.info("Updating user with ID {}", userId);
         User user = findUserById(userId);
-        String password = user.getPassword();
 
-        logger.debug("Copying DTO properties into user entity for ID {}", userId);
-        BeanUtils.copyProperties(userRecordDto, user);
-        user.setPassword(password);
+        logger.debug("Updating editable profile fields for user ID {}", userId);
+        user.setEmail(userRecordDto.email());
+        user.setName(userRecordDto.name());
 
         userRepository.save(user);
         logger.info("User with ID {} updated successfully", userId);
