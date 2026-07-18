@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.controllers;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.GrantSubscriptionRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SubscriptionRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.SubscriptionService;
@@ -54,8 +55,9 @@ public class SubscriptionController {
     public ResponseEntity<@NonNull SubscriptionRecordDTO> grantSubscription(
         @PathVariable Long userId,
         @PathVariable Long planId,
-        @RequestBody @Valid SubscriptionRecordDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(subscriptionService.grantSubscription(userId, planId, dto));
+        @RequestBody @Valid GrantSubscriptionRequestDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(subscriptionService.grantSubscription(userId, planId, request));
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")

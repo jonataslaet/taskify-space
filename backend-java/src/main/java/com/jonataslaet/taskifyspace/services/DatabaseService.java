@@ -248,29 +248,30 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 50L)
             ));
 
-        this.grantInternalSubscription(userJoiceLaet, basicPlan);
-
-        SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
-
-        spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
-
-        TaskRecordDTO taskRecordDTO = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
-
-        taskService.toggleActiveTask(taskRecordDTO.id());
-
-        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
-        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);
-        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
-        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
-
-        Set<Long> usersToBeApproved = new HashSet<>();
-        usersToBeApproved.add(userJoiceLaet.getId());
-        usersToBeApproved.add(userRalphLaet.getId());
-        usersToBeApproved.add(userBellaLaet.getId());
-        usersToBeApproved.add(adminJonatasLaet.getId());
-
-        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
-        spaceMembershipService.aproveSpaceMemberships(spaceResidenciaCasalLaet.id(), userJoiceLaet, usersToBeApproved);
+//        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
+//        this.grantInternalSubscription(userJoiceLaet, basicPlan);
+//
+//        SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
+//
+//        spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
+//
+//        TaskRecordDTO taskRecordDTO = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
+//
+//        taskService.toggleActiveTask(taskRecordDTO.id());
+//
+//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
+//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);
+//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
+//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
+//
+//        Set<Long> usersToBeApproved = new HashSet<>();
+//        usersToBeApproved.add(userJoiceLaet.getId());
+//        usersToBeApproved.add(userRalphLaet.getId());
+//        usersToBeApproved.add(userBellaLaet.getId());
+//        usersToBeApproved.add(adminJonatasLaet.getId());
+//
+//        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
+//        spaceMembershipService.aproveSpaceMemberships(spaceResidenciaCasalLaet.id(), userJoiceLaet, usersToBeApproved);
 
         return true;
     }

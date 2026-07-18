@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.GrantSubscriptionRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SubscriptionRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Plan;
 import com.jonataslaet.taskifyspace.entities.Subscription;
@@ -40,8 +41,8 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public SubscriptionRecordDTO grantSubscription(Long userId, Long planId, SubscriptionRecordDTO dto) {
-        if (Objects.isNull(dto)) {
+    public SubscriptionRecordDTO grantSubscription(Long userId, Long planId, GrantSubscriptionRequestDTO request) {
+        if (Objects.isNull(request)) {
             throw new InvalidRequestException("Dados da assinatura sao obrigatorios");
         }
         User user = userService.findUserById(userId);
@@ -56,21 +57,21 @@ public class SubscriptionService {
             return SubscriptionMapper.toDTO(activeSubscription.get());
         }
 
-        Instant periodStart = Objects.isNull(dto.currentPeriodStart()) ? now : dto.currentPeriodStart();
-        if (Objects.nonNull(dto.currentPeriodEnd()) && !dto.currentPeriodEnd().isAfter(periodStart)) {
+        Instant periodStart = Objects.isNull(request.currentPeriodStart()) ? now : request.currentPeriodStart();
+        if (Objects.nonNull(request.currentPeriodEnd()) && !request.currentPeriodEnd().isAfter(periodStart)) {
             throw new InvalidRequestException("Fim do periodo da assinatura deve ser posterior ao inicio");
         }
 
         Subscription subscription = new Subscription();
         subscription.setUser(user);
         subscription.setPlan(plan);
-        subscription.setStatus(dto.status() == null ? SubscriptionStatusEnum.ACTIVE : dto.status());
-        subscription.setProvider(dto.provider() == null ? SubscriptionProviderEnum.INTERNAL : dto.provider());
+        subscription.setStatus(request.status() == null ? SubscriptionStatusEnum.ACTIVE : request.status());
+        subscription.setProvider(request.provider() == null ? SubscriptionProviderEnum.INTERNAL : request.provider());
         subscription.setCurrentPeriodStart(periodStart);
-        subscription.setCurrentPeriodEnd(dto.currentPeriodEnd());
-        subscription.setExternalCustomerId(dto.externalCustomerId());
-        subscription.setExternalSubscriptionId(dto.externalSubscriptionId());
-        subscription.setExternalPriceId(dto.externalPriceId());
+        subscription.setCurrentPeriodEnd(request.currentPeriodEnd());
+        subscription.setExternalCustomerId(request.externalCustomerId());
+        subscription.setExternalSubscriptionId(request.externalSubscriptionId());
+        subscription.setExternalPriceId(request.externalPriceId());
         return SubscriptionMapper.toDTO(subscriptionRepository.save(subscription));
     }
 
