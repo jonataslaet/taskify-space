@@ -3,6 +3,7 @@ package com.jonataslaet.taskifyspace.controllers;
 import com.jonataslaet.taskifyspace.controllers.dtos.SubscriptionRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.SubscriptionService;
+import jakarta.validation.Valid;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -53,7 +54,7 @@ public class SubscriptionController {
     public ResponseEntity<@NonNull SubscriptionRecordDTO> grantSubscription(
         @PathVariable Long userId,
         @PathVariable Long planId,
-        @RequestBody SubscriptionRecordDTO dto) {
+        @RequestBody @Valid SubscriptionRecordDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(subscriptionService.grantSubscription(userId, planId, dto));
     }
 

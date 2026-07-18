@@ -120,7 +120,6 @@ public class SpaceService {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity,
             Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.MANAGE_PARTICIPANTS, spaceEntity);
         userRepository.findByEmail(email).ifPresent(user ->
             spaceMembershipService.setSpaceMembership(spaceEntity, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
     }
@@ -145,7 +144,6 @@ public class SpaceService {
     public SpaceMembershipRecordDTO updateParticipation(User authenticatedUser, Long spaceId,
         Long spaceMembershipId, SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole) {
         Space spaceEntity = getSpaceEntity(spaceId);
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.MANAGE_PARTICIPANTS, spaceEntity);
 
         if (Objects.nonNull(spaceUserRole)) {
             validateActiveParticipation(authenticatedUser, spaceEntity, Set.of(ROLE_SPACE_ADMIN));
@@ -153,7 +151,8 @@ public class SpaceService {
             validateActiveParticipation(authenticatedUser, spaceEntity, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
         }
 
-        return spaceMembershipService.updateParticipation(spaceId, spaceMembershipId, status, spaceUserRole);
+        return spaceMembershipService.updateParticipation(
+            spaceId, spaceMembershipId, status, spaceUserRole, authenticatedUser);
     }
 
     @Transactional

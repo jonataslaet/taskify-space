@@ -129,10 +129,6 @@ public class DatabaseService {
             plan.setName(name);
             plan.setDescription(description);
             plan.setActive(true);
-            Set<FeatureEnum> features = featureLimits.stream()
-                .map(PlanFeatureLimit::getFeature)
-                .collect(java.util.stream.Collectors.toSet());
-            plan.setFeatures(features);
             plan.setFeatureLimits(featureLimits);
             planRepository.save(plan);
         }
@@ -140,9 +136,9 @@ public class DatabaseService {
     }
 
     private void grantInternalSubscription(User user, Plan plan) {
-        boolean alreadyGranted = subscriptionRepository.findByUserId(user.getId()).stream()
-            .anyMatch(subscription -> subscription.getPlan().getId().equals(plan.getId())
-                && subscription.grantsAccessAt(Instant.now(clock)));
+        Instant now = Instant.now(clock);
+        boolean alreadyGranted = subscriptionRepository.findByUserIdAndPlanId(user.getId(), plan.getId()).stream()
+            .anyMatch(subscription -> subscription.grantsAccessAt(now));
         if (alreadyGranted) {
             return;
         }
@@ -192,7 +188,7 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.READ_SPACE, null, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, 1L),
+                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_MANAGER, null),
 
@@ -200,20 +196,21 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.READ_TASK, null, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, 10L),
+                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, null),
 
                 new PlanFeatureLimit(FeatureEnum.FINISH_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.MANAGE_PARTICIPANTS, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.MANAGE_PARTICIPANTS, ROLE_SPACE_MANAGER, null)
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, null, 1L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, null, 1L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 4L)
             ));
 
         Plan proPlan = this.createPlan("PRO", "Pro", "Plano com funcionalidades principais",
             Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, ROLE_SPACE_ADMIN, 2L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, null, 2L),
                 new PlanFeatureLimit(FeatureEnum.READ_SPACE, null, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, 2L),
+                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_MANAGER, null),
 
@@ -221,11 +218,12 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.READ_TASK, null, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, 20L),
+                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, null),
 
                 new PlanFeatureLimit(FeatureEnum.FINISH_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.MANAGE_PARTICIPANTS, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.MANAGE_PARTICIPANTS, ROLE_SPACE_MANAGER, null)
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, null, 2L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, null, 3L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 12L)
             ));
 
         Plan premiumPlan = this.createPlan("PREMIUM", "Premium", "Plano completo",
@@ -234,7 +232,7 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, null, 3L),
                 new PlanFeatureLimit(FeatureEnum.READ_SPACE, null, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, 3L),
+                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_MANAGER, null),
 
@@ -242,11 +240,12 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.READ_TASK, null, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_ADMIN, null),
                 new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, 30L),
+                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, null),
 
                 new PlanFeatureLimit(FeatureEnum.FINISH_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.MANAGE_PARTICIPANTS, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.MANAGE_PARTICIPANTS, ROLE_SPACE_MANAGER, null)
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, null, 5L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, null, 10L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 50L)
             ));
 
         this.grantInternalSubscription(userJoiceLaet, basicPlan);
@@ -262,7 +261,7 @@ public class DatabaseService {
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
-//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
+        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
 
         Set<Long> usersToBeApproved = new HashSet<>();
         usersToBeApproved.add(userJoiceLaet.getId());
@@ -270,6 +269,7 @@ public class DatabaseService {
         usersToBeApproved.add(userBellaLaet.getId());
         usersToBeApproved.add(adminJonatasLaet.getId());
 
+        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
         spaceMembershipService.aproveSpaceMemberships(spaceResidenciaCasalLaet.id(), userJoiceLaet, usersToBeApproved);
 
         return true;

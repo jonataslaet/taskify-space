@@ -4,16 +4,19 @@ import com.jonataslaet.taskifyspace.controllers.dtos.StandardErrorRecordDTO;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.time.Instant;
+import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -56,6 +59,34 @@ public class GlobalExceptionHandler {
         error.setTimestamp(Instant.now());
         error.setStatus(HttpStatus.BAD_REQUEST.value());
         error.setError("Erro de requisição");
+        error.setMessage(ex.getMessage());
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleMethodArgumentNotValidException(
+        MethodArgumentNotValidException ex, HttpServletRequest request) {
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.BAD_REQUEST.value());
+        error.setError("Requisicao invalida");
+        error.setMessage(ex.getBindingResult().getFieldErrors().stream()
+            .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
+            .collect(Collectors.joining("; ")));
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleInvalidRequestException(
+        InvalidRequestException ex, HttpServletRequest request) {
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.BAD_REQUEST.value());
+        error.setError("Requisicao invalida");
         error.setMessage(ex.getMessage());
         error.setPath(request.getRequestURI());
 

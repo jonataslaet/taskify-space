@@ -5,6 +5,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
@@ -36,12 +37,15 @@ public class SpaceMembershipService {
 
     private final SpaceMembershipRepository spaceMembershipRepository;
     private final ParticipantRepository participantRepository;
+    private final FeatureAccessService featureAccessService;
 
     public SpaceMembershipService(
         SpaceMembershipRepository spaceMembershipRepository,
-        ParticipantRepository participantRepository) {
+        ParticipantRepository participantRepository,
+        FeatureAccessService featureAccessService) {
         this.spaceMembershipRepository = spaceMembershipRepository;
         this.participantRepository = participantRepository;
+        this.featureAccessService = featureAccessService;
     }
 
     @Transactional
@@ -65,13 +69,15 @@ public class SpaceMembershipService {
         Set<SpaceMembership> spaceMemberships = spaceMembershipRepository.findBySpaceIdUsersIds(spaceId, null);
         AtomicBoolean hasAuthenticatedUserAsAdmin = new AtomicBoolean(false);
 
-        spaceMemberships.forEach(sm -> {
+        spaceMemberships.stream().filter(sm -> sm.getUser().isEnabled()).forEach(sm -> {
             if (!hasAuthenticatedUserAsAdmin.get() && sm.getSpaceUserRole().equals(
                 SpaceUserRoleEnum.ROLE_SPACE_ADMIN) && sm.getUser().getId().equals(
                 authenticatedUser.getId())) {
                 hasAuthenticatedUserAsAdmin.set(true);
             }
             if (usersIds.contains(sm.getUser().getId()) && !sm.getSpaceMembershipStatusEnum().equals(SpaceMembershipStatusEnum.APPROVED)) {
+                featureAccessService.requireFeature(
+                    authenticatedUser, approvalFeature(sm.getSpaceUserRole()), sm.getSpace());
                 sm.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
             }
         });
@@ -91,7 +97,8 @@ public class SpaceMembershipService {
 
     @Transactional
     public SpaceMembershipRecordDTO updateParticipation(
-        Long spaceId, Long spaceMembershipId, SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole) {
+        Long spaceId, Long spaceMembershipId, SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole,
+        User authenticatedUser) {
 
         SpaceMembership spaceMembership = spaceMembershipRepository.findByIdAndSpaceId(spaceMembershipId, spaceId)
             .orElseThrow(() -> new ResourceNotFoundException("Participação não encontrada"));
@@ -105,10 +112,36 @@ public class SpaceMembershipService {
             : spaceMembership.getSpaceUserRole();
         validNotDuplicateParticipation(spaceMembership, targetSpaceUserRole);
 
+        if (willIncreaseApprovedRoleCount(spaceMembership, status, targetSpaceUserRole)) {
+            featureAccessService.requireFeature(
+                authenticatedUser, approvalFeature(targetSpaceUserRole), spaceMembership.getSpace());
+        }
+
         spaceMembership.setSpaceMembershipStatusEnum(status);
         if (Objects.nonNull(spaceUserRole)) spaceMembership.setSpaceUserRole(targetSpaceUserRole);
 
         return SpaceMembershipMapper.toDTO(spaceMembershipRepository.save(spaceMembership));
+    }
+
+    private boolean willIncreaseApprovedRoleCount(
+        SpaceMembership spaceMembership,
+        SpaceMembershipStatusEnum status,
+        SpaceUserRoleEnum targetSpaceUserRole) {
+        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status)
+            ? status
+            : spaceMembership.getSpaceMembershipStatusEnum();
+
+        return SpaceMembershipStatusEnum.APPROVED.equals(targetStatus)
+            && (!SpaceMembershipStatusEnum.APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum())
+                || !spaceMembership.getSpaceUserRole().equals(targetSpaceUserRole));
+    }
+
+    private FeatureEnum approvalFeature(SpaceUserRoleEnum spaceUserRole) {
+        return switch (spaceUserRole) {
+            case ROLE_SPACE_ADMIN -> FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN;
+            case ROLE_SPACE_MANAGER -> FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER;
+            case ROLE_SPACE_PARTICIPANT -> FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT;
+        };
     }
 
     private void validNotDuplicateParticipation(

@@ -2,6 +2,7 @@ package com.jonataslaet.taskifyspace.controllers;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.PlanRecordDTO;
 import com.jonataslaet.taskifyspace.services.PlanService;
+import jakarta.validation.Valid;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,13 +40,13 @@ public class PlanController {
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PostMapping
-    public ResponseEntity<@NonNull PlanRecordDTO> createPlan(@RequestBody PlanRecordDTO dto) {
+    public ResponseEntity<@NonNull PlanRecordDTO> createPlan(@RequestBody @Valid PlanRecordDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(planService.createPlan(dto));
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PutMapping("/{planId}")
-    public ResponseEntity<@NonNull PlanRecordDTO> updatePlan(@PathVariable Long planId, @RequestBody PlanRecordDTO dto) {
+    public ResponseEntity<@NonNull PlanRecordDTO> updatePlan(@PathVariable Long planId, @RequestBody @Valid PlanRecordDTO dto) {
         return ResponseEntity.ok(planService.updatePlan(planId, dto));
     }
 

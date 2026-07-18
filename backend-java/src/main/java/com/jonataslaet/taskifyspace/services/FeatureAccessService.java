@@ -8,9 +8,8 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
-import com.jonataslaet.taskifyspace.entities.enums.SubscriptionStatusEnum;
-import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
@@ -27,10 +26,8 @@ import java.util.stream.Collectors;
 @Service
 public class FeatureAccessService {
 
-    private static final Set<SubscriptionStatusEnum> ACTIVE_STATUSES =
-        Set.of(SubscriptionStatusEnum.ACTIVE, SubscriptionStatusEnum.TRIALING);
-
     private final SubscriptionRepository subscriptionRepository;
+    private final SpaceMembershipRepository spaceMembershipRepository;
     private final SpaceRepository spaceRepository;
     private final TaskRepository taskRepository;
     private final TaskExecutionRepository taskExecutionRepository;
@@ -38,11 +35,13 @@ public class FeatureAccessService {
 
     public FeatureAccessService(
         SubscriptionRepository subscriptionRepository,
+        SpaceMembershipRepository spaceMembershipRepository,
         SpaceRepository spaceRepository,
         TaskRepository taskRepository,
         TaskExecutionRepository taskExecutionRepository,
         Clock clock) {
         this.subscriptionRepository = subscriptionRepository;
+        this.spaceMembershipRepository = spaceMembershipRepository;
         this.spaceRepository = spaceRepository;
         this.taskRepository = taskRepository;
         this.taskExecutionRepository = taskExecutionRepository;
@@ -56,9 +55,6 @@ public class FeatureAccessService {
 
     @Transactional(readOnly = true)
     public boolean hasFeature(User user, FeatureEnum feature, Space space) {
-        if (user.getRole().equals(UserRoleEnum.ROLE_ADMIN)) {
-            return true;
-        }
         Set<SpaceUserRoleEnum> spaceUserRoles = resolveSpaceUserRoles(user, space);
         UsageGrant usageGrant = resolveUsageGrant(user, feature, spaceUserRoles);
         if (!usageGrant.granted()) {
@@ -67,7 +63,7 @@ public class FeatureAccessService {
         if (usageGrant.unlimited()) {
             return true;
         }
-        long currentUsage = countUsage(user, feature, usageGrant.periodStart(), usageGrant.periodEnd());
+        long currentUsage = countUsage(user, feature, space, usageGrant.periodStart(), usageGrant.periodEnd());
         return currentUsage < usageGrant.usageLimit();
     }
 
@@ -131,7 +127,7 @@ public class FeatureAccessService {
             .collect(Collectors.toSet());
     }
 
-    private long countUsage(User user, FeatureEnum feature, Instant periodStart, Instant periodEnd) {
+    private long countUsage(User user, FeatureEnum feature, Space space, Instant periodStart, Instant periodEnd) {
         return switch (feature) {
             case CREATE_SPACE -> spaceRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 user.getId(), periodStart, periodEnd);
@@ -139,10 +135,15 @@ public class FeatureAccessService {
                 user.getId(), periodStart, periodEnd);
             case FINISH_TASK -> taskExecutionRepository.countExecutionsByExecutorInPeriod(
                 user.getId(), periodStart, periodEnd);
+            case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER,
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT -> Objects.isNull(space)
+                ? Long.MAX_VALUE
+                : spaceMembershipRepository.countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+                    space.getId(), SpaceMembershipStatusEnum.APPROVED, feature.approvalSpaceUserRole());
             case READ_SPACE, UPDATE_SPACE, DELETE_SPACE,
                  ACTIVE_OR_INACTIVE_SPACE,
-                 READ_TASK, UPDATE_TASK, DELETE_TASK,
-                 MANAGE_PARTICIPANTS -> 0;
+                 READ_TASK, UPDATE_TASK, DELETE_TASK -> 0;
         };
     }
 

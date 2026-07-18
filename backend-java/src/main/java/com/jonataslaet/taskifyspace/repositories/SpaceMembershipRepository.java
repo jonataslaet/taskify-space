@@ -47,4 +47,9 @@ public interface SpaceMembershipRepository extends JpaRepository<
         Long userId,
         Set<SpaceUserRoleEnum> roles,
         SpaceMembershipStatusEnum status);
+
+    long countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+        Long spaceId,
+        SpaceMembershipStatusEnum status,
+        SpaceUserRoleEnum spaceUserRole);
 }

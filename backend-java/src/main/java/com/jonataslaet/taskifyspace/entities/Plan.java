@@ -1,12 +1,9 @@
 package com.jonataslaet.taskifyspace.entities;
 
-import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,12 +32,6 @@ public class Plan {
     @Column(nullable = false)
     private Boolean active = Boolean.TRUE;
 
-    @ElementCollection(targetClass = FeatureEnum.class)
-    @CollectionTable(name = "plan_features", joinColumns = @JoinColumn(name = "plan_id"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "feature", nullable = false)
-    private Set<FeatureEnum> features = new HashSet<>();
-
     @ElementCollection
     @CollectionTable(name = "plan_feature_limits", joinColumns = @JoinColumn(name = "plan_id"))
     private Set<PlanFeatureLimit> featureLimits = new HashSet<>();
@@ -67,10 +58,6 @@ public class Plan {
         return active;
     }
 
-    public Set<FeatureEnum> getFeatures() {
-        return features;
-    }
-
     public Set<PlanFeatureLimit> getFeatureLimits() {
         return featureLimits;
     }
@@ -93,10 +80,6 @@ public class Plan {
 
     public void setActive(Boolean active) {
         this.active = active;
-    }
-
-    public void setFeatures(Set<FeatureEnum> features) {
-        this.features = features;
     }
 
     public void setFeatureLimits(Set<PlanFeatureLimit> featureLimits) {

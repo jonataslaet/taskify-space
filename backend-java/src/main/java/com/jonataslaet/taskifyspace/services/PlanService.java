@@ -1,8 +1,12 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.PlanRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.PlanFeatureLimitRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Plan;
+import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.PlanMapper;
 import com.jonataslaet.taskifyspace.repositories.PlanRepository;
@@ -15,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -28,6 +33,7 @@ public class PlanService {
 
     @Transactional
     public PlanRecordDTO createPlan(PlanRecordDTO dto) {
+        validatePlan(dto);
         if (planRepository.existsByCodeIgnoreCase(dto.code())) {
             throw new DuplicationException("Plano ja existe");
         }
@@ -55,14 +61,12 @@ public class PlanService {
 
     @Transactional
     public PlanRecordDTO updatePlan(Long planId, PlanRecordDTO dto) {
+        validatePlan(dto);
         Plan plan = getPlanEntity(planId);
         if (!plan.getCode().equalsIgnoreCase(dto.code()) && planRepository.existsByCodeIgnoreCase(dto.code())) {
             throw new DuplicationException("Plano ja existe");
         }
         BeanUtils.copyProperties(PlanMapper.toEntity(dto), plan, "id");
-        if (Objects.isNull(dto.features())) {
-            plan.setFeatures(new HashSet<>());
-        }
         return PlanMapper.toDTO(planRepository.save(plan));
     }
 
@@ -72,4 +76,46 @@ public class PlanService {
         plan.setActive(!plan.getActive());
         planRepository.save(plan);
     }
+
+    private void validatePlan(PlanRecordDTO dto) {
+        if (Objects.isNull(dto)) {
+            throw new InvalidRequestException("Plano e obrigatorio");
+        }
+        if (Objects.isNull(dto.featureLimits()) || dto.featureLimits().isEmpty()) {
+            throw new InvalidRequestException("Limites de funcionalidades do plano sao obrigatorios");
+        }
+
+        Set<FeatureEnum> featuresFromLimits = new HashSet<>();
+        Set<PlanFeatureLimitKey> featureLimitKeys = new HashSet<>();
+        for (PlanFeatureLimitRecordDTO limit : dto.featureLimits()) {
+            FeatureEnum feature = validateFeatureLimit(limit);
+            featuresFromLimits.add(feature);
+            if (!featureLimitKeys.add(new PlanFeatureLimitKey(feature, limit.spaceUserRole()))) {
+                throw new InvalidRequestException("Limite duplicado para funcionalidade " + feature);
+            }
+        }
+
+        if (Objects.nonNull(dto.features()) && !dto.features().equals(featuresFromLimits)) {
+            throw new InvalidRequestException("Campo features deve corresponder as funcionalidades em featureLimits");
+        }
+    }
+
+    private FeatureEnum validateFeatureLimit(PlanFeatureLimitRecordDTO limit) {
+        if (Objects.isNull(limit)) {
+            throw new InvalidRequestException("Limite de funcionalidade nao pode ser nulo");
+        }
+        FeatureEnum feature = limit.feature();
+        if (Objects.isNull(feature)) {
+            throw new InvalidRequestException("Funcionalidade do limite e obrigatoria");
+        }
+        if (!feature.supportsSpaceUserRoleScope() && Objects.nonNull(limit.spaceUserRole())) {
+            throw new InvalidRequestException("Funcionalidade " + feature + " nao aceita restricao por papel no espaco");
+        }
+        if (!feature.isUsageMetered() && Objects.nonNull(limit.usageLimit())) {
+            throw new InvalidRequestException("Funcionalidade " + feature + " nao aceita limite numerico de uso");
+        }
+        return feature;
+    }
+
+    private record PlanFeatureLimitKey(FeatureEnum feature, SpaceUserRoleEnum spaceUserRole) {}
 }

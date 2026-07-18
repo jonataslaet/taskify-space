@@ -4,6 +4,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.PlanRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.PlanFeatureLimitRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Plan;
 import com.jonataslaet.taskifyspace.entities.PlanFeatureLimit;
+import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -18,7 +19,6 @@ public class PlanMapper {
         plan.setName(dto.name());
         plan.setDescription(dto.description());
         plan.setActive(Objects.isNull(dto.active()) || dto.active());
-        plan.setFeatures(Objects.isNull(dto.features()) ? new HashSet<>() : new HashSet<>(dto.features()));
         plan.setFeatureLimits(toFeatureLimits(dto.featureLimits()));
         return plan;
     }
@@ -31,9 +31,16 @@ public class PlanMapper {
             plan.getName(),
             plan.getDescription(),
             plan.getActive(),
-            plan.getFeatures(),
+            toFeatures(plan.getFeatureLimits()),
             toFeatureLimitDTOs(plan.getFeatureLimits())
         );
+    }
+
+    private static Set<FeatureEnum> toFeatures(Set<PlanFeatureLimit> limits) {
+        if (Objects.isNull(limits)) return Set.of();
+        return limits.stream()
+            .map(PlanFeatureLimit::getFeature)
+            .collect(Collectors.toSet());
     }
 
     private static Set<PlanFeatureLimit> toFeatureLimits(Set<PlanFeatureLimitRecordDTO> dtos) {

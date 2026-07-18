@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.entities.Subscription;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionProviderEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionStatusEnum;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.SubscriptionMapper;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
@@ -18,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
@@ -38,14 +41,32 @@ public class SubscriptionService {
 
     @Transactional
     public SubscriptionRecordDTO grantSubscription(Long userId, Long planId, SubscriptionRecordDTO dto) {
+        if (Objects.isNull(dto)) {
+            throw new InvalidRequestException("Dados da assinatura sao obrigatorios");
+        }
         User user = userService.findUserById(userId);
         Plan plan = planService.getPlanEntity(planId);
+        if (!Boolean.TRUE.equals(plan.getActive())) {
+            throw new InvalidRequestException("Plano inativo nao pode ser concedido");
+        }
+
+        Instant now = Instant.now(clock);
+        Optional<Subscription> activeSubscription = findActiveSubscription(userId, planId, now);
+        if (activeSubscription.isPresent()) {
+            return SubscriptionMapper.toDTO(activeSubscription.get());
+        }
+
+        Instant periodStart = Objects.isNull(dto.currentPeriodStart()) ? now : dto.currentPeriodStart();
+        if (Objects.nonNull(dto.currentPeriodEnd()) && !dto.currentPeriodEnd().isAfter(periodStart)) {
+            throw new InvalidRequestException("Fim do periodo da assinatura deve ser posterior ao inicio");
+        }
+
         Subscription subscription = new Subscription();
         subscription.setUser(user);
         subscription.setPlan(plan);
         subscription.setStatus(dto.status() == null ? SubscriptionStatusEnum.ACTIVE : dto.status());
         subscription.setProvider(dto.provider() == null ? SubscriptionProviderEnum.INTERNAL : dto.provider());
-        subscription.setCurrentPeriodStart(dto.currentPeriodStart() == null ? Instant.now(clock) : dto.currentPeriodStart());
+        subscription.setCurrentPeriodStart(periodStart);
         subscription.setCurrentPeriodEnd(dto.currentPeriodEnd());
         subscription.setExternalCustomerId(dto.externalCustomerId());
         subscription.setExternalSubscriptionId(dto.externalSubscriptionId());
@@ -76,5 +97,11 @@ public class SubscriptionService {
     public Subscription getSubscriptionEntity(Long subscriptionId) {
         return subscriptionRepository.findById(subscriptionId)
             .orElseThrow(() -> new ResourceNotFoundException("Assinatura nao encontrada"));
+    }
+
+    private Optional<Subscription> findActiveSubscription(Long userId, Long planId, Instant now) {
+        return subscriptionRepository.findByUserIdAndPlanId(userId, planId).stream()
+            .filter(subscription -> subscription.grantsAccessAt(now))
+            .findFirst();
     }
 }
