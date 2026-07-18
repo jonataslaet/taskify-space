@@ -66,26 +66,30 @@ public class TaskController {
 
     @PutMapping("/{taskId}")
     public ResponseEntity<@NonNull TaskRecordDTO> updateTask(
-        @PathVariable("taskId") Long taskId, @RequestBody
+        @PathVariable("taskId") Long taskId,
+        @AuthenticationPrincipal User authenticatedUser,
+        @RequestBody
         @JsonView(TaskRecordDTO.TaskView.UpdateTask.class) TaskRecordDTO taskRecordDTO) {
 
-        TaskRecordDTO updatedTask = taskService.updateTask(taskId, taskRecordDTO);
+        TaskRecordDTO updatedTask = taskService.updateTask(authenticatedUser, taskId, taskRecordDTO);
         return ResponseEntity.ok(updatedTask);
     }
 
     @DeleteMapping("/{taskId}")
     public ResponseEntity<@NonNull Void> deleteTask(
-        @PathVariable("taskId") Long taskId) {
+        @PathVariable("taskId") Long taskId,
+        @AuthenticationPrincipal User authenticatedUser) {
 
-        taskService.deleteTask(taskId);
+        taskService.deleteTask(authenticatedUser, taskId);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{taskId}")
     public ResponseEntity<@NonNull Void> toggleActiveTask(
-        @PathVariable("taskId") Long taskId) {
+        @PathVariable("taskId") Long taskId,
+        @AuthenticationPrincipal User authenticatedUser) {
 
-        taskService.toggleActiveTask(taskId);
+        taskService.toggleActiveTask(authenticatedUser, taskId);
         return ResponseEntity.noContent().build();
     }
 }

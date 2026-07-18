@@ -79,7 +79,6 @@ public class SpaceService {
     public SpaceRecordDTO updateSpace(User authenticatedUser, Long spaceId, SpaceRecordDTO spaceRecordDTO) {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.UPDATE_SPACE, spaceEntity);
 //        TODO: Implement a method to verify if they are equals, if not, then return spaceRecordDTO
         BeanUtils.copyProperties(spaceRecordDTO, spaceEntity, "id");
         return SpaceMapper.toDTO(spaceRepository.save(spaceEntity));
@@ -89,7 +88,6 @@ public class SpaceService {
     public void deleteSpace(User authenticatedUser, Long spaceId) {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity, Set.of(ROLE_SPACE_ADMIN));
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.DELETE_SPACE, spaceEntity);
         taskExecutionRepository.deleteBySpaceId(spaceId);
         taskRepository.deleteBySpaceId(spaceId);
         spaceRepository.deleteById(spaceId);
@@ -129,7 +127,6 @@ public class SpaceService {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity,
             Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, spaceEntity);
         spaceEntity.setActive(!spaceEntity.getActive());
         spaceRepository.save(spaceEntity);
     }

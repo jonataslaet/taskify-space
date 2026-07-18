@@ -1,7 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.entities.*;
-import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
@@ -20,17 +19,15 @@ public class TaskExecutionService {
     private final SpaceService spaceService;
     private final SpaceMembershipService spaceMembershipService;
     private final TaskExecutionRepository taskExecutionRepository;
-    private final FeatureAccessService featureAccessService;
 
     public TaskExecutionService(TaskRepository taskRepository, UserService userService,
                                 SpaceService spaceService, SpaceMembershipService spaceMembershipService,
-                                TaskExecutionRepository taskExecutionRepository, FeatureAccessService featureAccessService) {
+                                TaskExecutionRepository taskExecutionRepository) {
         this.taskRepository = taskRepository;
         this.userService = userService;
         this.spaceService = spaceService;
         this.spaceMembershipService = spaceMembershipService;
         this.taskExecutionRepository = taskExecutionRepository;
-        this.featureAccessService = featureAccessService;
     }
 
     @Transactional
@@ -39,7 +36,6 @@ public class TaskExecutionService {
         TaskExecution taskExecution = getTaskExecutionEntity(taskExecutionId);
 
         Space space = taskExecution.getSpace();
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.FINISH_TASK, space);
         spaceService.validateActiveParticipation(
             authenticatedUser, space, Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
 

@@ -2,12 +2,10 @@ package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.entities.PlanFeatureLimit;
 import com.jonataslaet.taskifyspace.entities.Space;
-import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Subscription;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
-import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
@@ -20,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class FeatureAccessService {
@@ -55,8 +51,7 @@ public class FeatureAccessService {
 
     @Transactional(readOnly = true)
     public boolean hasFeature(User user, FeatureEnum feature, Space space) {
-        Set<SpaceUserRoleEnum> spaceUserRoles = resolveSpaceUserRoles(user, space);
-        UsageGrant usageGrant = resolveUsageGrant(user, feature, spaceUserRoles);
+        UsageGrant usageGrant = resolveUsageGrant(user, feature);
         if (!usageGrant.granted()) {
             return false;
         }
@@ -77,7 +72,7 @@ public class FeatureAccessService {
         }
     }
 
-    private UsageGrant resolveUsageGrant(User user, FeatureEnum feature, Set<SpaceUserRoleEnum> spaceUserRoles) {
+    private UsageGrant resolveUsageGrant(User user, FeatureEnum feature) {
         Instant now = Instant.now(clock);
         long usageLimit = 0;
         boolean granted = false;
@@ -91,7 +86,7 @@ public class FeatureAccessService {
             }
 
             for (PlanFeatureLimit limit : subscription.getPlan().getFeatureLimits()) {
-                if (!matches(limit, feature, spaceUserRoles)) {
+                if (!limit.getFeature().equals(feature)) {
                     continue;
                 }
                 granted = true;
@@ -107,24 +102,6 @@ public class FeatureAccessService {
 
         return new UsageGrant(granted, unlimited, usageLimit, nullableGrantStart(granted, periodStart),
             nullableGrantEnd(granted, periodEnd));
-    }
-
-    private boolean matches(PlanFeatureLimit limit, FeatureEnum feature, Set<SpaceUserRoleEnum> spaceUserRoles) {
-        if (!limit.getFeature().equals(feature)) {
-            return false;
-        }
-        return Objects.isNull(limit.getSpaceUserRole()) || spaceUserRoles.contains(limit.getSpaceUserRole());
-    }
-
-    private Set<SpaceUserRoleEnum> resolveSpaceUserRoles(User user, Space space) {
-        if (Objects.isNull(space)) {
-            return Set.of();
-        }
-        return space.getSpaceMemberships().stream()
-            .filter(item -> item.getUser().getId().equals(user.getId()))
-            .filter(item -> SpaceMembershipStatusEnum.APPROVED.equals(item.getSpaceMembershipStatusEnum()))
-            .map(SpaceMembership::getSpaceUserRole)
-            .collect(Collectors.toSet());
     }
 
     private long countUsage(User user, FeatureEnum feature, Space space, Instant periodStart, Instant periodEnd) {

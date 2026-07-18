@@ -46,7 +46,7 @@ public class PlanMapper {
     private static Set<PlanFeatureLimit> toFeatureLimits(Set<PlanFeatureLimitRecordDTO> dtos) {
         if (Objects.isNull(dtos)) return new HashSet<>();
         return dtos.stream()
-            .map(dto -> new PlanFeatureLimit(dto.feature(), dto.spaceUserRole(), dto.usageLimit()))
+            .map(dto -> new PlanFeatureLimit(dto.feature(), dto.usageLimit()))
             .collect(Collectors.toSet());
     }
 
@@ -55,7 +55,6 @@ public class PlanMapper {
         return limits.stream()
             .map(limit -> new PlanFeatureLimitRecordDTO(
                 limit.getFeature(),
-                limit.getSpaceUserRole(),
                 limit.getUsageLimit()
             ))
             .collect(Collectors.toSet());

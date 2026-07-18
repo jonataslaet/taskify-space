@@ -3,7 +3,6 @@ package com.jonataslaet.taskifyspace.services;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
-import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -18,12 +17,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 
 @Service
 @Transactional(readOnly = true)
@@ -52,9 +53,7 @@ public class TaskService {
         Space space = spaceService.getSpaceEntity(taskRecordDTO.spaceId());
         featureAccessService.requireFeature(authenticatedUser, FeatureEnum.CREATE_TASK, space);
         spaceService.validActiveSpace(space);
-        if (!hasPermissionToCreateTask(authenticatedUser, space)) {
-            throw new ForbiddenException("Esse usuário não tem permissão para criar tarefa nesse espaço");
-        }
+        spaceService.validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
 
         if (taskRepository.existsBySpaceIdAndDescriptionIgnoreCase(
             taskRecordDTO.spaceId(), taskRecordDTO.description())) {
@@ -69,10 +68,9 @@ public class TaskService {
     public void finishTask(Long taskId, Long spaceId, User authenticatedUser, Set<Long> executorsIds) {
 
         Space space = spaceService.getSpaceEntity(spaceId);
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.FINISH_TASK, space);
         spaceService.validActiveSpace(space);
         spaceService.validateActiveParticipation(
-            authenticatedUser, space, Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
+            authenticatedUser, space, Set.of(ROLE_SPACE_PARTICIPANT));
 
         includeExecutorsIds(executorsIds, Set.of(authenticatedUser.getId()));
         Set<SpaceMembership> approvedSpaceMemberships = getApprovedSpaceMemberships(space.getSpaceMemberships());
@@ -111,17 +109,6 @@ public class TaskService {
         }
     }
 
-    private boolean hasPermissionToCreateTask(User authenticatedUser, Space space) {
-        Set<SpaceMembership> spaceMemberships = spaceMembershipService.getSpaceMemberships(authenticatedUser, space);
-        for (SpaceMembership spaceMembership: spaceMemberships) {
-            if (List.of(SpaceUserRoleEnum.ROLE_SPACE_ADMIN, SpaceUserRoleEnum.ROLE_SPACE_MANAGER)
-                .contains(spaceMembership.getSpaceUserRole())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public TaskRecordDTO getTaskById(Long TaskId) {
         Task task = getTaskEntity(TaskId);
         return TaskMapper.toDTO(task);
@@ -133,10 +120,12 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskRecordDTO updateTask(Long TaskId, TaskRecordDTO taskRecordDTO) {
+    public TaskRecordDTO updateTask(User authenticatedUser, Long TaskId, TaskRecordDTO taskRecordDTO) {
         Task taskEntity = getTaskEntity(TaskId);
+        Space space = taskEntity.getSpace();
+        spaceService.validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
         if (!taskEntity.getDescription().equalsIgnoreCase(taskRecordDTO.description())) {
-            if (taskRepository.existsBySpaceIdAndDescriptionIgnoreCase(taskRecordDTO.spaceId(), taskRecordDTO.description())) {
+            if (taskRepository.existsBySpaceIdAndDescriptionIgnoreCase(space.getId(), taskRecordDTO.description())) {
                 throw new DuplicationException("Essa tarefa já existe");
             }
         }
@@ -145,16 +134,16 @@ public class TaskService {
     }
 
     @Transactional
-    public void deleteTask(Long TaskId) {
-        if (!taskRepository.existsById(TaskId)) {
-            throw new ResourceNotFoundException("Tarefa não encontrada");
-        }
+    public void deleteTask(User authenticatedUser, Long TaskId) {
+        Task task = getTaskEntity(TaskId);
+        spaceService.validateActiveParticipation(authenticatedUser, task.getSpace(), Set.of(ROLE_SPACE_ADMIN));
         taskRepository.deleteById(TaskId);
     }
 
     @Transactional
-    public void toggleActiveTask(Long taskId) {
+    public void toggleActiveTask(User authenticatedUser, Long taskId) {
         Task task = getTaskEntity(taskId);
+        spaceService.validateActiveParticipation(authenticatedUser, task.getSpace(), Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
         task.setActive(!task.isActive());
         taskRepository.save(task);
     }

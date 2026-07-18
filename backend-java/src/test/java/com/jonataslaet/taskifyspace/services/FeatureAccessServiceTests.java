@@ -80,7 +80,7 @@ class FeatureAccessServiceTests {
         User user = createUser(2L, UserRoleEnum.ROLE_USER);
         Plan plan = new Plan();
         plan.setActive(true);
-        plan.setFeatureLimits(Set.of(new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, null, 1L)));
+        plan.setFeatureLimits(Set.of(new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L)));
 
         Subscription subscription = new Subscription();
         subscription.setUser(user);
@@ -105,7 +105,7 @@ class FeatureAccessServiceTests {
         space.setId(10L);
         Subscription subscription = activeSubscription(
             user,
-            new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 3L));
+            new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 3L));
 
         when(subscriptionRepository.findByUserId(user.getId())).thenReturn(List.of(subscription));
         when(spaceMembershipRepository.countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
@@ -125,7 +125,7 @@ class FeatureAccessServiceTests {
         space.setId(11L);
         Subscription subscription = activeSubscription(
             user,
-            new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 3L));
+            new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 3L));
 
         when(subscriptionRepository.findByUserId(user.getId())).thenReturn(List.of(subscription));
         when(spaceMembershipRepository.countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(

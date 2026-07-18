@@ -9,7 +9,6 @@ import com.jonataslaet.taskifyspace.entities.Subscription;
 import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
-import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionProviderEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
@@ -29,11 +28,8 @@ import org.springframework.util.ObjectUtils;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-
-import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.*;
 
 @Service
 @Transactional
@@ -184,68 +180,29 @@ public class DatabaseService {
 
         Plan basicPlan = this.createPlan("BASIC", "Basic", "Plano basico para uso individual",
             Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, null, 1L),
-                new PlanFeatureLimit(FeatureEnum.READ_SPACE, null, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_MANAGER, null),
-
-                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, ROLE_SPACE_ADMIN, 10L),
-                new PlanFeatureLimit(FeatureEnum.READ_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, null),
-
-                new PlanFeatureLimit(FeatureEnum.FINISH_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, null, 1L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, null, 1L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 4L)
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 10L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 1L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 1L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 4L)
             ));
 
         Plan proPlan = this.createPlan("PRO", "Pro", "Plano com funcionalidades principais",
             Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, null, 2L),
-                new PlanFeatureLimit(FeatureEnum.READ_SPACE, null, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_MANAGER, null),
-
-                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, ROLE_SPACE_ADMIN, 20L),
-                new PlanFeatureLimit(FeatureEnum.READ_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, null),
-
-                new PlanFeatureLimit(FeatureEnum.FINISH_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, null, 2L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, null, 3L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 12L)
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 3L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 50L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 2L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 5L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 20L)
             ));
 
-        Plan premiumPlan = this.createPlan("PREMIUM", "Premium", "Plano completo",
+        Plan premiumPlan = this.createPlan("PREMIUM", "Premium", "Plano completo para equipes maiores",
             Set.of(
-
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, null, 3L),
-                new PlanFeatureLimit(FeatureEnum.READ_SPACE, null, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.ACTIVE_OR_INACTIVE_SPACE, ROLE_SPACE_MANAGER, null),
-
-                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, ROLE_SPACE_ADMIN, 30L),
-                new PlanFeatureLimit(FeatureEnum.READ_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_ADMIN, null),
-                new PlanFeatureLimit(FeatureEnum.UPDATE_TASK, ROLE_SPACE_MANAGER, null),
-                new PlanFeatureLimit(FeatureEnum.DELETE_TASK, ROLE_SPACE_ADMIN, null),
-
-                new PlanFeatureLimit(FeatureEnum.FINISH_TASK, null, null),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, null, 5L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, null, 10L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, null, 50L)
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 10L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 250L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 5L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 10L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 100L)
             ));
 
 //        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
@@ -257,7 +214,7 @@ public class DatabaseService {
 //
 //        TaskRecordDTO taskRecordDTO = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
 //
-//        taskService.toggleActiveTask(taskRecordDTO.id());
+//        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO.id());
 //
 //        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
 //        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);

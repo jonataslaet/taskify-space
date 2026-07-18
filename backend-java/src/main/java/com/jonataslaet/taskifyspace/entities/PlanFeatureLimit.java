@@ -1,7 +1,6 @@
 package com.jonataslaet.taskifyspace.entities;
 
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
-import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
@@ -16,25 +15,17 @@ public class PlanFeatureLimit {
     @Column(nullable = false)
     private FeatureEnum feature;
 
-    @Enumerated(EnumType.STRING)
-    private SpaceUserRoleEnum spaceUserRole;
-
     private Long usageLimit;
 
     public PlanFeatureLimit() {}
 
-    public PlanFeatureLimit(FeatureEnum feature, SpaceUserRoleEnum spaceUserRole, Long usageLimit) {
+    public PlanFeatureLimit(FeatureEnum feature, Long usageLimit) {
         this.feature = feature;
-        this.spaceUserRole = spaceUserRole;
         this.usageLimit = usageLimit;
     }
 
     public FeatureEnum getFeature() {
         return feature;
-    }
-
-    public SpaceUserRoleEnum getSpaceUserRole() {
-        return spaceUserRole;
     }
 
     public Long getUsageLimit() {
@@ -45,10 +36,6 @@ public class PlanFeatureLimit {
         this.feature = feature;
     }
 
-    public void setSpaceUserRole(SpaceUserRoleEnum spaceUserRole) {
-        this.spaceUserRole = spaceUserRole;
-    }
-
     public void setUsageLimit(Long usageLimit) {
         this.usageLimit = usageLimit;
     }
@@ -57,11 +44,11 @@ public class PlanFeatureLimit {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof PlanFeatureLimit that)) return false;
-        return feature == that.feature && spaceUserRole == that.spaceUserRole;
+        return feature == that.feature;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(feature, spaceUserRole);
+        return Objects.hash(feature);
     }
 }

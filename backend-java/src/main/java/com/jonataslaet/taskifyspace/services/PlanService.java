@@ -4,7 +4,6 @@ import com.jonataslaet.taskifyspace.controllers.dtos.PlanRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.PlanFeatureLimitRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Plan;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
-import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -86,11 +85,9 @@ public class PlanService {
         }
 
         Set<FeatureEnum> featuresFromLimits = new HashSet<>();
-        Set<PlanFeatureLimitKey> featureLimitKeys = new HashSet<>();
         for (PlanFeatureLimitRecordDTO limit : dto.featureLimits()) {
             FeatureEnum feature = validateFeatureLimit(limit);
-            featuresFromLimits.add(feature);
-            if (!featureLimitKeys.add(new PlanFeatureLimitKey(feature, limit.spaceUserRole()))) {
+            if (!featuresFromLimits.add(feature)) {
                 throw new InvalidRequestException("Limite duplicado para funcionalidade " + feature);
             }
         }
@@ -108,14 +105,9 @@ public class PlanService {
         if (Objects.isNull(feature)) {
             throw new InvalidRequestException("Funcionalidade do limite e obrigatoria");
         }
-        if (!feature.supportsSpaceUserRoleScope() && Objects.nonNull(limit.spaceUserRole())) {
-            throw new InvalidRequestException("Funcionalidade " + feature + " nao aceita restricao por papel no espaco");
-        }
         if (!feature.isUsageMetered() && Objects.nonNull(limit.usageLimit())) {
             throw new InvalidRequestException("Funcionalidade " + feature + " nao aceita limite numerico de uso");
         }
         return feature;
     }
-
-    private record PlanFeatureLimitKey(FeatureEnum feature, SpaceUserRoleEnum spaceUserRole) {}
 }
