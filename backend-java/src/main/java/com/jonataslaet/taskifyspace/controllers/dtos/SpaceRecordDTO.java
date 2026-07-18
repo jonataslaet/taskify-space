@@ -24,7 +24,10 @@ public record SpaceRecordDTO(
     SpaceUserRoleEnum spaceUserRole,
 
     @JsonView({SpaceView.ReadSpace.class})
-    SpaceMembershipStatusEnum spaceMembershipStatus
+    SpaceMembershipStatusEnum spaceMembershipStatus,
+
+    @JsonView({SpaceView.ReadSpace.class})
+    Long activeParticipationsCount
 ) {
     public interface SpaceView {
         interface CreateSpace {}

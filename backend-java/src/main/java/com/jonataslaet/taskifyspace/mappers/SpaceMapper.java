@@ -10,6 +10,8 @@ import org.springframework.beans.BeanUtils;
 import java.util.List;
 import java.util.Objects;
 
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+
 public class SpaceMapper {
 
     public static Space toEntity(SpaceRecordDTO spaceRecordDTO) {
@@ -19,7 +21,7 @@ public class SpaceMapper {
     }
 
     public static SpaceRecordDTO toDTO(Space space) {
-        return new SpaceRecordDTO(space.getId(), space.getName(), getSpaceAdminName(space), space.getActive(), null, null);
+        return new SpaceRecordDTO(space.getId(), space.getName(), getSpaceAdminName(space), space.getActive(), null, null, null);
     }
 
     public static SpaceRecordDTO toDTO(Space space, User authenticatedUser) {
@@ -30,8 +32,16 @@ public class SpaceMapper {
             getSpaceAdminName(space),
             space.getActive(),
             Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceUserRole() : null,
-            Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceMembershipStatusEnum() : null
+            Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceMembershipStatusEnum() : null,
+            countActiveParticipations(space)
         );
+    }
+
+    private static Long countActiveParticipations(Space space) {
+        return space.getSpaceMemberships().stream()
+            .filter(spaceMembership -> Objects.nonNull(spaceMembership)
+                && APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum()))
+            .count();
     }
 
     private static String getSpaceAdminName(Space space) {
