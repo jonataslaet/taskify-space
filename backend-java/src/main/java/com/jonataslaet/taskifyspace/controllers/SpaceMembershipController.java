@@ -32,6 +32,13 @@ public class SpaceMembershipController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/request")
+    public ResponseEntity<@NonNull SpaceRecordDTO> requestParticipation(@AuthenticationPrincipal User authenticatedUser,
+        @PathVariable Long spaceId) {
+        spaceService.requestParticipation(spaceId, authenticatedUser);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull SpaceMembershipRecordDTO>> readParticipations(
         SpecificationTemplate.SpaceMembershipSpecification spaceSpecification,

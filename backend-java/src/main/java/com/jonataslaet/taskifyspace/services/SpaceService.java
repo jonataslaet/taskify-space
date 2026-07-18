@@ -108,6 +108,12 @@ public class SpaceService {
     }
 
     @Transactional
+    public void requestParticipation(Long spaceId, User authenticatedUser) {
+        Space space = getSpaceEntity(spaceId);
+        spaceMembershipService.setSpaceMembership(space, authenticatedUser, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+    }
+
+    @Transactional
     public void createParticipation(User authenticatedUser, Long spaceId, String email) {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity,
