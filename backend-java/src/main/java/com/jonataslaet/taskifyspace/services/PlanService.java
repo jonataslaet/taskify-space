@@ -105,8 +105,8 @@ public class PlanService {
         if (Objects.isNull(feature)) {
             throw new InvalidRequestException("Funcionalidade do limite e obrigatoria");
         }
-        if (Objects.nonNull(limit.usageLimit())) {
-            throw new InvalidRequestException("Funcionalidade " + feature + " nao aceita limite numerico de uso");
+        if (Objects.nonNull(limit.usageLimit()) && limit.usageLimit() <= 0) {
+            throw new InvalidRequestException("Limite de uso deve ser positivo quando informado");
         }
         return feature;
     }
