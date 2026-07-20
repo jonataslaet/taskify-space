@@ -21,9 +21,9 @@ public class TaskExecutionController {
     }
 
     @DeleteMapping("/{taskExecutionId}")
-    public ResponseEntity<@NonNull Void> removeCurrentUserFromTaskExecution(@PathVariable Long taskExecutionId,
-        @AuthenticationPrincipal User authenticatedUser){
-        taskExecutionService.removeCurrentUserFromTaskExecution(taskExecutionId, authenticatedUser);
+    public ResponseEntity<@NonNull Void> removeCurrentUserFromTaskExecution(@PathVariable Long spaceId,
+        @PathVariable Long taskExecutionId, @AuthenticationPrincipal User authenticatedUser){
+        taskExecutionService.removeCurrentUserFromTaskExecution(spaceId, taskExecutionId, authenticatedUser);
         return ResponseEntity.noContent().build();
     }
 }
