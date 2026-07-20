@@ -5,6 +5,7 @@ import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.services.CustomUserDetailsService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,6 +69,9 @@ public class TokenConfiguration {
         JWTVerifier jwtVerifier = JWT.require(algorithm).acceptLeeway(3).build();
         DecodedJWT decodedJWT = jwtVerifier.verify(token);
         UserDetails userDetails = userService.loadUserByUsername(decodedJWT.getSubject());
+        if (!userDetails.isEnabled()) {
+            throw new InvalidAuthenticationException("Usuario nao esta ativo");
+        }
         return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 

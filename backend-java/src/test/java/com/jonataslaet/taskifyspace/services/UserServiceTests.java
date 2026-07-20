@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -31,11 +32,14 @@ class UserServiceTests {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, passwordEncoder);
+        userService = new UserService(userRepository, passwordEncoder, refreshTokenService);
     }
 
     @Test
@@ -109,6 +113,26 @@ class UserServiceTests {
         assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.ACTIVE);
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+    }
+
+    @Test
+    void changeStatusRevokesRefreshTokensWhenStatusChanges() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.SUSPENDED));
+
+        verify(refreshTokenService).revokeAllByUserId(user.getId());
+    }
+
+    @Test
+    void changeStatusDoesNotRevokeRefreshTokensWhenStatusIsUnchanged() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
+
+        verify(refreshTokenService, never()).revokeAllByUserId(user.getId());
     }
 
     private User createUser(Long id, UserRoleEnum role) {

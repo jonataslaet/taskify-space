@@ -21,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -31,10 +32,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -124,8 +127,12 @@ public class UserService {
     public void changeStatus(Long userId, UpdateUserStatusRequestDTO updateUserStatusRequestDTO) {
         logger.info("Changing user status to {}", updateUserStatusRequestDTO.status());
         User user = findUserById(userId);
+        UserStatusEnum previousStatus = user.getStatus();
         user.setStatus(updateUserStatusRequestDTO.status());
         userRepository.save(user);
+        if (!Objects.equals(previousStatus, updateUserStatusRequestDTO.status())) {
+            refreshTokenService.revokeAllByUserId(userId);
+        }
         logger.info("User status changed successfully to {}", userId);
     }
 

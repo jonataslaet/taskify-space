@@ -68,6 +68,8 @@ public class AuthenticationService {
         User user = userRepository.findByEmail(current.getUser().getUsername())
             .orElseThrow(() -> new InvalidAuthenticationException("Usuário não encontrado"));
 
+        validateEnabledUser(user);
+
         String newToken = tokenConfiguration.createAccessToken(user);
         String newRefreshToken = refreshTokenService.rotate(refreshToken, deviceId, userAgent, ipAddress);
 
@@ -116,6 +118,12 @@ public class AuthenticationService {
 
     private boolean isMatchedPassword(CredentialsRecordDTO credentialsRecordDTO, String encodedPassword) {
         return passwordEncoder.matches(credentialsRecordDTO.password(), encodedPassword);
+    }
+
+    private void validateEnabledUser(User user) {
+        if (!user.isEnabled()) {
+            throw new InvalidAuthenticationException("Usuario nao esta ativo");
+        }
     }
 
     @Transactional
