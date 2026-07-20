@@ -28,6 +28,7 @@ import org.springframework.util.ObjectUtils;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -205,30 +206,29 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 100L)
             ));
 
-//        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
-//        this.grantInternalSubscription(userJoiceLaet, basicPlan);
-//
-//        SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
-//
-//        spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
-//
-//        TaskRecordDTO taskRecordDTO = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
-//
-//        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO.id());
-//
-//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
-//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);
-//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
-//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
-//
-//        Set<Long> usersToBeApproved = new HashSet<>();
-//        usersToBeApproved.add(userJoiceLaet.getId());
-//        usersToBeApproved.add(userRalphLaet.getId());
-//        usersToBeApproved.add(userBellaLaet.getId());
-//        usersToBeApproved.add(adminJonatasLaet.getId());
-//
-//        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
-//        spaceMembershipService.aproveSpaceMemberships(spaceResidenciaCasalLaet.id(), userJoiceLaet, usersToBeApproved);
+        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
+        this.grantInternalSubscription(userJoiceLaet, basicPlan);
+
+        SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
+
+        spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
+
+        TaskRecordDTO taskRecordDTO = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
+
+        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO.id());
+
+        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
+        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);
+        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
+        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
+
+        Set<Long> usersToBeApproved = new HashSet<>();
+        usersToBeApproved.add(userJoiceLaet.getId());
+        usersToBeApproved.add(userRalphLaet.getId());
+        usersToBeApproved.add(userBellaLaet.getId());
+        usersToBeApproved.add(adminJonatasLaet.getId());
+
+        spaceMembershipService.aproveSpaceMemberships(spaceResidenciaCasalLaet.id(), userJoiceLaet, usersToBeApproved);
 
         return true;
     }

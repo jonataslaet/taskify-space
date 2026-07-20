@@ -71,7 +71,7 @@ public class TaskService {
         Space space = spaceService.getSpaceEntity(spaceId);
         spaceService.validActiveSpace(space);
         spaceService.validateActiveParticipation(
-            authenticatedUser, space, Set.of(ROLE_SPACE_PARTICIPANT));
+            authenticatedUser, space, Set.of(ROLE_SPACE_PARTICIPANT, ROLE_SPACE_MANAGER, ROLE_SPACE_ADMIN));
 
         Set<Long> executorIds = includeAuthenticatedUserId(executorsIds, authenticatedUser.getId());
         Set<SpaceMembership> approvedSpaceMemberships = getApprovedSpaceMemberships(space.getSpaceMemberships());
