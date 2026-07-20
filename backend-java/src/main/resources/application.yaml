@@ -29,7 +29,7 @@ security:
     password-recover:
       uri: ${PASSWORD_RECOVER_URI:http://localhost:5173/new-password/}
       token:
-        minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES:30000000}
+        minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES}
   password:
     root: ${PASSWORD_ROOT}
   jwt:

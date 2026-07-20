@@ -7,6 +7,8 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -32,16 +35,18 @@ public class AuthenticationService {
     private final TokenConfiguration tokenConfiguration;
     private final PasswordRecoveryService passwordRecoveryService;
     private final EmailService emailService;
+    private final Validator validator;
 
     public AuthenticationService(RefreshTokenService refreshTokenService, UserRepository userRepository,
         PasswordEncoder passwordEncoder, TokenConfiguration tokenConfiguration,
-        PasswordRecoveryService passwordRecoveryService, EmailService emailService) {
+        PasswordRecoveryService passwordRecoveryService, EmailService emailService, Validator validator) {
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenConfiguration = tokenConfiguration;
         this.passwordRecoveryService = passwordRecoveryService;
         this.emailService = emailService;
+        this.validator = validator;
     }
 
     @Transactional
@@ -140,7 +145,18 @@ public class AuthenticationService {
     }
 
     private void validPasswordRenovation(PasswordResetDTO passwordRenovationDTO) {
-        if (!passwordRenovationDTO.newPassword().equals(passwordRenovationDTO.newPasswordConfirmation())) {
+        if (Objects.isNull(passwordRenovationDTO)
+            || Objects.isNull(passwordRenovationDTO.newPassword())
+            || Objects.isNull(passwordRenovationDTO.newPasswordConfirmation())) {
+            throw new InvalidAuthenticationException("Nova senha e confirmacao sao obrigatorias");
+        }
+
+        Set<ConstraintViolation<PasswordResetDTO>> violations = validator.validate(passwordRenovationDTO);
+        if (!violations.isEmpty()) {
+            throw new InvalidAuthenticationException("Nova senha invalida");
+        }
+
+        if (!Objects.equals(passwordRenovationDTO.newPassword(), passwordRenovationDTO.newPasswordConfirmation())) {
             throw new InvalidAuthenticationException("A senha e a confirmação dela devem ser exatamente iguais");
         }
     }

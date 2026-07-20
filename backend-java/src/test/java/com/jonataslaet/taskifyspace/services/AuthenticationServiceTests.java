@@ -1,12 +1,15 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.configurations.TokenConfiguration;
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordResetDTO;
 import com.jonataslaet.taskifyspace.entities.RefreshToken;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,17 +48,21 @@ class AuthenticationServiceTests {
     @Mock
     private EmailService emailService;
 
+    private Validator validator;
+
     private AuthenticationService authenticationService;
 
     @BeforeEach
     void setUp() {
+        validator = Validation.buildDefaultValidatorFactory().getValidator();
         authenticationService = new AuthenticationService(
             refreshTokenService,
             userRepository,
             passwordEncoder,
             tokenConfiguration,
             passwordRecoveryService,
-            emailService);
+            emailService,
+            validator);
     }
 
     @Test
@@ -72,6 +80,26 @@ class AuthenticationServiceTests {
 
         verify(tokenConfiguration, never()).createAccessToken(any(User.class));
         verify(refreshTokenService, never()).rotate(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void resetPasswordRejectsNullNewPasswordBeforeLoadingRecoveryToken() {
+        PasswordResetDTO passwordResetDTO = new PasswordResetDTO(null, "Strong1!");
+
+        assertThatThrownBy(() -> authenticationService.resetPassword("token", passwordResetDTO))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(passwordRecoveryService, never()).getValidPasswordRecoveries(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void resetPasswordRejectsWeakNewPasswordBeforeLoadingRecoveryToken() {
+        PasswordResetDTO passwordResetDTO = new PasswordResetDTO("weakpass", "weakpass");
+
+        assertThatThrownBy(() -> authenticationService.resetPassword("token", passwordResetDTO))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(passwordRecoveryService, never()).getValidPasswordRecoveries(anyString(), any(Instant.class));
     }
 
     private User createUser(UserStatusEnum status) {
