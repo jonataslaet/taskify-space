@@ -9,6 +9,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
@@ -145,9 +146,10 @@ public class SpaceService {
     }
 
     public Page<@NonNull ParticipantDTO> readParticipants(
-         Pageable pageable, Long spaceId, User authenticatedUser, String name, SpaceUserRoleEnum spaceUserRole) {
+         Pageable pageable, Long spaceId, User authenticatedUser, String name, SpaceUserRoleEnum spaceUserRole,
+         TaskCategoryEnum taskCategory) {
         return spaceMembershipService.readParticipants(
-            pageable, spaceId, authenticatedUser.getId(), name, spaceUserRole);
+            pageable, spaceId, authenticatedUser.getId(), name, spaceUserRole, taskCategory);
     }
 
     public void validateActiveParticipation(User authenticatedUser,

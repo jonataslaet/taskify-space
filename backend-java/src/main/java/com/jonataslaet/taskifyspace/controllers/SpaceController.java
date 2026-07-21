@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.services.SpaceService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
 import org.jspecify.annotations.NonNull;
@@ -47,9 +48,10 @@ public class SpaceController {
         Pageable pageable, @PathVariable("spaceId") Long spaceId,
         @RequestParam(value = "name", required = false) String name,
         @RequestParam(value = "spaceUserRole", required = false) SpaceUserRoleEnum spaceUserRole,
+        @RequestParam(value = "taskCategory", required = false) TaskCategoryEnum taskCategory,
         @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull ParticipantDTO> pagedSpacememberships =
-            spaceService.readParticipants(pageable, spaceId, authenticatedUser, name, spaceUserRole);
+            spaceService.readParticipants(pageable, spaceId, authenticatedUser, name, spaceUserRole, taskCategory);
         return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
     }
 

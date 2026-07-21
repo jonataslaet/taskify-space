@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -189,7 +190,8 @@ public class SpaceMembershipService {
     }
 
     public Page<@NonNull ParticipantDTO> readParticipants(
-        Pageable pageable, Long spaceId, Long authUserId, String name, SpaceUserRoleEnum spaceUserRole) {
+        Pageable pageable, Long spaceId, Long authUserId, String name, SpaceUserRoleEnum spaceUserRole,
+        TaskCategoryEnum taskCategory) {
 
         boolean currentUserParticipatesInThisSpace =
             spaceMembershipRepository
@@ -202,6 +204,7 @@ public class SpaceMembershipService {
             throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
         }
 
-        return participantRepository.findParticipantsWithScores(spaceId, pageable, name, spaceUserRole);
+        return participantRepository.findParticipantsWithScores(
+            spaceId, pageable, name, spaceUserRole, taskCategory);
     }
 }

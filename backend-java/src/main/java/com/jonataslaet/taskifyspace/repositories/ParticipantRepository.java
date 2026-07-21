@@ -2,6 +2,7 @@ package com.jonataslaet.taskifyspace.repositories;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.jspecify.annotations.NonNull;
@@ -25,7 +26,7 @@ public class ParticipantRepository {
         "score", "COALESCE(scores.score, 0)"
     );
 
-    private static final String FROM_PARTICIPANTS = """
+    private static final String FROM_PARTICIPANTS_START = """
         FROM space_memberships sm
         JOIN users u ON u.id = sm.user_id
         LEFT JOIN (
@@ -41,6 +42,9 @@ public class ParticipantRepository {
                 GROUP BY task_execution_id
             ) executor_counts ON executor_counts.task_execution_id = te.id
             WHERE te.space_id = :spaceId
+        """;
+
+    private static final String FROM_PARTICIPANTS_END = """
             GROUP BY teu.user_id
         ) scores ON scores.user_id = u.id
         WHERE sm.space_id = :spaceId
@@ -54,17 +58,25 @@ public class ParticipantRepository {
     }
 
     public Page<@NonNull ParticipantDTO> findParticipantsWithScores(Long spaceId, Pageable pageable) {
-        return findParticipantsWithScores(spaceId, pageable, null, null);
+        return findParticipantsWithScores(spaceId, pageable, null, null, null);
     }
 
     public Page<@NonNull ParticipantDTO> findParticipantsWithScores(
         Long spaceId, Pageable pageable, String name, SpaceUserRoleEnum spaceUserRole) {
+        return findParticipantsWithScores(spaceId, pageable, name, spaceUserRole, null);
+    }
+
+    public Page<@NonNull ParticipantDTO> findParticipantsWithScores(
+        Long spaceId, Pageable pageable, String name, SpaceUserRoleEnum spaceUserRole,
+        TaskCategoryEnum taskCategory) {
+        String fromParticipants = buildFromParticipants(taskCategory);
         String filters = buildFilters(name, spaceUserRole);
         String sql = """
             SELECT u.id, u.name, sm.space_user_role, COALESCE(scores.score, 0)
-            """ + FROM_PARTICIPANTS + filters + buildOrderBy(pageable.getSort());
+            """ + fromParticipants + filters + buildOrderBy(pageable.getSort());
 
-        Query query = bindFilters(entityManager.createNativeQuery(sql), spaceId, name, spaceUserRole);
+        Query query = bindFilters(
+            entityManager.createNativeQuery(sql), spaceId, name, spaceUserRole, taskCategory);
 
         if (pageable.isPaged()) {
             query.setFirstResult(Math.toIntExact(pageable.getOffset()));
@@ -79,13 +91,26 @@ public class ParticipantRepository {
             .toList();
 
         Long total = ((Number) bindFilters(
-            entityManager.createNativeQuery("SELECT COUNT(*) " + FROM_PARTICIPANTS + filters),
+            entityManager.createNativeQuery("SELECT COUNT(*) " + fromParticipants + filters),
             spaceId,
             name,
-            spaceUserRole)
+            spaceUserRole,
+            taskCategory)
             .getSingleResult()).longValue();
 
         return new PageImpl<>(participants, pageable, total);
+    }
+
+    private String buildFromParticipants(TaskCategoryEnum taskCategory) {
+        return FROM_PARTICIPANTS_START + buildScoreFilters(taskCategory) + FROM_PARTICIPANTS_END;
+    }
+
+    private String buildScoreFilters(TaskCategoryEnum taskCategory) {
+        if (taskCategory != null) {
+            return "            AND CAST(t.category AS varchar) = :taskCategory\n";
+        }
+
+        return "";
     }
 
     private String buildFilters(String name, SpaceUserRoleEnum spaceUserRole) {
@@ -99,13 +124,18 @@ public class ParticipantRepository {
         return filters.toString();
     }
 
-    private Query bindFilters(Query query, Long spaceId, String name, SpaceUserRoleEnum spaceUserRole) {
+    private Query bindFilters(
+        Query query, Long spaceId, String name, SpaceUserRoleEnum spaceUserRole,
+        TaskCategoryEnum taskCategory) {
         query.setParameter("spaceId", spaceId);
         if (hasText(name)) {
             query.setParameter("name", "%" + name.toLowerCase() + "%");
         }
         if (spaceUserRole != null) {
             query.setParameter("spaceUserRole", spaceUserRole.name());
+        }
+        if (taskCategory != null) {
+            query.setParameter("taskCategory", taskCategory.name());
         }
         return query;
     }

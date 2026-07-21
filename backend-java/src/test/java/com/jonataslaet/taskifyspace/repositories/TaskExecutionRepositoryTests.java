@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -143,6 +144,41 @@ class TaskExecutionRepositoryTests {
     }
 
     @Test
+    void filtersParticipantScoresByTaskCategory() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user1 = userRepository.save(createUser("User 1", "category-score1@email.com"));
+        User user2 = userRepository.save(createUser("User 2", "category-score2@email.com"));
+
+        saveApprovedParticipant(space, user1);
+        saveApprovedParticipant(space, user2);
+
+        Task operationalTask = taskRepository.save(
+            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+        Task financialTask = taskRepository.save(
+            createTask(space, "Financial task", "30.0", TaskCategoryEnum.FINANCIAL));
+
+        taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
+        taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
+
+        Map<Long, BigDecimal> scoresByUserId = participantRepository
+            .findParticipantsWithScores(
+                space.getId(),
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")),
+                null,
+                null,
+                TaskCategoryEnum.FINANCIAL)
+            .getContent()
+            .stream()
+            .collect(Collectors.toMap(ParticipantDTO::id, ParticipantDTO::score));
+
+        assertThat(scoresByUserId.get(user1.getId())).isEqualByComparingTo("15.0");
+        assertThat(scoresByUserId.get(user2.getId())).isEqualByComparingTo("15.0");
+    }
+
+    @Test
     void findsApprovedUsersByIdsForAnySpaceRole() {
         Space space = new Space("Casa");
         space.setActive(true);
@@ -176,10 +212,16 @@ class TaskExecutionRepositoryTests {
     }
 
     private Task createTask(Space space, String description, String score) {
+        return createTask(space, description, score, TaskCategoryEnum.OPERATIONAL);
+    }
+
+    private Task createTask(
+        Space space, String description, String score, TaskCategoryEnum taskCategory) {
         Task task = new Task();
         task.setSpace(space);
         task.setDescription(description);
         task.setScore(new BigDecimal(score));
+        task.setCategory(taskCategory);
         task.setActive(true);
         return task;
     }
