@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
@@ -101,16 +102,21 @@ class TaskExecutionRepositoryTests {
         taskExecutionRepository.save(new TaskExecution(sharedTask, space, Set.of(user1, user2)));
         taskExecutionRepository.save(new TaskExecution(singleTask, space, Set.of(user1)));
 
-        List<Long> participantIds = participantRepository
+        List<ParticipantDTO> participants = participantRepository
             .findParticipantsWithScores(
                 space.getId(),
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "score")))
             .getContent()
             .stream()
-            .map(participant -> participant.id())
             .toList();
 
-        assertThat(participantIds).containsExactly(user1.getId(), user2.getId(), user3.getId());
+        assertThat(participants).hasSize(3);
+        assertThat(participants.get(0).taskCategories()).containsExactly(TaskCategoryEnum.OPERATIONAL);
+        assertThat(participants.get(1).taskCategories()).containsExactly(TaskCategoryEnum.OPERATIONAL);
+        assertThat(participants.get(2).taskCategories()).isEmpty();
+        assertThat(participants)
+            .extracting(ParticipantDTO::id)
+            .containsExactly(user1.getId(), user2.getId(), user3.getId());
     }
 
     @Test
@@ -127,24 +133,26 @@ class TaskExecutionRepositoryTests {
         saveMembership(space, participant, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
         saveMembership(space, otherParticipant, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
 
-        List<ParticipantDTO> participants = participantRepository
+        Page<ParticipantDTO> participants = participantRepository
             .findParticipantsWithScores(
                 space.getId(),
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")),
                 "jon",
-                SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT)
-            .getContent();
+                SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
 
-        assertThat(participants).singleElement().satisfies(foundParticipant -> {
+        assertThat(participants.getTotalElements()).isEqualTo(1);
+        assertThat(participants.getContent()).hasSize(1);
+        assertThat(participants.getContent()).allSatisfy(foundParticipant -> {
             assertThat(foundParticipant.id()).isEqualTo(participant.getId());
             assertThat(foundParticipant.name()).isEqualTo("Jon Participant");
             assertThat(foundParticipant.spaceUserRole()).isEqualTo(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+            assertThat(foundParticipant.taskCategories()).isEmpty();
             assertThat(foundParticipant.score()).isEqualByComparingTo("0");
         });
     }
 
     @Test
-    void filtersParticipantScoresByTaskCategory() {
+    void filtersParticipantScoresByTaskCategories() {
         Space space = new Space("Casa");
         space.setActive(true);
         space = spaceRepository.save(space);
@@ -163,19 +171,145 @@ class TaskExecutionRepositoryTests {
         taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
         taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
 
-        Map<Long, BigDecimal> scoresByUserId = participantRepository
+        List<ParticipantDTO> participants = participantRepository
             .findParticipantsWithScores(
                 space.getId(),
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")),
                 null,
                 null,
-                TaskCategoryEnum.FINANCIAL)
-            .getContent()
-            .stream()
+                List.of(TaskCategoryEnum.FINANCIAL))
+            .getContent();
+
+        Map<Long, BigDecimal> scoresByUserId = participants.stream()
             .collect(Collectors.toMap(ParticipantDTO::id, ParticipantDTO::score));
 
+        assertThat(participants)
+            .allSatisfy(participant ->
+                assertThat(participant.taskCategories()).containsExactly(TaskCategoryEnum.FINANCIAL));
         assertThat(scoresByUserId.get(user1.getId())).isEqualByComparingTo("15.0");
         assertThat(scoresByUserId.get(user2.getId())).isEqualByComparingTo("15.0");
+    }
+
+    @Test
+    void paginatesParticipantScoresBySelectedTaskCategories() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user1 = userRepository.save(createUser("User 1", "selected-category1@email.com"));
+        User user2 = userRepository.save(createUser("User 2", "selected-category2@email.com"));
+
+        saveApprovedParticipant(space, user1);
+        saveApprovedParticipant(space, user2);
+
+        Task operationalTask = taskRepository.save(
+            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+        Task financialTask = taskRepository.save(
+            createTask(space, "Financial task", "30.0", TaskCategoryEnum.FINANCIAL));
+
+        taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
+        taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
+
+        Page<ParticipantDTO> participants = participantRepository
+            .findParticipantsWithScores(
+                space.getId(),
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "id")),
+                null,
+                null,
+                List.of(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL));
+
+        assertThat(participants.getTotalElements()).isEqualTo(2);
+        assertThat(participants.getContent()).hasSize(1);
+        assertThat(participants.getContent())
+            .singleElement()
+            .satisfies(participant -> {
+                assertThat(participant.taskCategories())
+                    .containsExactly(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL);
+                assertThat(participant.score()).isEqualByComparingTo("105.0");
+            });
+    }
+
+    @Test
+    void showsOnlyScoredTaskCategoriesForEachParticipant() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user1 = userRepository.save(createUser("User 1", "actual-category1@email.com"));
+        User user2 = userRepository.save(createUser("User 2", "actual-category2@email.com"));
+        User user3 = userRepository.save(createUser("User 3", "actual-category3@email.com"));
+        User user4 = userRepository.save(createUser("User 4", "actual-category4@email.com"));
+
+        saveApprovedParticipant(space, user1);
+        saveApprovedParticipant(space, user2);
+        saveApprovedParticipant(space, user3);
+        saveApprovedParticipant(space, user4);
+
+        Task operationalTask = taskRepository.save(
+            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+        Task financialTask = taskRepository.save(
+            createTask(space, "Financial task", "80.0", TaskCategoryEnum.FINANCIAL));
+
+        taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1, user2, user3, user4)));
+        taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user2, user3, user4)));
+
+        List<ParticipantDTO> participants = participantRepository
+            .findParticipantsWithScores(
+                space.getId(),
+                PageRequest.of(0, 4, Sort.by(Sort.Direction.DESC, "score")),
+                null,
+                null,
+                List.of(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL))
+            .getContent();
+
+        assertThat(participants)
+            .extracting(ParticipantDTO::id)
+            .containsExactly(user2.getId(), user3.getId(), user4.getId(), user1.getId());
+        assertThat(participants.subList(0, 3))
+            .allSatisfy(participant -> {
+                assertThat(participant.taskCategories())
+                    .containsExactly(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL);
+                assertThat(participant.score())
+                    .isBetween(new BigDecimal("49.1666"), new BigDecimal("49.1667"));
+            });
+        assertThat(participants.get(3).taskCategories()).containsExactly(TaskCategoryEnum.OPERATIONAL);
+        assertThat(participants.get(3).score()).isEqualByComparingTo("22.5000000000000000");
+    }
+
+    @Test
+    void usesAllTaskCategoriesWhenFilterIsMissing() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user1 = userRepository.save(createUser("User 1", "all-category1@email.com"));
+        User user2 = userRepository.save(createUser("User 2", "all-category2@email.com"));
+
+        saveApprovedParticipant(space, user1);
+        saveApprovedParticipant(space, user2);
+
+        Task operationalTask = taskRepository.save(
+            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+        Task financialTask = taskRepository.save(
+            createTask(space, "Financial task", "30.0", TaskCategoryEnum.FINANCIAL));
+
+        taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
+        taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
+
+        Page<ParticipantDTO> participants = participantRepository
+            .findParticipantsWithScores(
+                space.getId(),
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "id")));
+
+        assertThat(participants.getTotalElements()).isEqualTo(2);
+        assertThat(participants.getContent()).hasSize(1);
+        assertThat(participants.getContent())
+            .singleElement()
+            .satisfies(participant -> {
+                assertThat(participant.taskCategories())
+                    .containsExactly(TaskCategoryEnum.OPERATIONAL, TaskCategoryEnum.FINANCIAL);
+                assertThat(participant.score()).isEqualByComparingTo("105.0");
+            });
     }
 
     @Test

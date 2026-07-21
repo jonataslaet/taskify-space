@@ -5,15 +5,16 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class ParticipantMapper {
 
     public static ParticipantDTO toDTO(User user, BigDecimal score) {
-        return new ParticipantDTO(user.getId(), user.getName(), null, score);
+        return new ParticipantDTO(user.getId(), user.getName(), null, List.of(), score);
     }
 
     public static ParticipantDTO toDTO(SpaceMembership spaceMembership, BigDecimal score) {
         User user = spaceMembership.getUser();
-        return new ParticipantDTO(user.getId(), user.getName(), spaceMembership.getSpaceUserRole(), score);
+        return new ParticipantDTO(user.getId(), user.getName(), spaceMembership.getSpaceUserRole(), List.of(), score);
     }
 }

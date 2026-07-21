@@ -191,7 +191,7 @@ public class SpaceMembershipService {
 
     public Page<@NonNull ParticipantDTO> readParticipants(
         Pageable pageable, Long spaceId, Long authUserId, String name, SpaceUserRoleEnum spaceUserRole,
-        TaskCategoryEnum taskCategory) {
+        List<TaskCategoryEnum> taskCategories) {
 
         boolean currentUserParticipatesInThisSpace =
             spaceMembershipRepository
@@ -205,6 +205,6 @@ public class SpaceMembershipService {
         }
 
         return participantRepository.findParticipantsWithScores(
-            spaceId, pageable, name, spaceUserRole, taskCategory);
+            spaceId, pageable, name, spaceUserRole, taskCategories);
     }
 }

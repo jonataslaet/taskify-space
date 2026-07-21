@@ -25,6 +25,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -147,9 +148,9 @@ public class SpaceService {
 
     public Page<@NonNull ParticipantDTO> readParticipants(
          Pageable pageable, Long spaceId, User authenticatedUser, String name, SpaceUserRoleEnum spaceUserRole,
-         TaskCategoryEnum taskCategory) {
+         List<TaskCategoryEnum> taskCategories) {
         return spaceMembershipService.readParticipants(
-            pageable, spaceId, authenticatedUser.getId(), name, spaceUserRole, taskCategory);
+            pageable, spaceId, authenticatedUser.getId(), name, spaceUserRole, taskCategories);
     }
 
     public void validateActiveParticipation(User authenticatedUser,

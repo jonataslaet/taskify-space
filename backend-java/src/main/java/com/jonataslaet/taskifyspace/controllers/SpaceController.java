@@ -17,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/spaces")
 public class SpaceController {
@@ -48,10 +50,10 @@ public class SpaceController {
         Pageable pageable, @PathVariable("spaceId") Long spaceId,
         @RequestParam(value = "name", required = false) String name,
         @RequestParam(value = "spaceUserRole", required = false) SpaceUserRoleEnum spaceUserRole,
-        @RequestParam(value = "taskCategory", required = false) TaskCategoryEnum taskCategory,
+        @RequestParam(value = "taskCategories", required = false) List<TaskCategoryEnum> taskCategories,
         @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull ParticipantDTO> pagedSpacememberships =
-            spaceService.readParticipants(pageable, spaceId, authenticatedUser, name, spaceUserRole, taskCategory);
+            spaceService.readParticipants(pageable, spaceId, authenticatedUser, name, spaceUserRole, taskCategories);
         return ResponseEntity.status(HttpStatus.OK).body(pagedSpacememberships);
     }
 
