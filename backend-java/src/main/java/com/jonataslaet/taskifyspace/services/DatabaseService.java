@@ -166,6 +166,16 @@ public class DatabaseService {
         return TaskMapper.toDTO(task);
     }
 
+    public TaskRecordDTO getTaskRecordPagarContaAguaDTO(SpaceRecordDTO spaceRecordDTO) {
+        Space space = spaceService.getSpaceEntity(spaceRecordDTO.id());
+        Task task = new Task();
+        task.setCategory(TaskCategoryEnum.FINANCIAL);
+        task.setScore(new BigDecimal("80.0"));
+        task.setDescription("Pagar conta de água");
+        task.setSpace(space);
+        return TaskMapper.toDTO(task);
+    }
+
     private void activateUser(User user) {
         user.setStatus(UserStatusEnum.ACTIVE);
         userRepository.save(user);
@@ -216,9 +226,11 @@ public class DatabaseService {
 
         spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
 
-        TaskRecordDTO taskRecordDTO = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
+        TaskRecordDTO taskRecordDTO1 = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
+        TaskRecordDTO taskRecordDTO2 = taskService.createTask(userJoiceLaet, getTaskRecordPagarContaAguaDTO(spaceResidenciaCasalLaet));
 
-        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO.id());
+        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO1.id());
+        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO2.id());
 
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
