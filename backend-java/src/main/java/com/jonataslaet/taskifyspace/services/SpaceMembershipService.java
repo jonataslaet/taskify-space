@@ -188,7 +188,8 @@ public class SpaceMembershipService {
         return spaceMembershipRepository.findAll(finalSpec, pageable).map(SpaceMembershipMapper::toDTO);
     }
 
-    public Page<@NonNull ParticipantDTO> readParticipants(Pageable pageable, Long spaceId, Long authUserId) {
+    public Page<@NonNull ParticipantDTO> readParticipants(
+        Pageable pageable, Long spaceId, Long authUserId, String name, SpaceUserRoleEnum spaceUserRole) {
 
         boolean currentUserParticipatesInThisSpace =
             spaceMembershipRepository
@@ -201,6 +202,6 @@ public class SpaceMembershipService {
             throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
         }
 
-        return participantRepository.findParticipantsWithScores(spaceId, pageable);
+        return participantRepository.findParticipantsWithScores(spaceId, pageable, name, spaceUserRole);
     }
 }

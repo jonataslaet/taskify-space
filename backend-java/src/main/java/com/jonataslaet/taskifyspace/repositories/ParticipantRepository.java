@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.repositories;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.jspecify.annotations.NonNull;
@@ -20,6 +21,7 @@ public class ParticipantRepository {
     private static final Map<String, String> SORT_COLUMNS = Map.of(
         "id", "u.id",
         "name", "u.name",
+        "spaceUserRole", "sm.space_user_role",
         "score", "COALESCE(scores.score, 0)"
     );
 
@@ -52,12 +54,17 @@ public class ParticipantRepository {
     }
 
     public Page<@NonNull ParticipantDTO> findParticipantsWithScores(Long spaceId, Pageable pageable) {
-        String sql = """
-            SELECT u.id, u.name, COALESCE(scores.score, 0)
-            """ + FROM_PARTICIPANTS + buildOrderBy(pageable.getSort());
+        return findParticipantsWithScores(spaceId, pageable, null, null);
+    }
 
-        Query query = entityManager.createNativeQuery(sql)
-            .setParameter("spaceId", spaceId);
+    public Page<@NonNull ParticipantDTO> findParticipantsWithScores(
+        Long spaceId, Pageable pageable, String name, SpaceUserRoleEnum spaceUserRole) {
+        String filters = buildFilters(name, spaceUserRole);
+        String sql = """
+            SELECT u.id, u.name, sm.space_user_role, COALESCE(scores.score, 0)
+            """ + FROM_PARTICIPANTS + filters + buildOrderBy(pageable.getSort());
+
+        Query query = bindFilters(entityManager.createNativeQuery(sql), spaceId, name, spaceUserRole);
 
         if (pageable.isPaged()) {
             query.setFirstResult(Math.toIntExact(pageable.getOffset()));
@@ -71,11 +78,40 @@ public class ParticipantRepository {
             .map(this::toParticipantDTO)
             .toList();
 
-        Long total = ((Number) entityManager.createNativeQuery("SELECT COUNT(*) " + FROM_PARTICIPANTS)
-            .setParameter("spaceId", spaceId)
+        Long total = ((Number) bindFilters(
+            entityManager.createNativeQuery("SELECT COUNT(*) " + FROM_PARTICIPANTS + filters),
+            spaceId,
+            name,
+            spaceUserRole)
             .getSingleResult()).longValue();
 
         return new PageImpl<>(participants, pageable, total);
+    }
+
+    private String buildFilters(String name, SpaceUserRoleEnum spaceUserRole) {
+        StringBuilder filters = new StringBuilder();
+        if (hasText(name)) {
+            filters.append(" AND LOWER(u.name) LIKE :name");
+        }
+        if (spaceUserRole != null) {
+            filters.append(" AND CAST(sm.space_user_role AS varchar) = :spaceUserRole");
+        }
+        return filters.toString();
+    }
+
+    private Query bindFilters(Query query, Long spaceId, String name, SpaceUserRoleEnum spaceUserRole) {
+        query.setParameter("spaceId", spaceId);
+        if (hasText(name)) {
+            query.setParameter("name", "%" + name.toLowerCase() + "%");
+        }
+        if (spaceUserRole != null) {
+            query.setParameter("spaceUserRole", spaceUserRole.name());
+        }
+        return query;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String buildOrderBy(Sort sort) {
@@ -105,7 +141,8 @@ public class ParticipantRepository {
         return new ParticipantDTO(
             ((Number) row[0]).longValue(),
             (String) row[1],
-            toBigDecimal(row[2]));
+            SpaceUserRoleEnum.valueOf(row[2].toString()),
+            toBigDecimal(row[3]));
     }
 
     private BigDecimal toBigDecimal(Object value) {

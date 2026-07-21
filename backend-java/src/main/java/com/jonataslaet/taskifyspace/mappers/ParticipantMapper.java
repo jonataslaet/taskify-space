@@ -9,10 +9,11 @@ import java.math.BigDecimal;
 public class ParticipantMapper {
 
     public static ParticipantDTO toDTO(User user, BigDecimal score) {
-        return new ParticipantDTO(user.getId(), user.getName(), score);
+        return new ParticipantDTO(user.getId(), user.getName(), null, score);
     }
 
     public static ParticipantDTO toDTO(SpaceMembership spaceMembership, BigDecimal score) {
-        return toDTO(spaceMembership.getUser(), score);
+        User user = spaceMembership.getUser();
+        return new ParticipantDTO(user.getId(), user.getName(), spaceMembership.getSpaceUserRole(), score);
     }
 }

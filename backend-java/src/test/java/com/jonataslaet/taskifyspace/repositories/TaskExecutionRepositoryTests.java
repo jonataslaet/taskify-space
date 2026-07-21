@@ -5,6 +5,7 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -109,6 +110,36 @@ class TaskExecutionRepositoryTests {
             .toList();
 
         assertThat(participantIds).containsExactly(user1.getId(), user2.getId(), user3.getId());
+    }
+
+    @Test
+    void filtersParticipantsByNameAndSpaceUserRole() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User admin = userRepository.save(createUser("Jon Admin", "filter-admin@email.com"));
+        User participant = userRepository.save(createUser("Jon Participant", "filter-participant@email.com"));
+        User otherParticipant = userRepository.save(createUser("Mary Participant", "filter-other@email.com"));
+
+        saveMembership(space, admin, SpaceUserRoleEnum.ROLE_SPACE_ADMIN, SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(space, participant, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(space, otherParticipant, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
+
+        List<ParticipantDTO> participants = participantRepository
+            .findParticipantsWithScores(
+                space.getId(),
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")),
+                "jon",
+                SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT)
+            .getContent();
+
+        assertThat(participants).singleElement().satisfies(foundParticipant -> {
+            assertThat(foundParticipant.id()).isEqualTo(participant.getId());
+            assertThat(foundParticipant.name()).isEqualTo("Jon Participant");
+            assertThat(foundParticipant.spaceUserRole()).isEqualTo(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+            assertThat(foundParticipant.score()).isEqualByComparingTo("0");
+        });
     }
 
     @Test

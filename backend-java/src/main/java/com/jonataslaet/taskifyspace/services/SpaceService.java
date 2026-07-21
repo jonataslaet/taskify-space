@@ -145,8 +145,9 @@ public class SpaceService {
     }
 
     public Page<@NonNull ParticipantDTO> readParticipants(
-         Pageable pageable, Long spaceId, User authenticatedUser) {
-        return spaceMembershipService.readParticipants(pageable, spaceId, authenticatedUser.getId());
+         Pageable pageable, Long spaceId, User authenticatedUser, String name, SpaceUserRoleEnum spaceUserRole) {
+        return spaceMembershipService.readParticipants(
+            pageable, spaceId, authenticatedUser.getId(), name, spaceUserRole);
     }
 
     public void validateActiveParticipation(User authenticatedUser,

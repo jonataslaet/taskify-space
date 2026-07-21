@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.controllers.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 
 import java.math.BigDecimal;
 
@@ -10,6 +11,8 @@ public record ParticipantDTO(
     Long id,
 
     String name,
+
+    SpaceUserRoleEnum spaceUserRole,
 
     BigDecimal score
 ) {
