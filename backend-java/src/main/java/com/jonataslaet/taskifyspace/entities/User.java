@@ -39,8 +39,8 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     private UserRoleEnum role;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<SpaceMembership> memberships = new HashSet<>();
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private SpaceMembership membership;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Subscription> subscriptions = new HashSet<>();
@@ -67,7 +67,7 @@ public class User implements UserDetails {
 
     public LocalDate getBirthDate() { return birthDate; }
 
-    public Set<SpaceMembership> getMemberships() { return memberships; }
+    public SpaceMembership getMembership() { return membership; }
 
     public Set<Subscription> getSubscriptions() {
         return subscriptions;
@@ -81,8 +81,8 @@ public class User implements UserDetails {
         this.executions = executions;
     }
 
-    public void setMemberships(Set<SpaceMembership> memberships) {
-        this.memberships = memberships;
+    public void setMembership(SpaceMembership membership) {
+        this.membership = membership;
     }
 
     public void setSubscriptions(Set<Subscription> subscriptions) {

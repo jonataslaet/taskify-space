@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 @Entity
 @Table(
     name = "space_memberships",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "space_id", "space_user_role"})
+    uniqueConstraints = @UniqueConstraint(columnNames = "user_id")
 )
 public class SpaceMembership {
 
@@ -15,8 +15,8 @@ public class SpaceMembership {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToOne(optional = false)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
     @ManyToOne(optional = false)

@@ -175,9 +175,9 @@ public class DatabaseService {
         User userJoiceLaet = this.createUserJoiceLaet();
         User userRalphLaet = this.createUserRalphLaet();
         User userBellaLaet = this.createUserBellaLaet();
-//        activateUser(userJoiceLaet);
-//        activateUser(userRalphLaet);
-//        activateUser(userBellaLaet);
+        activateUser(userJoiceLaet);
+        activateUser(userRalphLaet);
+        activateUser(userBellaLaet);
 
         Plan basicPlan = this.createPlan("BASIC", "Basic", "Plano basico para uso individual",
             Set.of(
@@ -206,8 +206,11 @@ public class DatabaseService {
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 100L)
             ));
 
-        userJoiceLaet.setStatus(UserStatusEnum.ACTIVE);
         this.grantInternalSubscription(userJoiceLaet, basicPlan);
+
+        if (spaceMembershipService.hasSpaceMembership(userJoiceLaet)) {
+            return true;
+        }
 
         SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
 
@@ -218,12 +221,10 @@ public class DatabaseService {
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO.id());
 
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
-        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userJoiceLaet);
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
 
         Set<Long> usersToBeApproved = new HashSet<>();
-        usersToBeApproved.add(userJoiceLaet.getId());
         usersToBeApproved.add(userRalphLaet.getId());
         usersToBeApproved.add(userBellaLaet.getId());
         usersToBeApproved.add(adminJonatasLaet.getId());

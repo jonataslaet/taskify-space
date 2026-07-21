@@ -19,11 +19,13 @@ public interface SpaceMembershipRepository extends JpaRepository<
     @NonNull SpaceMembership, @NonNull Long>, JpaSpecificationExecutor<@NonNull SpaceMembership> {
 
     @Query(value = """
-        SELECT p.user FROM SpaceMembership p WHERE p.user.id in (:usersIds) 
-        AND p.space.id = :spaceId AND p.spaceUserRole = :spaceUserRole
+        SELECT sm.user FROM SpaceMembership sm WHERE sm.user.id in (:usersIds)
+        AND sm.space.id = :spaceId AND sm.spaceMembershipStatusEnum = :status
         """)
-    Set<User> findParticipantsByIds(@Param("spaceId") Long spaceId,
-        @Param("usersIds") Set<Long> ids, @Param("spaceUserRole") SpaceUserRoleEnum participant);
+    Set<User> findApprovedUsersByIds(
+        @Param("spaceId") Long spaceId,
+        @Param("usersIds") Set<Long> ids,
+        @Param("status") SpaceMembershipStatusEnum status);
 
     @Query(value = """
         SELECT sm FROM SpaceMembership sm WHERE (:usersIds IS NULL or sm.user.id in (:usersIds)) AND sm.space.id = :spaceId
@@ -33,6 +35,8 @@ public interface SpaceMembershipRepository extends JpaRepository<
     Optional<SpaceMembership> findByIdAndSpaceId(Long id, Long spaceId);
 
     Set<SpaceMembership> findBySpaceIdAndUserId(Long spaceId, Long userId);
+
+    boolean existsByUserId(Long userId);
 
     boolean existsBySpaceIdAndUserIdAndSpaceUserRoleIn(Long spaceId, Long userId, Set<SpaceUserRoleEnum> roles);
 

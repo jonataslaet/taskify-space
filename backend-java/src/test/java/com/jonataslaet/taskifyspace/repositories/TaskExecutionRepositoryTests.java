@@ -111,6 +111,32 @@ class TaskExecutionRepositoryTests {
         assertThat(participantIds).containsExactly(user1.getId(), user2.getId(), user3.getId());
     }
 
+    @Test
+    void findsApprovedUsersByIdsForAnySpaceRole() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User admin = userRepository.save(createUser("Admin", "admin@email.com"));
+        User participant = userRepository.save(createUser("Participant", "participant@email.com"));
+        User pending = userRepository.save(createUser("Pending", "pending@email.com"));
+
+        saveMembership(space, admin, SpaceUserRoleEnum.ROLE_SPACE_ADMIN, SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(space, participant, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(space, pending, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.PENDING);
+
+        Set<Long> userIds = spaceMembershipRepository
+            .findApprovedUsersByIds(
+                space.getId(),
+                Set.of(admin.getId(), participant.getId(), pending.getId()),
+                SpaceMembershipStatusEnum.APPROVED)
+            .stream()
+            .map(User::getId)
+            .collect(Collectors.toSet());
+
+        assertThat(userIds).containsExactlyInAnyOrder(admin.getId(), participant.getId());
+    }
+
     private User createUser(String name, String email) {
         User user = new User(name, email, "password", LocalDate.of(2000, 1, 1));
         user.setRole(UserRoleEnum.ROLE_USER);
@@ -128,9 +154,20 @@ class TaskExecutionRepositoryTests {
     }
 
     private void saveApprovedParticipant(Space space, User user) {
-        SpaceMembership spaceMembership =
-            new SpaceMembership(user, space, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
-        spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(
+            space,
+            user,
+            SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+            SpaceMembershipStatusEnum.APPROVED);
+    }
+
+    private void saveMembership(
+        Space space,
+        User user,
+        SpaceUserRoleEnum role,
+        SpaceMembershipStatusEnum status) {
+        SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
+        spaceMembership.setSpaceMembershipStatusEnum(status);
         spaceMembershipRepository.save(spaceMembership);
     }
 }

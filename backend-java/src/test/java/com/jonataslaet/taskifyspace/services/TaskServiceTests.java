@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -89,7 +91,7 @@ class TaskServiceTests {
 
         when(spaceService.getSpaceEntity(space.getId())).thenReturn(space);
         when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
-        when(spaceMembershipService.getParticipantsBySpaceAndUsersIds(
+        when(spaceMembershipService.getApprovedMembersBySpaceAndUsersIds(
             eq(space), eq(Set.of(authenticatedUser.getId())))).thenReturn(Set.of(authenticatedUser));
 
         taskService.finishTask(task.getId(), space.getId(), authenticatedUser, null);
@@ -101,6 +103,34 @@ class TaskServiceTests {
         assertThat(savedTaskExecution.getTask()).isSameAs(task);
         assertThat(savedTaskExecution.getSpace()).isSameAs(space);
         assertThat(savedTaskExecution.getExecutors()).containsExactly(authenticatedUser);
+    }
+
+    @Test
+    void finishTaskIncludesApprovedAdminExecutor() {
+        User authenticatedUser = createUser(1L);
+        User adminExecutor = createUser(2L);
+        User participantExecutor = createUser(3L);
+        Space space = createSpace(10L);
+        Task task = createTask(20L, space);
+        addApprovedMembership(space, authenticatedUser, ROLE_SPACE_PARTICIPANT);
+        addApprovedMembership(space, adminExecutor, ROLE_SPACE_ADMIN);
+        addApprovedMembership(space, participantExecutor, ROLE_SPACE_PARTICIPANT);
+        Set<Long> executorIds = Set.of(adminExecutor.getId(), participantExecutor.getId());
+        Set<Long> expectedExecutorIds = Set.of(
+            authenticatedUser.getId(), adminExecutor.getId(), participantExecutor.getId());
+
+        when(spaceService.getSpaceEntity(space.getId())).thenReturn(space);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(spaceMembershipService.getApprovedMembersBySpaceAndUsersIds(eq(space), eq(expectedExecutorIds)))
+            .thenReturn(Set.of(authenticatedUser, adminExecutor, participantExecutor));
+
+        taskService.finishTask(task.getId(), space.getId(), authenticatedUser, executorIds);
+
+        ArgumentCaptor<TaskExecution> taskExecutionCaptor = ArgumentCaptor.forClass(TaskExecution.class);
+        verify(taskExecutionRepository).save(taskExecutionCaptor.capture());
+
+        assertThat(taskExecutionCaptor.getValue().getExecutors())
+            .containsExactlyInAnyOrder(authenticatedUser, adminExecutor, participantExecutor);
     }
 
     @Test
@@ -139,7 +169,11 @@ class TaskServiceTests {
     }
 
     private void addApprovedParticipant(Space space, User user) {
-        SpaceMembership spaceMembership = new SpaceMembership(user, space, ROLE_SPACE_PARTICIPANT);
+        addApprovedMembership(space, user, ROLE_SPACE_PARTICIPANT);
+    }
+
+    private void addApprovedMembership(Space space, User user, SpaceUserRoleEnum role) {
+        SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
         spaceMembership.setSpaceMembershipStatusEnum(APPROVED);
         space.getSpaceMemberships().add(spaceMembership);
     }

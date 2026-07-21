@@ -65,13 +65,14 @@ class TaskServiceJpaTests {
     void findAllReturnsOnlyTasksFromApprovedUserSpaces() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
         User otherUser = userRepository.save(createUser("other@example.com"));
+        User pendingUser = userRepository.save(createUser("pending@example.com"));
 
         Space approvedSpace = spaceRepository.save(createSpace("Approved"));
         Space pendingSpace = spaceRepository.save(createSpace("Pending"));
         Space otherUserSpace = spaceRepository.save(createSpace("Other"));
 
         saveMembership(approvedSpace, authenticatedUser, SpaceMembershipStatusEnum.APPROVED);
-        saveMembership(pendingSpace, authenticatedUser, SpaceMembershipStatusEnum.PENDING);
+        saveMembership(pendingSpace, pendingUser, SpaceMembershipStatusEnum.PENDING);
         saveMembership(otherUserSpace, otherUser, SpaceMembershipStatusEnum.APPROVED);
 
         Task visibleTask = taskRepository.save(createTask(approvedSpace, "Visible task"));

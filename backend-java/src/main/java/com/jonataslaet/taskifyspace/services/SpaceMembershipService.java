@@ -55,6 +55,11 @@ public class SpaceMembershipService {
 
         if (membershipAlreadyExists) return;
 
+        boolean userAlreadyHasMembership = spaceMembershipRepository.existsByUserId(user.getId());
+        if (userAlreadyHasMembership) {
+            throw new DuplicationException("Usuário já possui participação em um espaço");
+        }
+
         SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
         if (role.equals(SpaceUserRoleEnum.ROLE_SPACE_ADMIN))
             spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
@@ -93,6 +98,10 @@ public class SpaceMembershipService {
 
     public Set<SpaceMembership> getSpaceMemberships(Space space, Set<Long> usersIds) {
         return spaceMembershipRepository.findBySpaceIdUsersIds(space.getId(), usersIds);
+    }
+
+    public boolean hasSpaceMembership(User user) {
+        return spaceMembershipRepository.existsByUserId(user.getId());
     }
 
     @Transactional
@@ -154,9 +163,9 @@ public class SpaceMembershipService {
         }
     }
 
-    public Set<User> getParticipantsBySpaceAndUsersIds(Space space, Set<Long> usersIds) {
-        return spaceMembershipRepository.findParticipantsByIds(
-            space.getId(), usersIds, ROLE_SPACE_PARTICIPANT);
+    public Set<User> getApprovedMembersBySpaceAndUsersIds(Space space, Set<Long> usersIds) {
+        return spaceMembershipRepository.findApprovedUsersByIds(
+            space.getId(), usersIds, SpaceMembershipStatusEnum.APPROVED);
     }
 
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(

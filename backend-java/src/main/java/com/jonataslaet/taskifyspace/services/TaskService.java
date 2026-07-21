@@ -110,7 +110,7 @@ public class TaskService {
     }
 
     private TaskExecution getTaskExecution(Task task, Space space, Set<Long> usersIds) {
-        Set<User> users = spaceMembershipService.getParticipantsBySpaceAndUsersIds(space, usersIds);;
+        Set<User> users = spaceMembershipService.getApprovedMembersBySpaceAndUsersIds(space, usersIds);
         return new TaskExecution(task, space, users);
     }
 
