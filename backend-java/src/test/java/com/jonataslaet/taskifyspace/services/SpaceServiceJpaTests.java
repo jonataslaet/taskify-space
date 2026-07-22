@@ -49,7 +49,6 @@ class SpaceServiceJpaTests {
     void setUp() {
         spaceService = new SpaceService(
             spaceRepository,
-            mock(UserRepository.class),
             mock(SpaceMembershipService.class),
             mock(FeatureAccessService.class),
             mock(TaskRepository.class),

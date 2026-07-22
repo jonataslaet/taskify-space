@@ -8,7 +8,6 @@ import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
-import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,16 +26,7 @@ import static org.mockito.Mockito.when;
 class TaskExecutionServiceTests {
 
     @Mock
-    private TaskRepository taskRepository;
-
-    @Mock
-    private UserService userService;
-
-    @Mock
     private SpaceService spaceService;
-
-    @Mock
-    private SpaceMembershipService spaceMembershipService;
 
     @Mock
     private TaskExecutionRepository taskExecutionRepository;
@@ -46,10 +36,7 @@ class TaskExecutionServiceTests {
     @BeforeEach
     void setUp() {
         taskExecutionService = new TaskExecutionService(
-            taskRepository,
-            userService,
             spaceService,
-            spaceMembershipService,
             taskExecutionRepository);
     }
 

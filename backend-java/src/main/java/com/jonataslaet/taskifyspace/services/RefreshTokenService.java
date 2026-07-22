@@ -18,9 +18,6 @@ import static com.jonataslaet.taskifyspace.utils.TokenUtils.generateRandomToken;
 @Transactional(readOnly = true)
 public class RefreshTokenService {
 
-    @Value("${security.jwt.ttl.token.access}")
-    private Long ttlAccessToken;
-
     @Value("${security.jwt.ttl.token.refresh}")
     private Long ttlRefreshToken;
 

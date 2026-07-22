@@ -34,8 +34,6 @@ public interface SpaceMembershipRepository extends JpaRepository<
 
     Optional<SpaceMembership> findByIdAndSpaceId(Long id, Long spaceId);
 
-    Set<SpaceMembership> findBySpaceIdAndUserId(Long spaceId, Long userId);
-
     boolean existsByUserId(Long userId);
 
     boolean existsBySpaceIdAndUserId(Long spaceId, Long userId);

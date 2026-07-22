@@ -12,7 +12,6 @@ import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
-import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,9 +31,6 @@ class SpaceServiceTests {
     private SpaceRepository spaceRepository;
 
     @Mock
-    private UserRepository userRepository;
-
-    @Mock
     private SpaceMembershipService spaceMembershipService;
 
     @Mock
@@ -52,7 +48,6 @@ class SpaceServiceTests {
     void setUp() {
         spaceService = new SpaceService(
             spaceRepository,
-            userRepository,
             spaceMembershipService,
             featureAccessService,
             taskRepository,

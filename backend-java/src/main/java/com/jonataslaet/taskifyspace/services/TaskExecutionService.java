@@ -4,7 +4,6 @@ import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
-import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,19 +14,11 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class TaskExecutionService {
 
-    private final TaskRepository taskRepository;
-    private final UserService userService;
     private final SpaceService spaceService;
-    private final SpaceMembershipService spaceMembershipService;
     private final TaskExecutionRepository taskExecutionRepository;
 
-    public TaskExecutionService(TaskRepository taskRepository, UserService userService,
-                                SpaceService spaceService, SpaceMembershipService spaceMembershipService,
-                                TaskExecutionRepository taskExecutionRepository) {
-        this.taskRepository = taskRepository;
-        this.userService = userService;
+    public TaskExecutionService(SpaceService spaceService, TaskExecutionRepository taskExecutionRepository) {
         this.spaceService = spaceService;
-        this.spaceMembershipService = spaceMembershipService;
         this.taskExecutionRepository = taskExecutionRepository;
     }
 

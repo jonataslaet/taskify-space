@@ -16,7 +16,6 @@ import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
-import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,17 +37,15 @@ import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE
 public class SpaceService {
 
     private final SpaceRepository spaceRepository;
-    private final UserRepository userRepository;
     private final SpaceMembershipService spaceMembershipService;
     private final FeatureAccessService featureAccessService;
     private final TaskRepository taskRepository;
     private final TaskExecutionRepository taskExecutionRepository;
 
     public SpaceService(
-        SpaceRepository spaceRepository, UserRepository userRepository, SpaceMembershipService spaceMembershipService,
+        SpaceRepository spaceRepository, SpaceMembershipService spaceMembershipService,
         FeatureAccessService featureAccessService, TaskRepository taskRepository, TaskExecutionRepository taskExecutionRepository) {
         this.spaceRepository = spaceRepository;
-        this.userRepository = userRepository;
         this.spaceMembershipService = spaceMembershipService;
         this.featureAccessService = featureAccessService;
         this.taskRepository = taskRepository;

@@ -59,15 +59,6 @@ public class ParticipantRepository {
         this.entityManager = entityManager;
     }
 
-    public Page<@NonNull ParticipantDTO> findParticipantsWithScores(Long spaceId, Pageable pageable) {
-        return findParticipantsWithScores(spaceId, pageable, null, null, null);
-    }
-
-    public Page<@NonNull ParticipantDTO> findParticipantsWithScores(
-        Long spaceId, Pageable pageable, String name, SpaceUserRoleEnum spaceUserRole) {
-        return findParticipantsWithScores(spaceId, pageable, name, spaceUserRole, null);
-    }
-
     public Page<@NonNull ParticipantDTO> findParticipantsWithScores(
         Long spaceId, Pageable pageable, String name, SpaceUserRoleEnum spaceUserRole,
         List<TaskCategoryEnum> taskCategories) {

@@ -53,11 +53,6 @@ public class PlanService {
             .orElseThrow(() -> new ResourceNotFoundException("Plano nao encontrado"));
     }
 
-    public Plan getPlanByCode(String code) {
-        return planRepository.findByCodeIgnoreCase(code)
-            .orElseThrow(() -> new ResourceNotFoundException("Plano nao encontrado"));
-    }
-
     @Transactional
     public PlanRecordDTO updatePlan(Long planId, PlanRecordDTO dto) {
         validatePlan(dto);

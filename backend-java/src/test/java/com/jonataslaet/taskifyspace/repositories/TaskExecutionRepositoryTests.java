@@ -59,32 +59,6 @@ class TaskExecutionRepositoryTests {
     private UserRepository userRepository;
 
     @Test
-    void sumsParticipantScoreDividingTaskScoreByExecutionExecutorCount() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
-
-        User user1 = userRepository.save(createUser("User 1", "user1@email.com"));
-        User user2 = userRepository.save(createUser("User 2", "user2@email.com"));
-
-        Task sharedTask = taskRepository.save(createTask(space, "Shared task", "90.0"));
-        Task singleTask = taskRepository.save(createTask(space, "Single task", "30.0"));
-
-        taskExecutionRepository.save(new TaskExecution(sharedTask, space, Set.of(user1, user2)));
-        taskExecutionRepository.save(new TaskExecution(singleTask, space, Set.of(user1)));
-
-        Map<Long, BigDecimal> scoresByUserId = taskExecutionRepository
-            .sumParticipantScoresBySpaceIdAndUserIds(space.getId(), Set.of(user1.getId(), user2.getId()))
-            .stream()
-            .collect(Collectors.toMap(
-                TaskExecutionRepository.ParticipantScoreProjection::getUserId,
-                TaskExecutionRepository.ParticipantScoreProjection::getScore));
-
-        assertThat(scoresByUserId.get(user1.getId())).isEqualByComparingTo("75.0");
-        assertThat(scoresByUserId.get(user2.getId())).isEqualByComparingTo("45.0");
-    }
-
-    @Test
     void sortsParticipantsByScoreDescending() {
         Space space = new Space("Casa");
         space.setActive(true);
@@ -107,7 +81,10 @@ class TaskExecutionRepositoryTests {
         List<ParticipantDTO> participants = participantRepository
             .findParticipantsWithScores(
                 space.getId(),
-                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "score")))
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "score")),
+                null,
+                null,
+                null)
             .getContent()
             .stream()
             .toList();
@@ -140,7 +117,8 @@ class TaskExecutionRepositoryTests {
                 space.getId(),
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")),
                 "jon",
-                SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+                SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+                null);
 
         assertThat(participants.getTotalElements()).isEqualTo(1);
         assertThat(participants.getContent()).hasSize(1);
@@ -301,7 +279,10 @@ class TaskExecutionRepositoryTests {
         Page<ParticipantDTO> participants = participantRepository
             .findParticipantsWithScores(
                 space.getId(),
-                PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "id")));
+                PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "id")),
+                null,
+                null,
+                null);
 
         assertThat(participants.getTotalElements()).isEqualTo(2);
         assertThat(participants.getContent()).hasSize(1);

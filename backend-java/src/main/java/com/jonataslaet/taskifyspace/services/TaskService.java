@@ -31,17 +31,15 @@ import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE
 public class TaskService {
 
     private final TaskRepository taskRepository;
-    private final UserService userService;
     private final SpaceService spaceService;
     private final SpaceMembershipService spaceMembershipService;
     private final TaskExecutionRepository taskExecutionRepository;
     private final FeatureAccessService featureAccessService;
 
-    public TaskService(TaskRepository taskRepository, UserService userService,
+    public TaskService(TaskRepository taskRepository,
                        SpaceService spaceService, SpaceMembershipService spaceMembershipService,
                        TaskExecutionRepository taskExecutionRepository, FeatureAccessService featureAccessService) {
         this.taskRepository = taskRepository;
-        this.userService = userService;
         this.spaceService = spaceService;
         this.spaceMembershipService = spaceMembershipService;
         this.taskExecutionRepository = taskExecutionRepository;

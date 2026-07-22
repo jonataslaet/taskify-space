@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
-import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -143,10 +142,6 @@ public class UserService {
                 logger.warn("User with ID {} not found", userId);
                 return new ResourceNotFoundException("User not found");
             });
-    }
-
-    public Set<User> getExecutorsByIds(Set<Long> executorsIds) {
-        return userRepository.findUsersByIds(executorsIds);
     }
 
     private void validateAdminOrSelf(User authenticatedUser, Long userId) {

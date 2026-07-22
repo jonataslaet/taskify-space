@@ -14,7 +14,6 @@ import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
-import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,9 +47,6 @@ class FeatureAccessServiceTests {
     @Mock
     private TaskRepository taskRepository;
 
-    @Mock
-    private TaskExecutionRepository taskExecutionRepository;
-
     private FeatureAccessService featureAccessService;
 
     @BeforeEach
@@ -61,7 +57,6 @@ class FeatureAccessServiceTests {
             spaceMembershipRepository,
             spaceRepository,
             taskRepository,
-            taskExecutionRepository,
             clock);
     }
 

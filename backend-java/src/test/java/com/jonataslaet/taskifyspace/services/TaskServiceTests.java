@@ -42,9 +42,6 @@ class TaskServiceTests {
     private TaskRepository taskRepository;
 
     @Mock
-    private UserService userService;
-
-    @Mock
     private SpaceService spaceService;
 
     @Mock
@@ -62,7 +59,6 @@ class TaskServiceTests {
     void setUp() {
         taskService = new TaskService(
             taskRepository,
-            userService,
             spaceService,
             spaceMembershipService,
             taskExecutionRepository,

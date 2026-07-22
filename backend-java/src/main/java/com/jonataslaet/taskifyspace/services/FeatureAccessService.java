@@ -10,7 +10,6 @@ import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
-import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +25,6 @@ public class FeatureAccessService {
     private final SpaceMembershipRepository spaceMembershipRepository;
     private final SpaceRepository spaceRepository;
     private final TaskRepository taskRepository;
-    private final TaskExecutionRepository taskExecutionRepository;
     private final Clock clock;
 
     public FeatureAccessService(
@@ -34,13 +32,11 @@ public class FeatureAccessService {
         SpaceMembershipRepository spaceMembershipRepository,
         SpaceRepository spaceRepository,
         TaskRepository taskRepository,
-        TaskExecutionRepository taskExecutionRepository,
         Clock clock) {
         this.subscriptionRepository = subscriptionRepository;
         this.spaceMembershipRepository = spaceMembershipRepository;
         this.spaceRepository = spaceRepository;
         this.taskRepository = taskRepository;
-        this.taskExecutionRepository = taskExecutionRepository;
         this.clock = clock;
     }
 
