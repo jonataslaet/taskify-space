@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,7 +42,8 @@ public class SpaceController {
     @JsonView(SpaceRecordDTO.SpaceView.ReadSpace.class)
     @PostMapping
     public ResponseEntity<@NonNull SpaceRecordDTO> createSpace(@AuthenticationPrincipal User authenticatedUser,
-        @RequestBody @JsonView(SpaceRecordDTO.SpaceView.CreateSpace.class) SpaceRecordDTO spaceRecordDTO){
+        @RequestBody @Validated(SpaceRecordDTO.SpaceView.CreateSpace.class)
+        @JsonView(SpaceRecordDTO.SpaceView.CreateSpace.class) SpaceRecordDTO spaceRecordDTO){
         return ResponseEntity.status(HttpStatus.CREATED).body(spaceService.createSpace(spaceRecordDTO, authenticatedUser));
     }
 
@@ -69,7 +71,8 @@ public class SpaceController {
     @PutMapping("/{spaceId}")
     public ResponseEntity<@NonNull SpaceRecordDTO> updateSpace(
         @PathVariable("spaceId") Long spaceId, @AuthenticationPrincipal User authenticatedUser,
-        @RequestBody @JsonView(SpaceRecordDTO.SpaceView.UpdateSpace.class) SpaceRecordDTO spaceRecordDTO) {
+        @RequestBody @Validated(SpaceRecordDTO.SpaceView.UpdateSpace.class)
+        @JsonView(SpaceRecordDTO.SpaceView.UpdateSpace.class) SpaceRecordDTO spaceRecordDTO) {
 
         SpaceRecordDTO updatedSpace = spaceService.updateSpace(authenticatedUser, spaceId, spaceRecordDTO);
         return ResponseEntity.ok(updatedSpace);

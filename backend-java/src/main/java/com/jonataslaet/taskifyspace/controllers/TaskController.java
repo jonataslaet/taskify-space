@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -47,7 +48,8 @@ public class TaskController {
     @JsonView(TaskRecordDTO.TaskView.ReadTask.class)
     @PostMapping
     public ResponseEntity<@NonNull TaskRecordDTO> createTask(@AuthenticationPrincipal User authenticatedUser,
-        @RequestBody @JsonView(TaskRecordDTO.TaskView.CreateTask.class) TaskRecordDTO taskRecordDTO){
+        @RequestBody @Validated(TaskRecordDTO.TaskView.CreateTask.class)
+        @JsonView(TaskRecordDTO.TaskView.CreateTask.class) TaskRecordDTO taskRecordDTO){
         return ResponseEntity.status(HttpStatus.CREATED).body(taskService.createTask(authenticatedUser, taskRecordDTO));
     }
 
@@ -72,7 +74,7 @@ public class TaskController {
     public ResponseEntity<@NonNull TaskRecordDTO> updateTask(
         @PathVariable("taskId") Long taskId,
         @AuthenticationPrincipal User authenticatedUser,
-        @RequestBody
+        @RequestBody @Validated(TaskRecordDTO.TaskView.UpdateTask.class)
         @JsonView(TaskRecordDTO.TaskView.UpdateTask.class) TaskRecordDTO taskRecordDTO) {
 
         TaskRecordDTO updatedTask = taskService.updateTask(authenticatedUser, taskId, taskRecordDTO);
