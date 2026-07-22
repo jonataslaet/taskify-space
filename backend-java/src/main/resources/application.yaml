@@ -38,3 +38,8 @@ security:
       token:
         access: ${TTL_ACCESS_TOKEN:900000}
         refresh: ${TTL_REFRESH_TOKEN:604800000}
+
+logging:
+  charset:
+    console: UTF-8
+    file: UTF-8
