@@ -163,6 +163,44 @@ public class DatabaseService {
         subscriptionRepository.save(subscription);
     }
 
+    public void initializeProductionBaseline() {
+        createAdminJonatasLaet();
+        createDefaultPlans();
+    }
+
+    private DefaultPlans createDefaultPlans() {
+        Plan basicPlan = this.createPlan("BASIC", "Basic", "Plano basico para uso individual",
+            Set.of(
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 10L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 1L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 1L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 4L)
+            ));
+
+        Plan proPlan = this.createPlan("PRO", "Pro", "Plano com funcionalidades principais",
+            Set.of(
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 3L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 50L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 2L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 5L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 20L)
+            ));
+
+        Plan premiumPlan = this.createPlan("PREMIUM", "Premium", "Plano completo para equipes maiores",
+            Set.of(
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 10L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 250L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 5L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 10L),
+                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 100L)
+            ));
+
+        return new DefaultPlans(basicPlan, proPlan, premiumPlan);
+    }
+
+    private record DefaultPlans(Plan basicPlan, Plan proPlan, Plan premiumPlan) {}
+
     public SpaceRecordDTO getSpaceResidenciaCasalLaetDTO() {
         Space space = new Space();
         space.setActive(true);
@@ -201,7 +239,8 @@ public class DatabaseService {
         user.setStatus(UserStatusEnum.ACTIVE);
         userRepository.save(user);
     }
-    public Boolean initializeDatabase() {
+
+    public void initializeDemoDatabase() {
         User adminJonatasLaet = this.createAdminJonatasLaet();
         User userJoiceLaet = this.createUserJoiceLaet();
         User userRalphLaet = this.createUserRalphLaet();
@@ -212,38 +251,13 @@ public class DatabaseService {
         activateUser(userBellaLaet);
         activateUser(userMaridoBellaLaet);
 
-        Plan basicPlan = this.createPlan("BASIC", "Basic", "Plano basico para uso individual",
-            Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L),
-                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 10L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 1L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 1L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 4L)
-            ));
+        DefaultPlans defaultPlans = createDefaultPlans();
 
-        Plan proPlan = this.createPlan("PRO", "Pro", "Plano com funcionalidades principais",
-            Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 3L),
-                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 50L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 2L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 5L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 20L)
-            ));
-
-        Plan premiumPlan = this.createPlan("PREMIUM", "Premium", "Plano completo para equipes maiores",
-            Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 10L),
-                new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 250L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 5L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 10L),
-                new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 100L)
-            ));
-
-        this.grantInternalSubscription(userJoiceLaet, basicPlan);
-        this.grantInternalSubscription(userBellaLaet, basicPlan);
+        this.grantInternalSubscription(userJoiceLaet, defaultPlans.basicPlan());
+        this.grantInternalSubscription(userBellaLaet, defaultPlans.basicPlan());
 
         if (spaceMembershipService.hasSpaceMembership(userJoiceLaet)) {
-            return true;
+            return;
         }
 
         SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
@@ -273,7 +287,5 @@ public class DatabaseService {
         usersToBeApproved = new HashSet<>();
         usersToBeApproved.add(userMaridoBellaLaet.getId());
         spaceMembershipService.aproveSpaceMemberships(spaceBella.id(), userBellaLaet, usersToBeApproved);
-
-        return true;
     }
 }

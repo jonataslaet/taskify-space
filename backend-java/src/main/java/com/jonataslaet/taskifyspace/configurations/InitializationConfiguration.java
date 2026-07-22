@@ -1,12 +1,11 @@
 package com.jonataslaet.taskifyspace.configurations;
 
 import com.jonataslaet.taskifyspace.services.DatabaseService;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
-@Profile("!test")
 @Configuration
 public class InitializationConfiguration {
 
@@ -17,8 +16,14 @@ public class InitializationConfiguration {
     }
 
     @Bean
-    @Primary
-    public Boolean initializeDatabase() {
-        return databaseService.initializeDatabase();
+    @Profile("production")
+    public ApplicationRunner initializeProductionBaseline() {
+        return args -> databaseService.initializeProductionBaseline();
+    }
+
+    @Bean
+    @Profile({"development", "seed-demo"})
+    public ApplicationRunner initializeDemoDatabase() {
+        return args -> databaseService.initializeDemoDatabase();
     }
 }
