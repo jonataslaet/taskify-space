@@ -23,6 +23,9 @@ import java.util.UUID;
 @Service
 public class AuthenticationService {
 
+    private static final String INVALID_LOGIN_MESSAGE =
+        "Email ou senha invalidos ou usuario pendente de avaliacao";
+
     @Value("${security.email.password-recover.token.minutes}")
     private Long tokenMinutes;
 
@@ -52,6 +55,9 @@ public class AuthenticationService {
     @Transactional
     public AuthenticationResponseRecordDTO login(
         CredentialsRecordDTO credentialsRecordDTO, String deviceId, String userAgent, String ipAddress) {
+        if (hasMissingCredentials(credentialsRecordDTO)) {
+            throw new InvalidAuthenticationException(INVALID_LOGIN_MESSAGE);
+        }
 
         User user = userRepository.findByEmail(credentialsRecordDTO.username()).orElse(null);
         if (Objects.nonNull(user) && isMatchedPassword(credentialsRecordDTO, user.getPassword()) && user.isEnabled()) {
@@ -68,6 +74,7 @@ public class AuthenticationService {
     @Transactional
     public AuthenticationResponseRecordDTO refresh(
         String refreshToken, String deviceId, String userAgent, String ipAddress) {
+        validateRequiredRefreshToken(refreshToken);
 
         var current = refreshTokenService.validate(refreshToken);
         User user = userRepository.findByEmail(current.getUser().getUsername())
@@ -90,7 +97,24 @@ public class AuthenticationService {
 
     @Transactional
     public void logout(String rawRefreshToken) {
+        validateRequiredRefreshToken(rawRefreshToken);
         refreshTokenService.revoke(rawRefreshToken);
+    }
+
+    private boolean hasMissingCredentials(CredentialsRecordDTO credentialsRecordDTO) {
+        return Objects.isNull(credentialsRecordDTO)
+            || isBlank(credentialsRecordDTO.username())
+            || isBlank(credentialsRecordDTO.password());
+    }
+
+    private void validateRequiredRefreshToken(String refreshToken) {
+        if (isBlank(refreshToken)) {
+            throw new InvalidAuthenticationException("Refresh token obrigatorio");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return Objects.isNull(value) || value.isBlank();
     }
 
     @Transactional

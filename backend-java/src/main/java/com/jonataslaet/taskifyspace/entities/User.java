@@ -151,6 +151,6 @@ public class User implements UserDetails {
     @Override
     @JsonIgnore
     public boolean isEnabled() {
-        return status.equals(UserStatusEnum.ACTIVE);
+        return UserStatusEnum.ACTIVE.equals(status);
     }
 }

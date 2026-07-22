@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,6 +114,32 @@ class UserServiceTests {
         assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.ACTIVE);
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+    }
+
+    @Test
+    void changeStatusRejectsNullRequestBeforeLoadingUser() {
+        assertThatThrownBy(() -> userService.changeStatus(1L, null))
+            .isInstanceOf(InvalidRequestException.class);
+
+        verify(userRepository, never()).findById(1L);
+        verify(refreshTokenService, never()).revokeAllByUserId(1L);
+    }
+
+    @Test
+    void changeStatusRejectsNullStatusBeforeLoadingUser() {
+        assertThatThrownBy(() -> userService.changeStatus(1L, new UpdateUserStatusRequestDTO(null)))
+            .isInstanceOf(InvalidRequestException.class);
+
+        verify(userRepository, never()).findById(1L);
+        verify(refreshTokenService, never()).revokeAllByUserId(1L);
+    }
+
+    @Test
+    void userIsNotEnabledWhenStatusIsNull() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setStatus(null);
+
+        assertThat(user.isEnabled()).isFalse();
     }
 
     @Test

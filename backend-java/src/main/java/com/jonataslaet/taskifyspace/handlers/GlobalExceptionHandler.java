@@ -10,12 +10,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -139,6 +141,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<@NonNull StandardErrorRecordDTO> handleGenericException(
         Exception ex, HttpServletRequest request) {
+        ResponseStatus responseStatus = AnnotatedElementUtils.findMergedAnnotation(
+            ex.getClass(), ResponseStatus.class);
+        if (responseStatus != null) {
+            return handleResponseStatusException(ex, request, responseStatus);
+        }
+
         logger.error("Erro inesperado na requisicao {}", request.getRequestURI(), ex);
 
         StandardErrorRecordDTO error = new StandardErrorRecordDTO();
@@ -149,6 +157,33 @@ public class GlobalExceptionHandler {
         error.setPath(request.getRequestURI());
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    private ResponseEntity<@NonNull StandardErrorRecordDTO> handleResponseStatusException(
+        Exception ex,
+        HttpServletRequest request,
+        ResponseStatus responseStatus) {
+        HttpStatus status = responseStatus.code();
+
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(status.value());
+        error.setError(errorLabelFor(status));
+        error.setMessage(messageOrFallback(ex, status.getReasonPhrase()));
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(status).body(error);
+    }
+
+    private String errorLabelFor(HttpStatus status) {
+        return switch (status) {
+            case BAD_REQUEST -> "Requisicao invalida";
+            case UNAUTHORIZED -> "Erro de autenticacao";
+            case FORBIDDEN -> "Acesso negado";
+            case NOT_FOUND -> "Recurso nao encontrado";
+            case CONFLICT -> "Conflito";
+            default -> status.is5xxServerError() ? "Erro interno" : "Erro de requisicao";
+        };
     }
 
     private String messageOrFallback(Exception ex, String fallback) {

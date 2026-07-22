@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.UserMapper;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
@@ -124,6 +125,10 @@ public class UserService {
 
     @Transactional
     public void changeStatus(Long userId, UpdateUserStatusRequestDTO updateUserStatusRequestDTO) {
+        if (Objects.isNull(updateUserStatusRequestDTO) || Objects.isNull(updateUserStatusRequestDTO.status())) {
+            throw new InvalidRequestException("Status is required");
+        }
+
         logger.info("Changing user status to {}", updateUserStatusRequestDTO.status());
         User user = findUserById(userId);
         UserStatusEnum previousStatus = user.getStatus();

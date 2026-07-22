@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.configurations.TokenConfiguration;
+import com.jonataslaet.taskifyspace.controllers.dtos.CredentialsRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.EmailDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.PasswordResetDTO;
 import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
@@ -68,6 +69,44 @@ class AuthenticationServiceTests {
             validator);
         ReflectionTestUtils.setField(authenticationService, "tokenMinutes", 30L);
         ReflectionTestUtils.setField(authenticationService, "passwordRecoveryUri", "http://localhost/new-password/");
+    }
+
+    @Test
+    void loginRejectsNullCredentialsBeforeLoadingUser() {
+        assertThatThrownBy(() -> authenticationService.login(null, "device", "agent", "127.0.0.1"))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(refreshTokenService, never()).issue(any(User.class), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void loginRejectsBlankCredentialsBeforeLoadingUser() {
+        CredentialsRecordDTO credentials = new CredentialsRecordDTO(" ", "");
+
+        assertThatThrownBy(() -> authenticationService.login(credentials, "device", "agent", "127.0.0.1"))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(refreshTokenService, never()).issue(any(User.class), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void refreshRejectsBlankRefreshTokenBeforeValidation() {
+        assertThatThrownBy(() -> authenticationService.refresh(" ", "device", "agent", "127.0.0.1"))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(refreshTokenService, never()).validate(any());
+    }
+
+    @Test
+    void logoutRejectsBlankRefreshTokenBeforeRevocation() {
+        assertThatThrownBy(() -> authenticationService.logout(" "))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(refreshTokenService, never()).revoke(any());
     }
 
     @Test

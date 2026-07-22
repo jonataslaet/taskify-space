@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.UserService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
+import jakarta.validation.Valid;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -67,7 +68,7 @@ public class UserController {
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateStatus(
-        @PathVariable Long id, @RequestBody UpdateUserStatusRequestDTO request) {
+        @PathVariable Long id, @RequestBody @Valid UpdateUserStatusRequestDTO request) {
 
         userService.changeStatus(id, request);
 

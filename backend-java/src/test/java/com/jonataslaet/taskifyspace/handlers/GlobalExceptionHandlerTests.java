@@ -1,6 +1,9 @@
 package com.jonataslaet.taskifyspace.handlers;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.StandardErrorRecordDTO;
+import com.jonataslaet.taskifyspace.exceptions.EmailException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
+import com.jonataslaet.taskifyspace.exceptions.TokenExpirationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -40,5 +43,56 @@ class GlobalExceptionHandlerTests {
         assertThat(error.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         assertThat(error.getMessage()).isEqualTo("Ocorreu um erro inesperado");
         assertThat(error.getPath()).isEqualTo("/tasks");
+    }
+
+    @Test
+    void preservesTokenExpirationResponseStatus() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/new-password/token");
+
+        var response = handler.handleGenericException(
+            new TokenExpirationException("Token expirado"),
+            request);
+
+        assertResponseStatusException(response.getBody(), HttpStatus.UNAUTHORIZED, "Token expirado", request);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void preservesEmailExceptionResponseStatus() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/recovery-token");
+
+        var response = handler.handleGenericException(
+            new EmailException("Falha ao enviar email"),
+            request);
+
+        assertResponseStatusException(response.getBody(), HttpStatus.BAD_REQUEST, "Falha ao enviar email", request);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void preservesInvalidCredentialsResponseStatus() {
+        MockHttpServletRequest request = new MockHttpServletRequest("PATCH", "/users/password");
+
+        var response = handler.handleGenericException(
+            new InvalidCredentialsException("Old password does not match"),
+            request);
+
+        assertResponseStatusException(
+            response.getBody(),
+            HttpStatus.CONFLICT,
+            "Old password does not match",
+            request);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    private void assertResponseStatusException(
+        StandardErrorRecordDTO error,
+        HttpStatus status,
+        String message,
+        MockHttpServletRequest request) {
+        assertThat(error).isNotNull();
+        assertThat(error.getStatus()).isEqualTo(status.value());
+        assertThat(error.getMessage()).isEqualTo(message);
+        assertThat(error.getPath()).isEqualTo(request.getRequestURI());
     }
 }

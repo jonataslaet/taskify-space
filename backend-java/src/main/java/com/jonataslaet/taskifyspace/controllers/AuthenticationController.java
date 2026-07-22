@@ -19,7 +19,8 @@ public class AuthenticationController {
 
     @PostMapping("/login")
     public ResponseEntity<@NonNull AuthenticationResponseRecordDTO> login(
-        @RequestBody CredentialsRecordDTO credentialsRecordDTO, @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+        @RequestBody @Valid CredentialsRecordDTO credentialsRecordDTO,
+        @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
         @RequestHeader(value = "User-Agent", required = false) String userAgent,
         @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
         AuthenticationResponseRecordDTO authenticationResponseRecordDTO = authenticationService.login(
@@ -29,16 +30,18 @@ public class AuthenticationController {
 
     @PostMapping("/refresh")
     public ResponseEntity<@NonNull AuthenticationResponseRecordDTO> refresh(
-        @RequestBody RefreshTokenRecordDTO request, @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+        @RequestBody @Valid RefreshTokenRecordDTO request,
+        @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
         @RequestHeader(value = "User-Agent", required = false) String userAgent,
         @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
-        AuthenticationResponseRecordDTO dto = authenticationService.refresh(request.refreshToken(), deviceId, userAgent, ip);
+        AuthenticationResponseRecordDTO dto = authenticationService.refresh(
+            refreshTokenOrNull(request), deviceId, userAgent, ip);
         return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<@NonNull Void> logout(@RequestBody RefreshTokenRecordDTO request) {
-        authenticationService.logout(request.refreshToken());
+    public ResponseEntity<@NonNull Void> logout(@RequestBody @Valid RefreshTokenRecordDTO request) {
+        authenticationService.logout(refreshTokenOrNull(request));
         return ResponseEntity.noContent().build();
     }
 
@@ -53,5 +56,9 @@ public class AuthenticationController {
         @RequestBody @Valid PasswordResetDTO passwordResetDTO) {
         authenticationService.resetPassword(token, passwordResetDTO);
         return ResponseEntity.noContent().build();
+    }
+
+    private String refreshTokenOrNull(RefreshTokenRecordDTO request) {
+        return request == null ? null : request.refreshToken();
     }
 }
