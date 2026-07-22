@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -62,7 +63,6 @@ public class SecurityConfiguration {
             )
             .addFilterBefore(new AuthenticationFilter(tokenConfiguration), BasicAuthenticationFilter.class);
 
-
         return http.build();
     }
 
@@ -96,12 +96,25 @@ public class SecurityConfiguration {
             StandardErrorRecordDTO err = new StandardErrorRecordDTO();
             err.setTimestamp(Instant.now());
             err.setStatus(HttpStatus.UNAUTHORIZED.value());
-            err.setError("Erro de autenticação");
-            err.setMessage(ex.getMessage());
+            err.setError("Erro de autenticacao");
+            String message = resolveAuthenticationMessage(ex);
+            err.setMessage(message);
             err.setPath(request.getRequestURI());
-            logger.warn("Logando erro de autorização: {}", ex.getCause().getMessage());
+            logger.warn("Logando erro de autorizacao: {}", message);
             response.getWriter().write(mapper.writeValueAsString(err));
         };
     }
 
+    private String resolveAuthenticationMessage(AuthenticationException ex) {
+        if (ex.getMessage() != null && !ex.getMessage().isBlank()) {
+            return ex.getMessage();
+        }
+
+        Throwable cause = ex.getCause();
+        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
+            return cause.getMessage();
+        }
+
+        return "Nao autenticado";
+    }
 }

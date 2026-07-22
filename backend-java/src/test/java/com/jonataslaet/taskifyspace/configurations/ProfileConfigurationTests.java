@@ -34,6 +34,16 @@ class ProfileConfigurationTests {
     }
 
     @Test
+    void productionProfileDisablesSqlAndBindLogging() throws IOException {
+        String productionYaml = readResource("application-production.yaml");
+
+        assertThat(productionYaml).contains("show-sql: false");
+        assertThat(productionYaml).contains("org.hibernate.SQL: OFF");
+        assertThat(productionYaml).contains("org.hibernate.orm.jdbc.bind: OFF");
+        assertThat(productionYaml).contains("org.hibernate.type.descriptor.sql.BasicBinder: OFF");
+    }
+
+    @Test
     void developmentProfileKeepsCreateDropSchema() throws IOException {
         String developmentYaml = readResource("application-development.yaml");
 

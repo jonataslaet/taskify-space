@@ -8,6 +8,8 @@ import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<StandardErrorRecordDTO> handleForbiddenException(
@@ -93,6 +97,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(error);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleIllegalArgumentException(
+        IllegalArgumentException ex, HttpServletRequest request) {
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.BAD_REQUEST.value());
+        error.setError("Requisicao invalida");
+        error.setMessage(messageOrFallback(ex, "Parametro invalido"));
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.badRequest().body(error);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<@NonNull StandardErrorRecordDTO> handleResourceNotFoundException(ResourceNotFoundException ex,
                                                                                            HttpServletRequest httpServletRequest) {
@@ -117,5 +134,26 @@ public class GlobalExceptionHandler {
         standardErrorRecordDTO.setPath(httpServletRequest.getRequestURI());
 
         return ResponseEntity.status(HttpStatus.CONFLICT.value()).body(standardErrorRecordDTO);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleGenericException(
+        Exception ex, HttpServletRequest request) {
+        logger.error("Erro inesperado na requisicao {}", request.getRequestURI(), ex);
+
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        error.setError("Erro interno");
+        error.setMessage("Ocorreu um erro inesperado");
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    private String messageOrFallback(Exception ex, String fallback) {
+        return ex.getMessage() == null || ex.getMessage().isBlank()
+            ? fallback
+            : ex.getMessage();
     }
 }
