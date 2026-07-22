@@ -79,9 +79,10 @@ public class RefreshTokenService {
         Instant now = Instant.now(clock);
 
         // marca encadeamento e revogação lógica do antigo
-        old.setReplacedByHash(newHash);
-        old.setRevokedAt(now);
-        refreshTokenRepository.save(old);
+        int rotatedTokens = refreshTokenRepository.rotateActiveToken(old.getTokenHash(), newHash, now);
+        if (rotatedTokens != 1) {
+            throw new InvalidAuthenticationException("Refresh token ja foi rotacionado");
+        }
 
         // cria o novo
         RefreshToken newer = new RefreshToken();

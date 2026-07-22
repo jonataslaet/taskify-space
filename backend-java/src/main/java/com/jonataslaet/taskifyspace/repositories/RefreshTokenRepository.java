@@ -13,6 +13,21 @@ import java.util.Optional;
 public interface RefreshTokenRepository extends JpaRepository<@NonNull RefreshToken, @NonNull Long> {
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        UPDATE RefreshToken refreshToken
+        SET refreshToken.revokedAt = :revokedAt,
+            refreshToken.replacedByHash = :replacedByHash
+        WHERE refreshToken.tokenHash = :tokenHash
+            AND refreshToken.revokedAt IS NULL
+            AND refreshToken.replacedByHash IS NULL
+            AND refreshToken.expiresAt >= :revokedAt
+        """)
+    int rotateActiveToken(
+        @Param("tokenHash") String tokenHash,
+        @Param("replacedByHash") String replacedByHash,
+        @Param("revokedAt") Instant revokedAt);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE RefreshToken refreshToken
