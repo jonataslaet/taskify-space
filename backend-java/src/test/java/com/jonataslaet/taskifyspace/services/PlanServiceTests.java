@@ -47,6 +47,17 @@ class PlanServiceTests {
     }
 
     @Test
+    void createPlanDefaultsActiveToTrueWhenNotProvided() {
+        PlanRecordDTO dto = createPlanDTO(1L, null);
+        when(planRepository.existsByCodeIgnoreCase(dto.code())).thenReturn(false);
+        when(planRepository.save(any(Plan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlanRecordDTO created = planService.createPlan(dto);
+
+        assertThat(created.active()).isTrue();
+    }
+
+    @Test
     void updatePlanAllowsNumericUsageLimit() {
         Plan existingPlan = createPlan();
         PlanRecordDTO dto = createPlanDTO(10L);
@@ -60,6 +71,32 @@ class PlanServiceTests {
     }
 
     @Test
+    void updatePlanPreservesActiveWhenNotProvided() {
+        Plan existingPlan = createPlan();
+        existingPlan.setActive(false);
+        PlanRecordDTO dto = createPlanDTO(10L, null);
+        when(planRepository.findById(existingPlan.getId())).thenReturn(Optional.of(existingPlan));
+        when(planRepository.save(any(Plan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlanRecordDTO updated = planService.updatePlan(existingPlan.getId(), dto);
+
+        assertThat(updated.active()).isFalse();
+    }
+
+    @Test
+    void updatePlanChangesActiveWhenProvided() {
+        Plan existingPlan = createPlan();
+        existingPlan.setActive(true);
+        PlanRecordDTO dto = createPlanDTO(10L, false);
+        when(planRepository.findById(existingPlan.getId())).thenReturn(Optional.of(existingPlan));
+        when(planRepository.save(any(Plan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PlanRecordDTO updated = planService.updatePlan(existingPlan.getId(), dto);
+
+        assertThat(updated.active()).isFalse();
+    }
+
+    @Test
     void createPlanRejectsNonPositiveUsageLimit() {
         PlanRecordDTO dto = createPlanDTO(0L);
 
@@ -68,6 +105,10 @@ class PlanServiceTests {
     }
 
     private PlanRecordDTO createPlanDTO(Long usageLimit) {
+        return createPlanDTO(usageLimit, true);
+    }
+
+    private PlanRecordDTO createPlanDTO(Long usageLimit, Boolean active) {
         Set<PlanFeatureLimitRecordDTO> featureLimits = Set.of(
             new PlanFeatureLimitRecordDTO(FeatureEnum.CREATE_SPACE, usageLimit));
 
@@ -76,7 +117,7 @@ class PlanServiceTests {
             "basic",
             "Basic",
             "Basic plan",
-            true,
+            active,
             Set.of(FeatureEnum.CREATE_SPACE),
             featureLimits);
     }

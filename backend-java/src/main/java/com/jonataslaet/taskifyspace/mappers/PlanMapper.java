@@ -18,9 +18,19 @@ public class PlanMapper {
         plan.setCode(dto.code());
         plan.setName(dto.name());
         plan.setDescription(dto.description());
-        plan.setActive(Objects.isNull(dto.active()) || dto.active());
+        plan.setActive(Objects.isNull(dto.active()) ? Boolean.TRUE : dto.active());
         plan.setFeatureLimits(toFeatureLimits(dto.featureLimits()));
         return plan;
+    }
+
+    public static void updateEntity(PlanRecordDTO dto, Plan plan) {
+        plan.setCode(dto.code());
+        plan.setName(dto.name());
+        plan.setDescription(dto.description());
+        if (Objects.nonNull(dto.active())) {
+            plan.setActive(dto.active());
+        }
+        plan.setFeatureLimits(toFeatureLimits(dto.featureLimits()));
     }
 
     public static PlanRecordDTO toDTO(Plan plan) {

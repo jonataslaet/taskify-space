@@ -10,7 +10,6 @@ import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.PlanMapper;
 import com.jonataslaet.taskifyspace.repositories.PlanRepository;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -60,7 +59,7 @@ public class PlanService {
         if (!plan.getCode().equalsIgnoreCase(dto.code()) && planRepository.existsByCodeIgnoreCase(dto.code())) {
             throw new DuplicationException("Plano ja existe");
         }
-        BeanUtils.copyProperties(PlanMapper.toEntity(dto), plan, "id");
+        PlanMapper.updateEntity(dto, plan);
         return PlanMapper.toDTO(planRepository.save(plan));
     }
 
