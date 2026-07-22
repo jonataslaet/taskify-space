@@ -7,6 +7,7 @@ import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -149,6 +150,35 @@ class TaskServiceTests {
             .hasMessage("Tarefa nao encontrada nesse espaco");
 
         verify(taskExecutionRepository, never()).save(any(TaskExecution.class));
+    }
+
+    @Test
+    void updateTaskWithPartialPayloadPreservesMissingFields() {
+        User authenticatedUser = createUser(1L);
+        Space space = createSpace(10L);
+        Task task = createTask(20L, space);
+        task.setDescription("Original task");
+        task.setScore(new BigDecimal("10.0"));
+        task.setCategory(TaskCategoryEnum.OPERATIONAL);
+        task.setActive(true);
+        TaskRecordDTO partialUpdate = new TaskRecordDTO(
+            null,
+            null,
+            null,
+            new BigDecimal("20.0"),
+            null,
+            null,
+            null);
+
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(taskRepository.save(task)).thenReturn(task);
+
+        TaskRecordDTO updatedTask = taskService.updateTask(authenticatedUser, task.getId(), partialUpdate);
+
+        assertThat(updatedTask.description()).isEqualTo("Original task");
+        assertThat(updatedTask.score()).isEqualByComparingTo("20.0");
+        assertThat(updatedTask.category()).isEqualTo(TaskCategoryEnum.OPERATIONAL);
+        assertThat(updatedTask.active()).isTrue();
     }
 
     private Space createSpace(Long id) {

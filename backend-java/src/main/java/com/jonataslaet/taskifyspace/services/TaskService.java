@@ -10,7 +10,6 @@ import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -136,12 +135,17 @@ public class TaskService {
         Task taskEntity = getTaskEntity(TaskId);
         Space space = taskEntity.getSpace();
         spaceService.validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
-        if (!taskEntity.getDescription().equalsIgnoreCase(taskRecordDTO.description())) {
+        if (Objects.nonNull(taskRecordDTO.description())
+            && !taskEntity.getDescription().equalsIgnoreCase(taskRecordDTO.description())) {
             if (taskRepository.existsBySpaceIdAndDescriptionIgnoreCase(space.getId(), taskRecordDTO.description())) {
                 throw new DuplicationException("Essa tarefa já existe");
             }
+            taskEntity.setDescription(taskRecordDTO.description());
         }
-        BeanUtils.copyProperties(taskRecordDTO, taskEntity, "id");
+
+        if (Objects.nonNull(taskRecordDTO.score())) taskEntity.setScore(taskRecordDTO.score());
+        if (Objects.nonNull(taskRecordDTO.category())) taskEntity.setCategory(taskRecordDTO.category());
+
         return TaskMapper.toDTO(taskRepository.save(taskEntity));
     }
 

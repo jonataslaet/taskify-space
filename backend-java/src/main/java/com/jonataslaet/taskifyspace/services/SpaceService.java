@@ -18,7 +18,6 @@ import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -82,8 +81,7 @@ public class SpaceService {
     public SpaceRecordDTO updateSpace(User authenticatedUser, Long spaceId, SpaceRecordDTO spaceRecordDTO) {
         Space spaceEntity = getSpaceEntity(spaceId);
         validateActiveParticipation(authenticatedUser, spaceEntity, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
-//        TODO: Implement a method to verify if they are equals, if not, then return spaceRecordDTO
-        BeanUtils.copyProperties(spaceRecordDTO, spaceEntity, "id");
+        if (Objects.nonNull(spaceRecordDTO.name())) spaceEntity.setName(spaceRecordDTO.name());
         return SpaceMapper.toDTO(spaceRepository.save(spaceEntity));
     }
 

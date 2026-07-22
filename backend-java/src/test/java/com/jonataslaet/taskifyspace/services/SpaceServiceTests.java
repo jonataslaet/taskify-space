@@ -84,6 +84,35 @@ class SpaceServiceTests {
             .isInstanceOf(ForbiddenException.class);
     }
 
+    @Test
+    void updateSpaceWithPartialPayloadPreservesMissingFields() {
+        User user = createUser(1L);
+        Space space = createSpace(10L);
+        space.setName("Original space");
+        space.setActive(true);
+        addMembership(
+            space,
+            user,
+            SpaceMembershipStatusEnum.APPROVED,
+            SpaceUserRoleEnum.ROLE_SPACE_ADMIN);
+        SpaceRecordDTO partialUpdate = new SpaceRecordDTO(
+            null,
+            "Updated space",
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        when(spaceRepository.findById(space.getId())).thenReturn(Optional.of(space));
+        when(spaceRepository.save(space)).thenReturn(space);
+
+        SpaceRecordDTO updatedSpace = spaceService.updateSpace(user, space.getId(), partialUpdate);
+
+        assertThat(updatedSpace.name()).isEqualTo("Updated space");
+        assertThat(updatedSpace.active()).isTrue();
+    }
+
     private User createUser(Long id) {
         User user = new User();
         user.setId(id);
@@ -102,8 +131,16 @@ class SpaceServiceTests {
     }
 
     private void addMembership(Space space, User user, SpaceMembershipStatusEnum status) {
+        addMembership(space, user, status, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+    }
+
+    private void addMembership(
+        Space space,
+        User user,
+        SpaceMembershipStatusEnum status,
+        SpaceUserRoleEnum role) {
         SpaceMembership spaceMembership =
-            new SpaceMembership(user, space, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+            new SpaceMembership(user, space, role);
         spaceMembership.setSpaceMembershipStatusEnum(status);
         space.getSpaceMemberships().add(spaceMembership);
     }
