@@ -1,7 +1,9 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.configurations.TokenConfiguration;
+import com.jonataslaet.taskifyspace.controllers.dtos.EmailDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.PasswordResetDTO;
+import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.RefreshToken;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -63,6 +66,8 @@ class AuthenticationServiceTests {
             passwordRecoveryService,
             emailService,
             validator);
+        ReflectionTestUtils.setField(authenticationService, "tokenMinutes", 30L);
+        ReflectionTestUtils.setField(authenticationService, "passwordRecoveryUri", "http://localhost/new-password/");
     }
 
     @Test
@@ -100,6 +105,28 @@ class AuthenticationServiceTests {
             .isInstanceOf(InvalidAuthenticationException.class);
 
         verify(passwordRecoveryService, never()).getValidPasswordRecoveries(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void recoveryTokenDoesNotRevealMissingEmail() {
+        String email = "missing@example.com";
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        authenticationService.recoveryToken(new EmailDTO(email));
+
+        verify(passwordRecoveryService, never()).savePasswordRecovery(any(PasswordRecovery.class));
+        verify(emailService, never()).sendEmail(any());
+    }
+
+    @Test
+    void recoveryTokenCreatesRecoveryAndSendsEmailForExistingUser() {
+        User user = createUser(UserStatusEnum.ACTIVE);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+
+        authenticationService.recoveryToken(new EmailDTO(user.getEmail()));
+
+        verify(passwordRecoveryService).savePasswordRecovery(any(PasswordRecovery.class));
+        verify(emailService).sendEmail(any());
     }
 
     private User createUser(UserStatusEnum status) {

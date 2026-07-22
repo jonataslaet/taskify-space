@@ -101,8 +101,10 @@ public class AuthenticationService {
 
     @Transactional
     public void recoveryToken(EmailDTO emailDTO) {
-        User user = userRepository.findByEmail(emailDTO.address())
-            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        if (userRepository.findByEmail(emailDTO.address()).isEmpty()) {
+            return;
+        }
+
         String uuidToken = UUID.randomUUID().toString();
         PasswordRecovery passwordRecovery = new PasswordRecovery(
             uuidToken,
