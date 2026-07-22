@@ -27,7 +27,12 @@ public class TokenUtils {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    public static boolean isValidBearerToken(String headerValue) {
-        return Objects.nonNull(headerValue) && headerValue.startsWith("Bearer ");
+    public static boolean isBearerAuthorizationHeader(String headerValue) {
+        if (Objects.isNull(headerValue) || headerValue.isBlank()) {
+            return false;
+        }
+
+        String[] authorizationParts = headerValue.trim().split("\\s+", 2);
+        return "Bearer".equalsIgnoreCase(authorizationParts[0]);
     }
 }

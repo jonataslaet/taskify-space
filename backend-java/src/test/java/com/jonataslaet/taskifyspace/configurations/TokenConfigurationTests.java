@@ -3,13 +3,14 @@ package com.jonataslaet.taskifyspace.configurations;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
-import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.services.CustomUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -41,7 +42,25 @@ class TokenConfigurationTests {
         when(userService.loadUserByUsername(user.getEmail())).thenReturn(user);
 
         assertThatThrownBy(() -> tokenConfiguration.validateToken(token))
-            .isInstanceOf(InvalidAuthenticationException.class);
+            .isInstanceOf(DisabledException.class);
+    }
+
+    @Test
+    void authenticateRejectsEmptyBearerToken() {
+        assertThatThrownBy(() -> tokenConfiguration.authenticate("Bearer "))
+            .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void authenticateRejectsMalformedBearerHeader() {
+        assertThatThrownBy(() -> tokenConfiguration.authenticate("Bearer token extra"))
+            .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void validateTokenRejectsMalformedJwt() {
+        assertThatThrownBy(() -> tokenConfiguration.validateToken("not-a-jwt"))
+            .isInstanceOf(BadCredentialsException.class);
     }
 
     private User createUser(UserStatusEnum status) {

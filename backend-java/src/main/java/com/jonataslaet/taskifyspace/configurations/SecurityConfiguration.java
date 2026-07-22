@@ -61,7 +61,9 @@ public class SecurityConfiguration {
                 .accessDeniedHandler(customAccessDeniedHandler())
                 .authenticationEntryPoint(customAuthenticationEntryPoint())
             )
-            .addFilterBefore(new AuthenticationFilter(tokenConfiguration), BasicAuthenticationFilter.class);
+            .addFilterBefore(
+                new AuthenticationFilter(tokenConfiguration, customAuthenticationEntryPoint()),
+                BasicAuthenticationFilter.class);
 
         return http.build();
     }

@@ -6,35 +6,40 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-import static com.jonataslaet.taskifyspace.utils.TokenUtils.isValidBearerToken;
+import static com.jonataslaet.taskifyspace.utils.TokenUtils.isBearerAuthorizationHeader;
 
 
 public class AuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenConfiguration tokenConfiguration;
+    private final AuthenticationEntryPoint authenticationEntryPoint;
 
-    public AuthenticationFilter(TokenConfiguration tokenConfiguration) {
+    public AuthenticationFilter(TokenConfiguration tokenConfiguration, AuthenticationEntryPoint authenticationEntryPoint) {
         this.tokenConfiguration = tokenConfiguration;
+        this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
         throws ServletException, IOException {
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (!isValidBearerToken(header)) {
+        if (!isBearerAuthorizationHeader(header)) {
             filterChain.doFilter(request, response);
             return;
         }
         try {
             tokenConfiguration.authenticate(header);
-        } catch (RuntimeException e) {
+        } catch (AuthenticationException e) {
             SecurityContextHolder.clearContext();
-            throw e;
+            authenticationEntryPoint.commence(request, response, e);
+            return;
         }
         filterChain.doFilter(request, response);
     }
