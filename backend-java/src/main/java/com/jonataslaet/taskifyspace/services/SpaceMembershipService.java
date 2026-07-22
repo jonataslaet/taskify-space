@@ -28,6 +28,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
+
 @Service
 @Transactional(readOnly = true)
 public class SpaceMembershipService {
@@ -112,7 +117,13 @@ public class SpaceMembershipService {
         SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole)
             ? spaceUserRole
             : spaceMembership.getSpaceUserRole();
+        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status)
+            ? status
+            : spaceMembership.getSpaceMembershipStatusEnum();
+
+        validateParticipationUpdatePermission(spaceMembership, spaceUserRole, targetSpaceUserRole, authenticatedUser);
         validNotDuplicateParticipation(spaceMembership);
+        validateSpaceKeepsApprovedAdmin(spaceMembership, targetStatus, targetSpaceUserRole);
 
         if (willIncreaseApprovedRoleCount(spaceMembership, status, targetSpaceUserRole)) {
             featureAccessService.requireFeature(
@@ -136,6 +147,71 @@ public class SpaceMembershipService {
         return SpaceMembershipStatusEnum.APPROVED.equals(targetStatus)
             && (!SpaceMembershipStatusEnum.APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum())
                 || !spaceMembership.getSpaceUserRole().equals(targetSpaceUserRole));
+    }
+
+    private void validateParticipationUpdatePermission(
+        SpaceMembership spaceMembership,
+        SpaceUserRoleEnum requestedSpaceUserRole,
+        SpaceUserRoleEnum targetSpaceUserRole,
+        User authenticatedUser) {
+        if (!requiresSpaceAdmin(spaceMembership, requestedSpaceUserRole, targetSpaceUserRole)) {
+            return;
+        }
+
+        boolean authenticatedUserIsApprovedAdmin =
+            spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+                spaceMembership.getSpace().getId(),
+                authenticatedUser.getId(),
+                APPROVED,
+                ROLE_SPACE_ADMIN);
+
+        if (!authenticatedUserIsApprovedAdmin) {
+            throw new ForbiddenException("Somente administradores do espaço podem alterar administradores ou gerentes");
+        }
+    }
+
+    private boolean requiresSpaceAdmin(
+        SpaceMembership spaceMembership,
+        SpaceUserRoleEnum requestedSpaceUserRole,
+        SpaceUserRoleEnum targetSpaceUserRole) {
+        boolean roleChangeWasRequested = Objects.nonNull(requestedSpaceUserRole)
+            && !spaceMembership.getSpaceUserRole().equals(requestedSpaceUserRole);
+
+        return roleChangeWasRequested
+            || isPrivilegedRole(spaceMembership.getSpaceUserRole())
+            || isPrivilegedRole(targetSpaceUserRole);
+    }
+
+    private boolean isPrivilegedRole(SpaceUserRoleEnum spaceUserRole) {
+        return ROLE_SPACE_ADMIN.equals(spaceUserRole) || ROLE_SPACE_MANAGER.equals(spaceUserRole);
+    }
+
+    private void validateSpaceKeepsApprovedAdmin(
+        SpaceMembership spaceMembership,
+        SpaceMembershipStatusEnum targetStatus,
+        SpaceUserRoleEnum targetSpaceUserRole) {
+        boolean currentlyApprovedAdmin = isApprovedAdmin(
+            spaceMembership.getSpaceMembershipStatusEnum(),
+            spaceMembership.getSpaceUserRole());
+        boolean willRemainApprovedAdmin = isApprovedAdmin(targetStatus, targetSpaceUserRole);
+
+        if (!currentlyApprovedAdmin || willRemainApprovedAdmin) {
+            return;
+        }
+
+        Set<SpaceMembership> approvedAdmins =
+            spaceMembershipRepository.findBySpaceIdAndStatusAndSpaceUserRoleForUpdate(
+                spaceMembership.getSpace().getId(),
+                APPROVED,
+                ROLE_SPACE_ADMIN);
+
+        if (approvedAdmins.size() <= 1) {
+            throw new ForbiddenException("O espaço precisa manter pelo menos um administrador aprovado");
+        }
+    }
+
+    private boolean isApprovedAdmin(SpaceMembershipStatusEnum status, SpaceUserRoleEnum role) {
+        return APPROVED.equals(status) && ROLE_SPACE_ADMIN.equals(role);
     }
 
     private FeatureEnum approvalFeature(SpaceUserRoleEnum spaceUserRole) {

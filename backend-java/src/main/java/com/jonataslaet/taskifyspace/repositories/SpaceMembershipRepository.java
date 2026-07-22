@@ -4,9 +4,11 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
+import jakarta.persistence.LockModeType;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -48,8 +50,26 @@ public interface SpaceMembershipRepository extends JpaRepository<
         Long userId,
         SpaceMembershipStatusEnum status);
 
+    boolean existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+        Long spaceId,
+        Long userId,
+        SpaceMembershipStatusEnum status,
+        SpaceUserRoleEnum spaceUserRole);
+
     long countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
         Long spaceId,
         SpaceMembershipStatusEnum status,
         SpaceUserRoleEnum spaceUserRole);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT sm FROM SpaceMembership sm
+        WHERE sm.space.id = :spaceId
+            AND sm.spaceMembershipStatusEnum = :status
+            AND sm.spaceUserRole = :spaceUserRole
+        """)
+    Set<SpaceMembership> findBySpaceIdAndStatusAndSpaceUserRoleForUpdate(
+        @Param("spaceId") Long spaceId,
+        @Param("status") SpaceMembershipStatusEnum status,
+        @Param("spaceUserRole") SpaceUserRoleEnum spaceUserRole);
 }

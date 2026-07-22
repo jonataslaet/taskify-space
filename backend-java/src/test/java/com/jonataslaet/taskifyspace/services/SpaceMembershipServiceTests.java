@@ -4,8 +4,11 @@ import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.repositories.ParticipantRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,12 +19,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.PENDING;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.SUSPENDED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +66,9 @@ class SpaceMembershipServiceTests {
 
         when(spaceMembershipRepository.findByIdAndSpaceId(20L, space.getId()))
             .thenReturn(Optional.of(spaceMembership));
+        when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+            space.getId(), authenticatedUser.getId(), APPROVED, ROLE_SPACE_ADMIN))
+            .thenReturn(true);
         when(spaceMembershipRepository.save(spaceMembership)).thenReturn(spaceMembership);
 
         SpaceMembershipRecordDTO updatedMembership = spaceMembershipService.updateParticipation(
@@ -72,6 +82,71 @@ class SpaceMembershipServiceTests {
         assertThat(savedMembership.getSpaceUserRole()).isEqualTo(ROLE_SPACE_MANAGER);
         assertThat(updatedMembership.spaceMembershipStatus()).isEqualTo(APPROVED);
         assertThat(updatedMembership.spaceUserRole()).isEqualTo(ROLE_SPACE_MANAGER);
+    }
+
+    @Test
+    void updateParticipationPreventsManagerFromChangingAdminStatus() {
+        User manager = createUser(1L);
+        User admin = createUser(2L);
+        Space space = createSpace();
+        SpaceMembership adminMembership = createMembership(admin, space, ROLE_SPACE_ADMIN, APPROVED);
+
+        when(spaceMembershipRepository.findByIdAndSpaceId(20L, space.getId()))
+            .thenReturn(Optional.of(adminMembership));
+
+        assertThatThrownBy(() -> spaceMembershipService.updateParticipation(
+            space.getId(), 20L, SUSPENDED, null, manager))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(spaceMembershipRepository, never()).save(org.mockito.ArgumentMatchers.any(SpaceMembership.class));
+    }
+
+    @Test
+    void updateParticipationPreventsRemovingLastApprovedAdmin() {
+        User admin = createUser(1L);
+        Space space = createSpace();
+        SpaceMembership adminMembership = createMembership(admin, space, ROLE_SPACE_ADMIN, APPROVED);
+
+        when(spaceMembershipRepository.findByIdAndSpaceId(20L, space.getId()))
+            .thenReturn(Optional.of(adminMembership));
+        when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+            space.getId(), admin.getId(), APPROVED, ROLE_SPACE_ADMIN))
+            .thenReturn(true);
+        when(spaceMembershipRepository.findBySpaceIdAndStatusAndSpaceUserRoleForUpdate(
+            space.getId(), APPROVED, ROLE_SPACE_ADMIN))
+            .thenReturn(Set.of(adminMembership));
+
+        assertThatThrownBy(() -> spaceMembershipService.updateParticipation(
+            space.getId(), 20L, SUSPENDED, null, admin))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(spaceMembershipRepository, never()).save(org.mockito.ArgumentMatchers.any(SpaceMembership.class));
+    }
+
+    @Test
+    void updateParticipationAllowsAdminToSuspendAdminWhenAnotherApprovedAdminRemains() {
+        User authenticatedAdmin = createUser(1L);
+        User targetAdmin = createUser(2L);
+        User otherAdmin = createUser(3L);
+        Space space = createSpace();
+        SpaceMembership targetAdminMembership = createMembership(targetAdmin, space, ROLE_SPACE_ADMIN, APPROVED);
+        SpaceMembership otherAdminMembership = createMembership(otherAdmin, space, ROLE_SPACE_ADMIN, APPROVED);
+
+        when(spaceMembershipRepository.findByIdAndSpaceId(20L, space.getId()))
+            .thenReturn(Optional.of(targetAdminMembership));
+        when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+            space.getId(), authenticatedAdmin.getId(), APPROVED, ROLE_SPACE_ADMIN))
+            .thenReturn(true);
+        when(spaceMembershipRepository.findBySpaceIdAndStatusAndSpaceUserRoleForUpdate(
+            space.getId(), APPROVED, ROLE_SPACE_ADMIN))
+            .thenReturn(Set.of(targetAdminMembership, otherAdminMembership));
+        when(spaceMembershipRepository.save(targetAdminMembership)).thenReturn(targetAdminMembership);
+
+        SpaceMembershipRecordDTO updatedMembership = spaceMembershipService.updateParticipation(
+            space.getId(), 20L, SUSPENDED, null, authenticatedAdmin);
+
+        assertThat(updatedMembership.spaceMembershipStatus()).isEqualTo(SUSPENDED);
+        assertThat(updatedMembership.spaceUserRole()).isEqualTo(ROLE_SPACE_ADMIN);
     }
 
     @Test
@@ -119,5 +194,22 @@ class SpaceMembershipServiceTests {
         user.setRole(UserRoleEnum.ROLE_USER);
         user.setStatus(UserStatusEnum.ACTIVE);
         return user;
+    }
+
+    private Space createSpace() {
+        Space space = new Space("Space");
+        space.setId(10L);
+        return space;
+    }
+
+    private SpaceMembership createMembership(
+        User user,
+        Space space,
+        SpaceUserRoleEnum role,
+        SpaceMembershipStatusEnum status) {
+        SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
+        spaceMembership.setSpaceMembershipStatusEnum(status);
+        space.getSpaceMemberships().add(spaceMembership);
+        return spaceMembership;
     }
 }
