@@ -14,8 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 	"security.email.root=root@email.com",
 	"security.email.password-recover.token.minutes=30",
 	"security.password.root=password",
-	"security.jwt.secret=test-secret",
-	"cors.origins=http://localhost:3000"
+	"security.jwt.secret=test-secret"
 })
 class TaskifySpaceApplicationTests {
 

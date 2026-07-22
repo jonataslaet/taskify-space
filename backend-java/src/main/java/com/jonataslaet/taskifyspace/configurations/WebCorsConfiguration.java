@@ -14,20 +14,21 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 public class WebCorsConfiguration {
 
-    @Value("${cors.origins}")
+    @Value("${cors.origins:}")
     private String corsOrigins;
 
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
 
-        String[] origins = corsOrigins.split(",");
+        List<String> origins = parseAllowedOrigins();
 
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOriginPatterns(Arrays.asList(origins));
+        corsConfig.setAllowedOrigins(origins);
         corsConfig.setAllowedMethods(Arrays.asList(
             HttpMethod.POST.name(), HttpMethod.GET.name(), HttpMethod.PUT.name(),
             HttpMethod.DELETE.name(), HttpMethod.PATCH.name(), HttpMethod.OPTIONS.name()
@@ -49,5 +50,19 @@ public class WebCorsConfiguration {
             new CorsFilter(corsConfigurationSource()));
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return bean;
+    }
+
+    private List<String> parseAllowedOrigins() {
+        return Arrays.stream(corsOrigins.split(","))
+            .map(String::trim)
+            .filter(origin -> !origin.isBlank())
+            .peek(this::validateExactOrigin)
+            .toList();
+    }
+
+    private void validateExactOrigin(String origin) {
+        if (origin.contains("*")) {
+            throw new IllegalStateException("CORS origins must be explicit when credentials are allowed");
+        }
     }
 }
