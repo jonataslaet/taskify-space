@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -175,6 +176,22 @@ class TaskServiceTests {
         assertThat(updatedTask.score()).isEqualByComparingTo("20.0");
         assertThat(updatedTask.category()).isEqualTo(TaskCategoryEnum.OPERATIONAL);
         assertThat(updatedTask.active()).isTrue();
+    }
+
+    @Test
+    void deleteTaskRemovesExecutionsBeforeDeletingTask() {
+        User authenticatedUser = createUser(1L);
+        Space space = createSpace(10L);
+        Task task = createTask(20L, space);
+
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+
+        taskService.deleteTask(authenticatedUser, task.getId());
+
+        verify(spaceService).validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN));
+        var inOrder = inOrder(taskExecutionRepository, taskRepository);
+        inOrder.verify(taskExecutionRepository).deleteByTaskId(task.getId());
+        inOrder.verify(taskRepository).deleteById(task.getId());
     }
 
     private Space createSpace(Long id) {

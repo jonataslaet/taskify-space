@@ -28,4 +28,6 @@ public interface TaskExecutionRepository extends JpaRepository<@NonNull TaskExec
     }
 
     void deleteBySpaceId(Long spaceId);
+
+    void deleteByTaskId(Long taskId);
 }

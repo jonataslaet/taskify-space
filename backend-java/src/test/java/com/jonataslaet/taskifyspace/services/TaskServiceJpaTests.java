@@ -4,6 +4,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
+import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -46,6 +48,9 @@ class TaskServiceJpaTests {
     private SpaceMembershipRepository spaceMembershipRepository;
 
     @Autowired
+    private TaskExecutionRepository taskExecutionRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     private TaskService taskService;
@@ -56,7 +61,7 @@ class TaskServiceJpaTests {
             taskRepository,
             mock(SpaceService.class),
             mock(SpaceMembershipService.class),
-            mock(TaskExecutionRepository.class),
+            taskExecutionRepository,
             mock(FeatureAccessService.class));
     }
 
@@ -82,6 +87,23 @@ class TaskServiceJpaTests {
 
         List<Long> taskIds = tasks.getContent().stream().map(TaskRecordDTO::id).toList();
         assertThat(taskIds).containsExactly(visibleTask.getId());
+    }
+
+    @Test
+    void deleteTaskRemovesExistingExecutionsBeforeDeletingTask() {
+        User authenticatedUser = userRepository.save(createUser("admin@example.com"));
+
+        Space space = spaceRepository.save(createSpace("Space"));
+        saveMembership(space, authenticatedUser, SpaceMembershipStatusEnum.APPROVED);
+
+        Task task = taskRepository.save(createTask(space, "Executed task"));
+        taskExecutionRepository.saveAndFlush(new TaskExecution(task, space, Set.of(authenticatedUser)));
+
+        taskService.deleteTask(authenticatedUser, task.getId());
+        taskRepository.flush();
+
+        assertThat(taskExecutionRepository.findAll()).isEmpty();
+        assertThat(taskRepository.findById(task.getId())).isEmpty();
     }
 
     private User createUser(String email) {

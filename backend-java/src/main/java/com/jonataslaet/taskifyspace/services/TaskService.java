@@ -151,6 +151,7 @@ public class TaskService {
     public void deleteTask(User authenticatedUser, Long TaskId) {
         Task task = getTaskEntity(TaskId);
         spaceService.validateActiveParticipation(authenticatedUser, task.getSpace(), Set.of(ROLE_SPACE_ADMIN));
+        taskExecutionRepository.deleteByTaskId(TaskId);
         taskRepository.deleteById(TaskId);
     }
 
