@@ -98,13 +98,21 @@ public class SpaceService {
         Specification<@NonNull Space> spaceSpecification, Pageable pageable, User authenticatedUser) {
         Specification<@NonNull Space> authenticatedUserSpaces = (root, query, criteriaBuilder) -> {
             query.distinct(true);
-            return criteriaBuilder.equal(
-                root.join("spaceMemberships").get("user").get("id"),
-                authenticatedUser.getId()
+            var spaceMembershipJoin = root.join("spaceMemberships");
+            return criteriaBuilder.and(
+                criteriaBuilder.equal(
+                    spaceMembershipJoin.get("user").get("id"),
+                    authenticatedUser.getId()
+                ),
+                criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED)
             );
         };
-        return spaceRepository.findAll(
-            Specification.where(authenticatedUserSpaces).and(spaceSpecification), pageable)
+        Specification<@NonNull Space> finalSpecification = authenticatedUserSpaces;
+        if (Objects.nonNull(spaceSpecification)) {
+            finalSpecification = authenticatedUserSpaces.and(spaceSpecification);
+        }
+
+        return spaceRepository.findAll(finalSpecification, pageable)
             .map(space -> SpaceMapper.toDTO(space, authenticatedUser));
     }
 
