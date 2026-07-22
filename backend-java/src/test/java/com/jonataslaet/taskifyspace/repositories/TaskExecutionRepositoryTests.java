@@ -12,6 +12,7 @@ import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest(properties = {
     "spring.datasource.url=jdbc:h2:mem:taskify-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
@@ -336,6 +338,44 @@ class TaskExecutionRepositoryTests {
             .collect(Collectors.toSet());
 
         assertThat(userIds).containsExactlyInAnyOrder(admin.getId(), participant.getId());
+    }
+
+    @Test
+    void allowsSameUserToHaveMembershipsInDifferentSpaces() {
+        Space firstSpace = new Space("Casa");
+        firstSpace.setActive(true);
+        firstSpace = spaceRepository.save(firstSpace);
+
+        Space secondSpace = new Space("Trabalho");
+        secondSpace.setActive(true);
+        secondSpace = spaceRepository.save(secondSpace);
+
+        User user = userRepository.save(createUser("Participant", "multi-space@email.com"));
+
+        saveMembership(firstSpace, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(secondSpace, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
+        spaceMembershipRepository.flush();
+
+        assertThat(spaceMembershipRepository.existsBySpaceIdAndUserId(firstSpace.getId(), user.getId())).isTrue();
+        assertThat(spaceMembershipRepository.existsBySpaceIdAndUserId(secondSpace.getId(), user.getId())).isTrue();
+    }
+
+    @Test
+    void preventsSameUserFromHavingDuplicateMembershipInSameSpace() {
+        Space space = new Space("Casa");
+        space.setActive(true);
+        space = spaceRepository.save(space);
+
+        User user = userRepository.save(createUser("Participant", "same-space@email.com"));
+
+        saveMembership(space, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, SpaceMembershipStatusEnum.APPROVED);
+        spaceMembershipRepository.flush();
+
+        SpaceMembership duplicateMembership = new SpaceMembership(user, space, SpaceUserRoleEnum.ROLE_SPACE_MANAGER);
+        duplicateMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.PENDING);
+
+        assertThatThrownBy(() -> spaceMembershipRepository.saveAndFlush(duplicateMembership))
+            .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private User createUser(String name, String email) {

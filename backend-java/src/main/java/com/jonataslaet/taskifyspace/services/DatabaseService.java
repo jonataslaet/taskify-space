@@ -119,6 +119,20 @@ public class DatabaseService {
         return createdUser;
     }
 
+    private User createUserMaridoBellaLaet() {
+        final String userEmail = "maridobellalaet@gmail.com";
+        User createdUser = userRepository.findByEmail(userEmail).orElse(new User());
+        if (ObjectUtils.isEmpty(createdUser.getEmail())) {
+            createdUser.setRole(UserRoleEnum.ROLE_USER);
+            createdUser.setEmail(userEmail);
+            createdUser.setPassword(passwordEncoder.encode(this.passwordRoot));
+            createdUser.setName("Marido Bella Laet");
+            createdUser.setStatus(UserStatusEnum.PENDING_EVALUATION);
+            userRepository.save(createdUser);
+        }
+        return createdUser;
+    }
+
     private Plan createPlan(String code, String name, String description, Set<PlanFeatureLimit> featureLimits) {
         Plan plan = planRepository.findByCodeIgnoreCase(code).orElse(new Plan());
         if (Objects.isNull(plan.getId())) {
@@ -156,6 +170,13 @@ public class DatabaseService {
         return SpaceMapper.toDTO(space);
     }
 
+    public SpaceRecordDTO getSpaceBellaResidenceDTO() {
+        Space space = new Space();
+        space.setActive(true);
+        space.setName("Residência do Marido da Bella");
+        return SpaceMapper.toDTO(space);
+    }
+
     public TaskRecordDTO getTaskRecordTrocarBotijaoDTO(SpaceRecordDTO spaceRecordDTO) {
         Space space = spaceService.getSpaceEntity(spaceRecordDTO.id());
         Task task = new Task();
@@ -185,9 +206,11 @@ public class DatabaseService {
         User userJoiceLaet = this.createUserJoiceLaet();
         User userRalphLaet = this.createUserRalphLaet();
         User userBellaLaet = this.createUserBellaLaet();
+        User userMaridoBellaLaet = this.createUserMaridoBellaLaet();
         activateUser(userJoiceLaet);
         activateUser(userRalphLaet);
         activateUser(userBellaLaet);
+        activateUser(userMaridoBellaLaet);
 
         Plan basicPlan = this.createPlan("BASIC", "Basic", "Plano basico para uso individual",
             Set.of(
@@ -217,14 +240,17 @@ public class DatabaseService {
             ));
 
         this.grantInternalSubscription(userJoiceLaet, basicPlan);
+        this.grantInternalSubscription(userBellaLaet, basicPlan);
 
         if (spaceMembershipService.hasSpaceMembership(userJoiceLaet)) {
             return true;
         }
 
         SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
-
         spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
+
+        SpaceRecordDTO spaceBella = spaceService.createSpace(getSpaceBellaResidenceDTO(), userBellaLaet);
+        spaceService.toggleActiveSpace(userBellaLaet, spaceBella.id());
 
         TaskRecordDTO taskRecordDTO1 = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
         TaskRecordDTO taskRecordDTO2 = taskService.createTask(userJoiceLaet, getTaskRecordPagarContaAguaDTO(spaceResidenciaCasalLaet));
@@ -242,6 +268,11 @@ public class DatabaseService {
         usersToBeApproved.add(adminJonatasLaet.getId());
 
         spaceMembershipService.aproveSpaceMemberships(spaceResidenciaCasalLaet.id(), userJoiceLaet, usersToBeApproved);
+
+        spaceService.requestParticipation(spaceBella.id(), userMaridoBellaLaet);
+        usersToBeApproved = new HashSet<>();
+        usersToBeApproved.add(userMaridoBellaLaet.getId());
+        spaceMembershipService.aproveSpaceMemberships(spaceBella.id(), userBellaLaet, usersToBeApproved);
 
         return true;
     }

@@ -6,7 +6,6 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
-import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.repositories.ParticipantRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,13 +16,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
-import java.util.Set;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.PENDING;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,20 +75,40 @@ class SpaceMembershipServiceTests {
     }
 
     @Test
-    void setSpaceMembershipPreventsUserWithExistingMembership() {
+    void setSpaceMembershipAllowsUserWithMembershipInAnotherSpace() {
         User user = createUser(2L);
         Space space = new Space("Space");
         space.setId(10L);
 
-        when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceUserRoleIn(
-            space.getId(), user.getId(), Set.of(ROLE_SPACE_PARTICIPANT)))
+        when(spaceMembershipRepository.existsBySpaceIdAndUserId(space.getId(), user.getId()))
             .thenReturn(false);
-        when(spaceMembershipRepository.existsByUserId(user.getId())).thenReturn(true);
 
-        assertThatThrownBy(() -> spaceMembershipService.setSpaceMembership(space, user, ROLE_SPACE_PARTICIPANT))
-            .isInstanceOf(DuplicationException.class);
+        spaceMembershipService.setSpaceMembership(space, user, ROLE_SPACE_PARTICIPANT);
+
+        ArgumentCaptor<SpaceMembership> spaceMembershipCaptor = ArgumentCaptor.forClass(SpaceMembership.class);
+        verify(spaceMembershipRepository).save(spaceMembershipCaptor.capture());
+        SpaceMembership savedMembership = spaceMembershipCaptor.getValue();
+
+        assertThat(savedMembership.getUser()).isEqualTo(user);
+        assertThat(savedMembership.getSpace()).isEqualTo(space);
+        assertThat(savedMembership.getSpaceUserRole()).isEqualTo(ROLE_SPACE_PARTICIPANT);
+        assertThat(savedMembership.getSpaceMembershipStatusEnum()).isEqualTo(PENDING);
+        assertThat(space.getSpaceMemberships()).contains(savedMembership);
+    }
+
+    @Test
+    void setSpaceMembershipDoesNotCreateDuplicateParticipationInSameSpace() {
+        User user = createUser(2L);
+        Space space = new Space("Space");
+        space.setId(10L);
+
+        when(spaceMembershipRepository.existsBySpaceIdAndUserId(space.getId(), user.getId()))
+            .thenReturn(true);
+
+        spaceMembershipService.setSpaceMembership(space, user, ROLE_SPACE_PARTICIPANT);
 
         verify(spaceMembershipRepository, never()).save(org.mockito.ArgumentMatchers.any(SpaceMembership.class));
+        assertThat(space.getSpaceMemberships()).isEmpty();
     }
 
     private User createUser(Long id) {

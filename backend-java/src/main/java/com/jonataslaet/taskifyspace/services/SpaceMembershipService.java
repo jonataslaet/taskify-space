@@ -51,14 +51,10 @@ public class SpaceMembershipService {
 
     @Transactional
     public void setSpaceMembership(Space space, User user, SpaceUserRoleEnum role) {
-        boolean membershipAlreadyExists = spaceMembershipRepository
-            .existsBySpaceIdAndUserIdAndSpaceUserRoleIn(space.getId(), user.getId(), Set.of(role));
-
-        if (membershipAlreadyExists) return;
-
-        boolean userAlreadyHasMembership = spaceMembershipRepository.existsByUserId(user.getId());
-        if (userAlreadyHasMembership) {
-            throw new DuplicationException("Usuário já possui participação em um espaço");
+        boolean userAlreadyParticipatesInSpace = spaceMembershipRepository
+            .existsBySpaceIdAndUserId(space.getId(), user.getId());
+        if (userAlreadyParticipatesInSpace) {
+            return;
         }
 
         SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
@@ -120,7 +116,7 @@ public class SpaceMembershipService {
         SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole)
             ? spaceUserRole
             : spaceMembership.getSpaceUserRole();
-        validNotDuplicateParticipation(spaceMembership, targetSpaceUserRole);
+        validNotDuplicateParticipation(spaceMembership);
 
         if (willIncreaseApprovedRoleCount(spaceMembership, status, targetSpaceUserRole)) {
             featureAccessService.requireFeature(
@@ -154,13 +150,11 @@ public class SpaceMembershipService {
         };
     }
 
-    private void validNotDuplicateParticipation(
-        SpaceMembership spaceMembership, SpaceUserRoleEnum targetSpaceUserRole) {
-        boolean isDuplicated = spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceUserRoleInAndIdNot(
-            spaceMembership.getSpace().getId(), spaceMembership.getUser().getId(), Set.of(targetSpaceUserRole),
-            spaceMembership.getId());
+    private void validNotDuplicateParticipation(SpaceMembership spaceMembership) {
+        boolean isDuplicated = spaceMembershipRepository.existsBySpaceIdAndUserIdAndIdNot(
+            spaceMembership.getSpace().getId(), spaceMembership.getUser().getId(), spaceMembership.getId());
         if (isDuplicated) {
-            throw new DuplicationException("Já existe uma participação exatamente assim neste espaço");
+            throw new DuplicationException("Já existe uma participação deste usuário neste espaço");
         }
     }
 
