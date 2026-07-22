@@ -76,6 +76,61 @@ class SpaceServiceJpaTests {
         assertThat(spaceIds).containsExactly(approvedSpace.getId());
     }
 
+    @Test
+    void findAllFiltersRoleOnAuthenticatedUsersMembershipOnly() {
+        User authenticatedUser = userRepository.save(createUser("user@example.com"));
+        User otherUser = userRepository.save(createUser("other@example.com"));
+
+        Space sharedSpace = spaceRepository.save(createSpace("Shared"));
+        Space adminSpace = spaceRepository.save(createSpace("Admin"));
+
+        saveMembership(
+            sharedSpace,
+            authenticatedUser,
+            SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+            SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(
+            sharedSpace,
+            otherUser,
+            SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
+            SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(
+            adminSpace,
+            authenticatedUser,
+            SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
+            SpaceMembershipStatusEnum.APPROVED);
+
+        Page<SpaceRecordDTO> spaces = spaceService.findAll(
+            null, Pageable.unpaged(), authenticatedUser, SpaceUserRoleEnum.ROLE_SPACE_ADMIN, null);
+
+        List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
+        assertThat(spaceIds).containsExactly(adminSpace.getId());
+    }
+
+    @Test
+    void findAllFiltersStatusOnAuthenticatedUsersMembershipOnly() {
+        User authenticatedUser = userRepository.save(createUser("user@example.com"));
+        User otherUser = userRepository.save(createUser("other@example.com"));
+
+        Space sharedSpace = spaceRepository.save(createSpace("Shared"));
+
+        saveMembership(
+            sharedSpace,
+            authenticatedUser,
+            SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+            SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(
+            sharedSpace,
+            otherUser,
+            SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+            SpaceMembershipStatusEnum.PENDING);
+
+        Page<SpaceRecordDTO> spaces = spaceService.findAll(
+            null, Pageable.unpaged(), authenticatedUser, null, SpaceMembershipStatusEnum.PENDING);
+
+        assertThat(spaces.getContent()).isEmpty();
+    }
+
     private User createUser(String email) {
         User user = new User();
         user.setName(email);
@@ -93,8 +148,13 @@ class SpaceServiceJpaTests {
     }
 
     private void saveMembership(Space space, User user, SpaceMembershipStatusEnum status) {
+        saveMembership(space, user, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT, status);
+    }
+
+    private void saveMembership(
+        Space space, User user, SpaceUserRoleEnum role, SpaceMembershipStatusEnum status) {
         SpaceMembership spaceMembership =
-            new SpaceMembership(user, space, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT);
+            new SpaceMembership(user, space, role);
         spaceMembership.setSpaceMembershipStatusEnum(status);
         spaceMembershipRepository.save(spaceMembership);
     }

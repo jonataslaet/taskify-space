@@ -5,6 +5,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.services.SpaceService;
@@ -33,9 +34,13 @@ public class SpaceController {
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull SpaceRecordDTO>> readAllSpaces(
         SpecificationTemplate.SpaceSpecification spaceSpecification,
+        @RequestParam(value = "spaceUserRole", required = false) SpaceUserRoleEnum spaceUserRole,
+        @RequestParam(value = "spaceMembershipStatus", required = false)
+        SpaceMembershipStatusEnum spaceMembershipStatus,
         Pageable pageable, @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull SpaceRecordDTO> SpaceModelPage =
-            spaceService.findAll(spaceSpecification, pageable, authenticatedUser);
+            spaceService.findAll(
+                spaceSpecification, pageable, authenticatedUser, spaceUserRole, spaceMembershipStatus);
         return ResponseEntity.status(HttpStatus.OK).body(SpaceModelPage);
     }
 

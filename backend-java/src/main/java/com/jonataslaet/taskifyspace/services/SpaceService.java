@@ -16,6 +16,7 @@ import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -93,16 +95,32 @@ public class SpaceService {
 
     public Page<@NonNull SpaceRecordDTO> findAll(
         Specification<@NonNull Space> spaceSpecification, Pageable pageable, User authenticatedUser) {
+        return findAll(spaceSpecification, pageable, authenticatedUser, null, null);
+    }
+
+    public Page<@NonNull SpaceRecordDTO> findAll(
+        Specification<@NonNull Space> spaceSpecification, Pageable pageable, User authenticatedUser,
+        SpaceUserRoleEnum spaceUserRole, SpaceMembershipStatusEnum spaceMembershipStatus) {
         Specification<@NonNull Space> authenticatedUserSpaces = (root, query, criteriaBuilder) -> {
             query.distinct(true);
             var spaceMembershipJoin = root.join("spaceMemberships");
-            return criteriaBuilder.and(
-                criteriaBuilder.equal(
-                    spaceMembershipJoin.get("user").get("id"),
-                    authenticatedUser.getId()
-                ),
-                criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED)
-            );
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(
+                spaceMembershipJoin.get("user").get("id"),
+                authenticatedUser.getId()
+            ));
+            predicates.add(criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED));
+
+            if (Objects.nonNull(spaceUserRole)) {
+                predicates.add(criteriaBuilder.equal(spaceMembershipJoin.get("spaceUserRole"), spaceUserRole));
+            }
+
+            if (Objects.nonNull(spaceMembershipStatus)) {
+                predicates.add(criteriaBuilder.equal(
+                    spaceMembershipJoin.get("spaceMembershipStatusEnum"), spaceMembershipStatus));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
         };
         Specification<@NonNull Space> finalSpecification = authenticatedUserSpaces;
         if (Objects.nonNull(spaceSpecification)) {

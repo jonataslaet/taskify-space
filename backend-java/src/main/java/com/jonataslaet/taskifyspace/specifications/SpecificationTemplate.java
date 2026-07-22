@@ -29,17 +29,13 @@ public class SpecificationTemplate {
         @Spec(path = "active", params = "active", spec = Equal.class),
         @Spec(path = "category", params = "categories", paramSeparator = ',', spec = In.class),
         @Spec(path = "score", params = "minScore", spec = GreaterThanOrEqual.class),
-        @Spec(path = "score", params = "maxScore", spec = LessThanOrEqual.class),
-        @Spec(path = "score", params = "minScore", spec = GreaterThanOrEqual.class),
         @Spec(path = "score", params = "maxScore", spec = LessThanOrEqual.class)
     })
     public interface TaskSpecification extends Specification<@NonNull Task> {}
 
     @And({
         @Spec(path = "name", spec = LikeIgnoreCase.class),
-        @Spec(path = "active", params = "active", spec = Equal.class),
-        @Spec(path = "spaceMemberships.spaceUserRole", params = "spaceUserRole", spec = Equal.class),
-        @Spec(path = "spaceMemberships.spaceMembershipStatusEnum", params = "spaceMembershipStatus", spec = Equal.class)
+        @Spec(path = "active", params = "active", spec = Equal.class)
     })
     public interface SpaceSpecification extends Specification<@NonNull Space> {}
 
