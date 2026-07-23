@@ -1,9 +1,11 @@
 package com.jonataslaet.taskifyspace.repositories;
 
 import com.jonataslaet.taskifyspace.entities.User;
+import jakarta.persistence.LockModeType;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,5 +19,13 @@ public interface UserRepository extends JpaRepository<@NonNull User, @NonNull Lo
 
     @Query("SELECT u FROM User u WHERE u.email = :username")
     Optional<User> findByEmail(@Param("username") String username);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id = :userId")
+    Optional<User> findByIdForUpdate(@Param("userId") Long userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.email = :email")
+    Optional<User> findByEmailForUpdate(@Param("email") String email);
 
 }

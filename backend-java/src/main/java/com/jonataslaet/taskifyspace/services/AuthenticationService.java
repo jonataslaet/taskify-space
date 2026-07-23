@@ -5,8 +5,10 @@ import com.jonataslaet.taskifyspace.controllers.dtos.*;
 import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.utils.TokenUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Value;
@@ -125,22 +127,29 @@ public class AuthenticationService {
 
     @Transactional
     public void recoveryToken(EmailDTO emailDTO) {
-        if (userRepository.findByEmail(emailDTO.address()).isEmpty()) {
+        if (Objects.isNull(emailDTO) || isBlank(emailDTO.address())) {
+            throw new InvalidRequestException("Email is required");
+        }
+
+        User user = userRepository.findByEmailForUpdate(emailDTO.address()).orElse(null);
+        if (Objects.isNull(user)) {
             return;
         }
 
+        Instant now = Instant.now();
+        passwordRecoveryService.expireValidPasswordRecoveriesByEmail(user.getEmail(), now);
         String uuidToken = UUID.randomUUID().toString();
         PasswordRecovery passwordRecovery = new PasswordRecovery(
-            uuidToken,
-            emailDTO.address(),
-            Instant.now().plusSeconds(60 * tokenMinutes)
+            TokenUtils.sha256(uuidToken),
+            user.getEmail(),
+            now.plusSeconds(60 * tokenMinutes)
         );
         passwordRecoveryService.savePasswordRecovery(passwordRecovery);
         String emailBody = "Clique no seguinte link para resetar sua senha: \n" + passwordRecoveryUri + uuidToken
             + "\n\n Esse link expirará daqui a 30 minutos. " +
             "Portanto, se esse email não foi solicitado por você, apenas o ignore.";
         emailService.sendEmail(new SendingEmailDTO(
-            emailDTO.address(),
+            user.getEmail(),
             null,
             "Resetamento de senha",
             emailBody

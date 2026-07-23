@@ -49,7 +49,7 @@ public class TaskService {
     @Transactional
     public TaskRecordDTO createTask(User authenticatedUser, TaskRecordDTO taskRecordDTO) {
         Space space = spaceService.getSpaceEntity(taskRecordDTO.spaceId());
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.CREATE_TASK, space);
+        featureAccessService.requireFeatureWithUsageLock(authenticatedUser, FeatureEnum.CREATE_TASK, space);
         spaceService.validActiveSpace(space);
         spaceService.validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
 

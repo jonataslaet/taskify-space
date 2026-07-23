@@ -79,7 +79,7 @@ public class SpaceMembershipService {
                 hasAuthenticatedUserAsAdmin.set(true);
             }
             if (usersIds.contains(sm.getUser().getId()) && !sm.getSpaceMembershipStatusEnum().equals(SpaceMembershipStatusEnum.APPROVED)) {
-                featureAccessService.requireFeature(
+                featureAccessService.requireFeatureWithUsageLock(
                     authenticatedUser, approvalFeature(sm.getSpaceUserRole()), sm.getSpace());
                 sm.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
             }
@@ -88,10 +88,6 @@ public class SpaceMembershipService {
             throw new ForbiddenException("Esse espaço não possui o usuário logado como administrador");
         }
         spaceMembershipRepository.saveAll(spaceMemberships);
-    }
-
-    public Set<SpaceMembership> getSpaceMemberships(User authenticatedUser, Space space) {
-        return getSpaceMemberships(space, Set.of(authenticatedUser.getId()));
     }
 
     public Set<SpaceMembership> getSpaceMemberships(Space space, Set<Long> usersIds) {
@@ -126,7 +122,7 @@ public class SpaceMembershipService {
         validateSpaceKeepsApprovedAdmin(spaceMembership, targetStatus, targetSpaceUserRole);
 
         if (willIncreaseApprovedRoleCount(spaceMembership, status, targetSpaceUserRole)) {
-            featureAccessService.requireFeature(
+            featureAccessService.requireFeatureWithUsageLock(
                 authenticatedUser, approvalFeature(targetSpaceUserRole), spaceMembership.getSpace());
         }
 

@@ -16,7 +16,8 @@ public class Space {
 
     private String name;
 
-    private Boolean active;
+    @Column(nullable = false)
+    private Boolean active = Boolean.FALSE;
 
     private Instant createdAt;
 
@@ -53,7 +54,7 @@ public class Space {
     public void setName(String name) { this.name = name; }
 
     public Boolean getActive() {
-        return active;
+        return Boolean.TRUE.equals(active);
     }
 
     public void setActive(Boolean active) {

@@ -7,6 +7,10 @@ import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
+import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
+import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTests {
@@ -36,11 +41,30 @@ class UserServiceTests {
     @Mock
     private RefreshTokenService refreshTokenService;
 
+    @Mock
+    private SpaceMembershipRepository spaceMembershipRepository;
+
+    @Mock
+    private SpaceRepository spaceRepository;
+
+    @Mock
+    private TaskRepository taskRepository;
+
+    @Mock
+    private TaskExecutionRepository taskExecutionRepository;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, passwordEncoder, refreshTokenService);
+        userService = new UserService(
+            userRepository,
+            passwordEncoder,
+            refreshTokenService,
+            spaceMembershipRepository,
+            spaceRepository,
+            taskRepository,
+            taskExecutionRepository);
     }
 
     @Test
@@ -66,10 +90,17 @@ class UserServiceTests {
     @Test
     void deleteByIdAllowsAdminToDeleteAnyUser() {
         User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        User targetUser = createUser(2L, UserRoleEnum.ROLE_USER);
+        when(userRepository.findById(targetUser.getId())).thenReturn(Optional.of(targetUser));
 
-        userService.deleteById(admin, 2L);
+        userService.deleteById(admin, targetUser.getId());
 
-        verify(userRepository).deleteById(2L);
+        verify(taskExecutionRepository).deleteExecutorLinksByUserId(targetUser.getId());
+        verify(taskExecutionRepository).deleteExecutionsWithoutExecutors();
+        verify(taskRepository).clearCreatorByUserId(targetUser.getId());
+        verify(spaceRepository).clearCreatorByUserId(targetUser.getId());
+        verify(refreshTokenService).deleteAllByUserId(targetUser.getId());
+        verify(userRepository).delete(targetUser);
     }
 
     @Test
@@ -79,7 +110,26 @@ class UserServiceTests {
         assertThatThrownBy(() -> userService.deleteById(authenticatedUser, 2L))
             .isInstanceOf(ForbiddenException.class);
 
-        verify(userRepository, never()).deleteById(2L);
+        verify(userRepository, never()).findById(2L);
+        verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
+    void deleteByIdPreventsRemovingLastApprovedSpaceAdmin() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        User targetUser = createUser(2L, UserRoleEnum.ROLE_USER);
+        when(userRepository.findById(targetUser.getId())).thenReturn(Optional.of(targetUser));
+        when(spaceMembershipRepository.countSpacesWhereUserIsOnlyApprovedAdmin(
+            targetUser.getId(),
+            com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED,
+            com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN))
+            .thenReturn(1L);
+
+        assertThatThrownBy(() -> userService.deleteById(admin, targetUser.getId()))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(taskExecutionRepository, never()).deleteExecutorLinksByUserId(targetUser.getId());
+        verify(userRepository, never()).delete(any(User.class));
     }
 
     @Test

@@ -56,7 +56,7 @@ public class SpaceService {
 
     @Transactional
     public SpaceRecordDTO createSpace(SpaceRecordDTO spaceRecordDTO, User authenticatedUser) {
-        featureAccessService.requireFeature(authenticatedUser, FeatureEnum.CREATE_SPACE);
+        featureAccessService.requireFeatureWithUsageLock(authenticatedUser, FeatureEnum.CREATE_SPACE);
         Space space = SpaceMapper.toEntity(spaceRecordDTO);
         space.setCreator(authenticatedUser);
         space.setActive(Boolean.FALSE);

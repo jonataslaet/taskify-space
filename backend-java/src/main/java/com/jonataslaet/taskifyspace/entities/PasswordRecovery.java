@@ -13,8 +13,8 @@ public class PasswordRecovery {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String token;
+    @Column(name = "token_hash", nullable = false, length = 64)
+    private String tokenHash;
 
     @Column(nullable = false)
     private Instant expiration;
@@ -30,8 +30,8 @@ public class PasswordRecovery {
 
     public  PasswordRecovery() {}
 
-    public PasswordRecovery(String token, String email, Instant expiration) {
-        this.token = token;
+    public PasswordRecovery(String tokenHash, String email, Instant expiration) {
+        this.tokenHash = tokenHash;
         this.email = email;
         this.expiration = expiration;
     }

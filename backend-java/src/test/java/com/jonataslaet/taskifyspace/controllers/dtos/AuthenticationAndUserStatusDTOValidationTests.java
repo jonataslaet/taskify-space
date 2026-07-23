@@ -48,6 +48,15 @@ class AuthenticationAndUserStatusDTOValidationTests {
     }
 
     @Test
+    void emailRejectsInvalidAddress() {
+        EmailDTO email = new EmailDTO("not-an-email");
+
+        Set<String> fields = violatedFields(validator.validate(email));
+
+        assertThat(fields).contains("address");
+    }
+
+    @Test
     void userStatusRejectsMissingStatus() {
         UpdateUserStatusRequestDTO statusRequest = new UpdateUserStatusRequestDTO(null);
 

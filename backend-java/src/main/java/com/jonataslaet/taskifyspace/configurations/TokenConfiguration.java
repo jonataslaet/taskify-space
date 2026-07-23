@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 @Configuration
 public class TokenConfiguration {
@@ -50,6 +51,9 @@ public class TokenConfiguration {
     }
 
     public String createAccessToken(User user) {
+        if (Objects.isNull(user.getStatus())) {
+            throw new DisabledException("Usuario nao esta ativo");
+        }
         Date now = new Date();
         Date limitDate = Date.from(Instant.now(clock).plusMillis(ttlAccessToken));
         List<String> authorities = new ArrayList<>();

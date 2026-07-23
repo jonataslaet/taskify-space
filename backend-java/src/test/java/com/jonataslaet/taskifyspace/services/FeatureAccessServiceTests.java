@@ -15,6 +15,7 @@ import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
+import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,9 +26,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +50,9 @@ class FeatureAccessServiceTests {
     @Mock
     private TaskRepository taskRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
     private FeatureAccessService featureAccessService;
 
     @BeforeEach
@@ -57,6 +63,7 @@ class FeatureAccessServiceTests {
             spaceMembershipRepository,
             spaceRepository,
             taskRepository,
+            userRepository,
             clock);
     }
 
@@ -68,6 +75,26 @@ class FeatureAccessServiceTests {
         boolean hasFeature = featureAccessService.hasFeature(admin, FeatureEnum.CREATE_SPACE);
 
         assertThat(hasFeature).isFalse();
+    }
+
+    @Test
+    void requireFeatureWithUsageLockLocksUserBeforeCheckingUserScopedUsage() {
+        User user = createUser(5L, UserRoleEnum.ROLE_USER);
+        Plan plan = new Plan();
+        plan.setActive(true);
+        plan.setFeatureLimits(Set.of(new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L)));
+        Subscription subscription = new Subscription();
+        subscription.setUser(user);
+        subscription.setPlan(plan);
+        subscription.setStatus(SubscriptionStatusEnum.ACTIVE);
+        subscription.setCurrentPeriodStart(NOW.minusSeconds(60));
+
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+        when(subscriptionRepository.findByUserId(user.getId())).thenReturn(List.of(subscription));
+
+        featureAccessService.requireFeatureWithUsageLock(user, FeatureEnum.CREATE_SPACE);
+
+        verify(userRepository).findByIdForUpdate(user.getId());
     }
 
     @Test

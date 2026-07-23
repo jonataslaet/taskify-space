@@ -100,10 +100,7 @@ class ProfileConfigurationTests {
     }
 
     private String readResource(String resourceName) throws IOException {
-        try (var inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
-            assertThat(inputStream).as("Resource " + resourceName).isNotNull();
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        return Files.readString(Path.of("src/main/resources", resourceName), StandardCharsets.UTF_8);
     }
 
     private boolean hasSupportedTextExtension(String fileName) {

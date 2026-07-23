@@ -7,10 +7,12 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
+import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class FeatureAccessService {
     private final SpaceMembershipRepository spaceMembershipRepository;
     private final SpaceRepository spaceRepository;
     private final TaskRepository taskRepository;
+    private final UserRepository userRepository;
     private final Clock clock;
 
     public FeatureAccessService(
@@ -32,11 +35,13 @@ public class FeatureAccessService {
         SpaceMembershipRepository spaceMembershipRepository,
         SpaceRepository spaceRepository,
         TaskRepository taskRepository,
+        UserRepository userRepository,
         Clock clock) {
         this.subscriptionRepository = subscriptionRepository;
         this.spaceMembershipRepository = spaceMembershipRepository;
         this.spaceRepository = spaceRepository;
         this.taskRepository = taskRepository;
+        this.userRepository = userRepository;
         this.clock = clock;
     }
 
@@ -65,6 +70,34 @@ public class FeatureAccessService {
     public void requireFeature(User user, FeatureEnum feature, Space space) {
         if (!hasFeature(user, feature, space)) {
             throw new ForbiddenException("Plano atual nao libera a funcionalidade " + feature);
+        }
+    }
+
+    @Transactional
+    public void requireFeatureWithUsageLock(User user, FeatureEnum feature) {
+        requireFeatureWithUsageLock(user, feature, null);
+    }
+
+    @Transactional
+    public void requireFeatureWithUsageLock(User user, FeatureEnum feature, Space space) {
+        lockUsageScope(user, feature, space);
+        requireFeature(user, feature, space);
+    }
+
+    private void lockUsageScope(User user, FeatureEnum feature, Space space) {
+        switch (feature) {
+            case CREATE_SPACE, CREATE_TASK ->
+                userRepository.findByIdForUpdate(user.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER,
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT -> {
+                if (Objects.isNull(space)) {
+                    throw new ForbiddenException("Espaco obrigatorio para validar limite de aprovacao");
+                }
+                spaceRepository.findByIdForUpdate(space.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Espaco nao encontrado"));
+            }
         }
     }
 

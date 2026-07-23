@@ -113,4 +113,9 @@ public class RefreshTokenService {
         refreshTokenRepository.revokeActiveByUserId(userId, Instant.now(clock));
     }
 
+    @Transactional
+    public void deleteAllByUserId(Long userId) {
+        refreshTokenRepository.deleteByUserId(userId);
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.entities;
 
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -30,7 +31,8 @@ public class Task {
     @Enumerated(EnumType.STRING)
     private TaskCategoryEnum category;
 
-    private Boolean active;
+    @Column(nullable = false)
+    private Boolean active = Boolean.FALSE;
 
     private Instant createdAt;
 
@@ -85,7 +87,7 @@ public class Task {
     }
 
     public Boolean isActive() {
-        return active;
+        return Boolean.TRUE.equals(active);
     }
 
     public Instant getCreatedAt() {

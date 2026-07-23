@@ -61,6 +61,25 @@ public interface SpaceMembershipRepository extends JpaRepository<
         SpaceMembershipStatusEnum status,
         SpaceUserRoleEnum spaceUserRole);
 
+    @Query("""
+        SELECT COUNT(spaceMembership)
+        FROM SpaceMembership spaceMembership
+        WHERE spaceMembership.user.id = :userId
+            AND spaceMembership.spaceMembershipStatusEnum = :status
+            AND spaceMembership.spaceUserRole = :spaceUserRole
+            AND (
+                SELECT COUNT(adminMembership)
+                FROM SpaceMembership adminMembership
+                WHERE adminMembership.space.id = spaceMembership.space.id
+                    AND adminMembership.spaceMembershipStatusEnum = :status
+                    AND adminMembership.spaceUserRole = :spaceUserRole
+            ) = 1
+        """)
+    long countSpacesWhereUserIsOnlyApprovedAdmin(
+        @Param("userId") Long userId,
+        @Param("status") SpaceMembershipStatusEnum status,
+        @Param("spaceUserRole") SpaceUserRoleEnum spaceUserRole);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT sm FROM SpaceMembership sm

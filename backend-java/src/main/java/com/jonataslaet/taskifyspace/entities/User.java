@@ -32,8 +32,9 @@ public class User implements UserDetails {
 
     private LocalDate birthDate;
 
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private UserStatusEnum status;
+    private UserStatusEnum status = UserStatusEnum.PENDING_EVALUATION;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -121,7 +122,7 @@ public class User implements UserDetails {
     @Override
     @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singletonList(new SimpleGrantedAuthority(this.role.toString()));
+        return Collections.singletonList(new SimpleGrantedAuthority(this.role.name()));
     }
 
     @JsonIgnore

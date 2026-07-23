@@ -149,10 +149,11 @@ class AuthenticationServiceTests {
     @Test
     void recoveryTokenDoesNotRevealMissingEmail() {
         String email = "missing@example.com";
-        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+        when(userRepository.findByEmailForUpdate(email)).thenReturn(Optional.empty());
 
         authenticationService.recoveryToken(new EmailDTO(email));
 
+        verify(passwordRecoveryService, never()).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
         verify(passwordRecoveryService, never()).savePasswordRecovery(any(PasswordRecovery.class));
         verify(emailService, never()).sendEmail(any());
     }
@@ -160,10 +161,11 @@ class AuthenticationServiceTests {
     @Test
     void recoveryTokenCreatesRecoveryAndSendsEmailForExistingUser() {
         User user = createUser(UserStatusEnum.ACTIVE);
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate(user.getEmail())).thenReturn(Optional.of(user));
 
         authenticationService.recoveryToken(new EmailDTO(user.getEmail()));
 
+        verify(passwordRecoveryService).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
         verify(passwordRecoveryService).savePasswordRecovery(any(PasswordRecovery.class));
         verify(emailService).sendEmail(any());
     }

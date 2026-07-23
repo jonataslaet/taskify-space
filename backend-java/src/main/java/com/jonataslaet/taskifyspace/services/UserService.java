@@ -11,6 +11,10 @@ import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.UserMapper;
+import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
+import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -33,11 +37,26 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final SpaceMembershipRepository spaceMembershipRepository;
+    private final SpaceRepository spaceRepository;
+    private final TaskRepository taskRepository;
+    private final TaskExecutionRepository taskExecutionRepository;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, RefreshTokenService refreshTokenService) {
+    public UserService(
+        UserRepository userRepository,
+        PasswordEncoder passwordEncoder,
+        RefreshTokenService refreshTokenService,
+        SpaceMembershipRepository spaceMembershipRepository,
+        SpaceRepository spaceRepository,
+        TaskRepository taskRepository,
+        TaskExecutionRepository taskExecutionRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
+        this.spaceMembershipRepository = spaceMembershipRepository;
+        this.spaceRepository = spaceRepository;
+        this.taskRepository = taskRepository;
+        this.taskExecutionRepository = taskExecutionRepository;
     }
 
     @Transactional
@@ -76,13 +95,17 @@ public class UserService {
     @Transactional
     public void deleteById(Long userId) {
         logger.info("Attempting to delete user with ID {}", userId);
-        try {
-            userRepository.deleteById(userId);
-            logger.info("User with ID {} deleted successfully", userId);
-        } catch (RuntimeException e) {
-            logger.warn("Attempt to delete user with ID {} failed: {}", userId, e.getMessage());
-            throw new ResourceNotFoundException("User not found");
-        }
+        User user = findUserById(userId);
+        validateUserIsNotOnlyApprovedSpaceAdmin(userId);
+
+        taskExecutionRepository.deleteExecutorLinksByUserId(userId);
+        taskExecutionRepository.deleteExecutionsWithoutExecutors();
+        taskRepository.clearCreatorByUserId(userId);
+        spaceRepository.clearCreatorByUserId(userId);
+        refreshTokenService.deleteAllByUserId(userId);
+
+        userRepository.delete(user);
+        logger.info("User with ID {} deleted successfully", userId);
     }
 
     @Transactional
@@ -156,5 +179,16 @@ public class UserService {
         }
 
         throw new ForbiddenException("Usuario nao possui permissao para acessar esse recurso");
+    }
+
+    private void validateUserIsNotOnlyApprovedSpaceAdmin(Long userId) {
+        long spacesWhereUserIsOnlyApprovedAdmin =
+            spaceMembershipRepository.countSpacesWhereUserIsOnlyApprovedAdmin(
+                userId,
+                com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED,
+                com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN);
+        if (spacesWhereUserIsOnlyApprovedAdmin > 0) {
+            throw new ForbiddenException("Usuario e o ultimo administrador aprovado de pelo menos um espaco");
+        }
     }
 }
