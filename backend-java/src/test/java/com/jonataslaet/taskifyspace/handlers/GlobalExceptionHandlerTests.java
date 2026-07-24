@@ -3,8 +3,10 @@ package com.jonataslaet.taskifyspace.handlers;
 import com.jonataslaet.taskifyspace.controllers.dtos.StandardErrorRecordDTO;
 import com.jonataslaet.taskifyspace.exceptions.EmailException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
+import com.jonataslaet.taskifyspace.exceptions.RateLimitExceededException;
 import com.jonataslaet.taskifyspace.exceptions.TokenExpirationException;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -83,6 +85,19 @@ class GlobalExceptionHandlerTests {
             "Old password does not match",
             request);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void handlesRateLimitExceededAsTooManyRequestsWithRetryAfterHeader() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/login");
+
+        var response = handler.handleRateLimitExceededException(
+            new RateLimitExceededException("Muitas tentativas", 60),
+            request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
+        assertResponseStatusException(response.getBody(), HttpStatus.TOO_MANY_REQUESTS, "Muitas tentativas", request);
     }
 
     private void assertResponseStatusException(

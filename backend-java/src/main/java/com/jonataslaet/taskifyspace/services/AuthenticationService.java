@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.services.ratelimit.AuthRateLimiter;
 import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -33,12 +34,14 @@ public class AuthenticationService {
     private final PasswordRecoveryService passwordRecoveryService;
     private final PasswordRecoveryRequestService passwordRecoveryRequestService;
     private final Validator validator;
+    private final AuthRateLimiter authRateLimiter;
 
     public AuthenticationService(RefreshTokenService refreshTokenService, UserRepository userRepository,
         PasswordEncoder passwordEncoder, TokenConfiguration tokenConfiguration,
         PasswordRecoveryService passwordRecoveryService,
         PasswordRecoveryRequestService passwordRecoveryRequestService,
-        Validator validator) {
+        Validator validator,
+        AuthRateLimiter authRateLimiter) {
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -46,6 +49,7 @@ public class AuthenticationService {
         this.passwordRecoveryService = passwordRecoveryService;
         this.passwordRecoveryRequestService = passwordRecoveryRequestService;
         this.validator = validator;
+        this.authRateLimiter = authRateLimiter;
     }
 
     @Transactional
@@ -55,14 +59,19 @@ public class AuthenticationService {
             throw new InvalidAuthenticationException(INVALID_LOGIN_MESSAGE);
         }
 
-        User user = userRepository.findByEmail(EmailUtils.normalize(credentialsRecordDTO.username())).orElse(null);
+        String normalizedEmail = EmailUtils.normalize(credentialsRecordDTO.username());
+        authRateLimiter.checkLogin(ipAddress, normalizedEmail, deviceId);
+
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
         if (Objects.nonNull(user) && isMatchedPassword(credentialsRecordDTO, user.getPassword()) && user.isEnabled()) {
             String accessToken = tokenConfiguration.createAccessToken(user);
             String refreshToken = refreshTokenService.issue(user, deviceId, userAgent, ipAddress);
+            authRateLimiter.recordLoginSuccess(ipAddress, normalizedEmail, deviceId);
 
             return new AuthenticationResponseRecordDTO(user.getId(), user.getEmail(), user.getName(),
                 accessToken, refreshToken, user.getRole());
         }
+        authRateLimiter.recordLoginFailure(ipAddress, normalizedEmail, deviceId);
         throw new InvalidAuthenticationException(
             "Email ou senha estão inválidos ou este usuário está pendente de avaliação");
     }
@@ -120,11 +129,17 @@ public class AuthenticationService {
     }
 
     public void recoveryToken(EmailDTO emailDTO) {
+        recoveryToken(emailDTO, null, null);
+    }
+
+    public void recoveryToken(EmailDTO emailDTO, String ipAddress, String deviceId) {
         if (Objects.isNull(emailDTO) || isBlank(emailDTO.address())) {
             throw new InvalidRequestException("Email is required");
         }
 
-        passwordRecoveryRequestService.requestRecoveryToken(EmailUtils.normalize(emailDTO.address()));
+        String normalizedEmail = EmailUtils.normalize(emailDTO.address());
+        authRateLimiter.checkPasswordRecovery(ipAddress, normalizedEmail, deviceId);
+        passwordRecoveryRequestService.requestRecoveryToken(normalizedEmail);
     }
 
     private boolean isMatchedPassword(CredentialsRecordDTO credentialsRecordDTO, String encodedPassword) {

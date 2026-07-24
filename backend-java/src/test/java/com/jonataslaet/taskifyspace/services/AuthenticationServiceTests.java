@@ -11,7 +11,9 @@ import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
+import com.jonataslaet.taskifyspace.exceptions.RateLimitExceededException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.services.ratelimit.AuthRateLimiter;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +57,9 @@ class AuthenticationServiceTests {
     @Mock
     private PasswordRecoveryRequestService passwordRecoveryRequestService;
 
+    @Mock
+    private AuthRateLimiter authRateLimiter;
+
     private Validator validator;
 
     private AuthenticationService authenticationService;
@@ -68,7 +74,8 @@ class AuthenticationServiceTests {
             tokenConfiguration,
             passwordRecoveryService,
             passwordRecoveryRequestService,
-            validator);
+            validator,
+            authRateLimiter);
     }
 
     @Test
@@ -105,7 +112,37 @@ class AuthenticationServiceTests {
 
         authenticationService.login(credentials, "device", "agent", "127.0.0.1");
 
+        verify(authRateLimiter).checkLogin("127.0.0.1", "user@example.com", "device");
+        verify(authRateLimiter).recordLoginSuccess("127.0.0.1", "user@example.com", "device");
+        verify(authRateLimiter, never()).recordLoginFailure(anyString(), anyString(), anyString());
         verify(userRepository).findByEmail("user@example.com");
+    }
+
+    @Test
+    void loginDoesNotLoadUserWhenRateLimited() {
+        CredentialsRecordDTO credentials = new CredentialsRecordDTO("user@example.com", "Strong1!");
+        doThrow(new RateLimitExceededException("Too many attempts", 60))
+            .when(authRateLimiter).checkLogin("127.0.0.1", "user@example.com", "device");
+
+        assertThatThrownBy(() -> authenticationService.login(credentials, "device", "agent", "127.0.0.1"))
+            .isInstanceOf(RateLimitExceededException.class);
+
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(refreshTokenService, never()).issue(any(User.class), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void loginRecordsFailureWhenCredentialsAreInvalid() {
+        CredentialsRecordDTO credentials = new CredentialsRecordDTO(" User@Example.COM ", "Strong1!");
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authenticationService.login(credentials, "device", "agent", "127.0.0.1"))
+            .isInstanceOf(InvalidAuthenticationException.class);
+
+        verify(authRateLimiter).checkLogin("127.0.0.1", "user@example.com", "device");
+        verify(authRateLimiter).recordLoginFailure("127.0.0.1", "user@example.com", "device");
+        verify(authRateLimiter, never()).recordLoginSuccess(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -195,12 +232,25 @@ class AuthenticationServiceTests {
     void recoveryTokenQueuesRequestWithoutLoadingUserSynchronously() {
         String email = " User@Example.COM ";
 
-        authenticationService.recoveryToken(new EmailDTO(email));
+        authenticationService.recoveryToken(new EmailDTO(email), "127.0.0.1", "device");
 
+        verify(authRateLimiter).checkPasswordRecovery("127.0.0.1", "user@example.com", "device");
         verify(passwordRecoveryRequestService).requestRecoveryToken("user@example.com");
         verify(userRepository, never()).findByEmailForUpdate(anyString());
         verify(passwordRecoveryService, never()).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
         verify(passwordRecoveryService, never()).savePasswordRecovery(any(PasswordRecovery.class));
+    }
+
+    @Test
+    void recoveryTokenDoesNotQueueRequestWhenRateLimited() {
+        EmailDTO emailDTO = new EmailDTO("user@example.com");
+        doThrow(new RateLimitExceededException("Too many recovery requests", 300))
+            .when(authRateLimiter).checkPasswordRecovery("127.0.0.1", "user@example.com", "device");
+
+        assertThatThrownBy(() -> authenticationService.recoveryToken(emailDTO, "127.0.0.1", "device"))
+            .isInstanceOf(RateLimitExceededException.class);
+
+        verify(passwordRecoveryRequestService, never()).requestRecoveryToken(anyString());
     }
 
     private User createUser(UserStatusEnum status) {

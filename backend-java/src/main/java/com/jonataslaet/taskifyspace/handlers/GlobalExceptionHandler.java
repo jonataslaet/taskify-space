@@ -5,12 +5,14 @@ import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
+import com.jonataslaet.taskifyspace.exceptions.RateLimitExceededException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -136,6 +138,21 @@ public class GlobalExceptionHandler {
         standardErrorRecordDTO.setPath(httpServletRequest.getRequestURI());
 
         return ResponseEntity.status(HttpStatus.CONFLICT.value()).body(standardErrorRecordDTO);
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleRateLimitExceededException(
+        RateLimitExceededException ex, HttpServletRequest request) {
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        error.setError("Muitas requisicoes");
+        error.setMessage(ex.getMessage());
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+            .body(error);
     }
 
     @ExceptionHandler(Exception.class)

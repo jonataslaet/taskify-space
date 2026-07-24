@@ -24,7 +24,7 @@ public class AuthenticationController {
         @RequestHeader(value = "User-Agent", required = false) String userAgent,
         @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
         AuthenticationResponseRecordDTO authenticationResponseRecordDTO = authenticationService.login(
-            credentialsRecordDTO, deviceId, userAgent, ip);
+            credentialsRecordDTO, deviceId, userAgent, firstForwardedIp(ip));
         return ResponseEntity.ok(authenticationResponseRecordDTO);
     }
 
@@ -35,7 +35,7 @@ public class AuthenticationController {
         @RequestHeader(value = "User-Agent", required = false) String userAgent,
         @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
         AuthenticationResponseRecordDTO dto = authenticationService.refresh(
-            refreshTokenOrNull(request), deviceId, userAgent, ip);
+            refreshTokenOrNull(request), deviceId, userAgent, firstForwardedIp(ip));
         return ResponseEntity.ok(dto);
     }
 
@@ -46,8 +46,11 @@ public class AuthenticationController {
     }
 
     @PostMapping("/recovery-token")
-    public ResponseEntity<?> recoveryToken(@RequestBody @Valid EmailDTO emailDTO) {
-        authenticationService.recoveryToken(emailDTO);
+    public ResponseEntity<?> recoveryToken(
+        @RequestBody @Valid EmailDTO emailDTO,
+        @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+        @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
+        authenticationService.recoveryToken(emailDTO, firstForwardedIp(ip), deviceId);
         return ResponseEntity.ok("Caso esse email exista, será enviado a ele um link para resetar a senha");
     }
 
@@ -60,5 +63,12 @@ public class AuthenticationController {
 
     private String refreshTokenOrNull(RefreshTokenRecordDTO request) {
         return request == null ? null : request.refreshToken();
+    }
+
+    private String firstForwardedIp(String forwardedFor) {
+        if (forwardedFor == null || forwardedFor.isBlank()) {
+            return forwardedFor;
+        }
+        return forwardedFor.split(",", 2)[0].trim();
     }
 }
