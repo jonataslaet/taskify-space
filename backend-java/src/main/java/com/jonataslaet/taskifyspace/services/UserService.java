@@ -96,6 +96,7 @@ public class UserService {
     public void deleteById(Long userId) {
         logger.info("Attempting to delete user with ID {}", userId);
         User user = findUserById(userId);
+        validateUserIsNotLastActiveGlobalAdmin(user);
         validateUserIsNotOnlyApprovedSpaceAdmin(userId);
 
         taskExecutionRepository.deleteExecutorLinksByUserId(userId);
@@ -156,6 +157,7 @@ public class UserService {
         logger.info("Changing user status to {}", updateUserStatusRequestDTO.status());
         User user = findUserById(userId);
         UserStatusEnum previousStatus = user.getStatus();
+        validateStatusChangeDoesNotRemoveLastActiveGlobalAdmin(user, updateUserStatusRequestDTO.status());
         user.setStatus(updateUserStatusRequestDTO.status());
         userRepository.save(user);
         if (!Objects.equals(previousStatus, updateUserStatusRequestDTO.status())) {
@@ -191,5 +193,32 @@ public class UserService {
         if (spacesWhereUserIsOnlyApprovedAdmin > 0) {
             throw new ForbiddenException("Usuario e o ultimo administrador aprovado de pelo menos um espaco");
         }
+    }
+
+    private void validateStatusChangeDoesNotRemoveLastActiveGlobalAdmin(User user, UserStatusEnum targetStatus) {
+        if (!isActiveGlobalAdmin(user) || UserStatusEnum.ACTIVE.equals(targetStatus)) {
+            return;
+        }
+
+        validateUserIsNotLastActiveGlobalAdmin(user);
+    }
+
+    private void validateUserIsNotLastActiveGlobalAdmin(User user) {
+        if (!isActiveGlobalAdmin(user)) {
+            return;
+        }
+
+        int activeGlobalAdmins = userRepository.findByRoleAndStatusForUpdate(
+            UserRoleEnum.ROLE_ADMIN,
+            UserStatusEnum.ACTIVE).size();
+
+        if (activeGlobalAdmins <= 1) {
+            throw new ForbiddenException("Sistema precisa manter pelo menos um administrador global ativo");
+        }
+    }
+
+    private boolean isActiveGlobalAdmin(User user) {
+        return UserRoleEnum.ROLE_ADMIN.equals(user.getRole())
+            && UserStatusEnum.ACTIVE.equals(user.getStatus());
     }
 }

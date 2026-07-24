@@ -21,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -131,6 +132,36 @@ class UserServiceTests {
 
         verify(taskExecutionRepository, never()).deleteExecutorLinksByUserId(targetUser.getId());
         verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
+    void deleteByIdPreventsRemovingLastActiveGlobalAdmin() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(userRepository.findByRoleAndStatusForUpdate(UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE))
+            .thenReturn(List.of(admin));
+
+        assertThatThrownBy(() -> userService.deleteById(admin, admin.getId()))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(spaceMembershipRepository, never()).countSpacesWhereUserIsOnlyApprovedAdmin(any(), any(), any());
+        verify(taskExecutionRepository, never()).deleteExecutorLinksByUserId(admin.getId());
+        verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
+    void deleteByIdAllowsRemovingActiveGlobalAdminWhenAnotherActiveGlobalAdminExists() {
+        User authenticatedAdmin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        User targetAdmin = createUser(2L, UserRoleEnum.ROLE_ADMIN);
+        when(userRepository.findById(targetAdmin.getId())).thenReturn(Optional.of(targetAdmin));
+        when(userRepository.findByRoleAndStatusForUpdate(UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE))
+            .thenReturn(List.of(authenticatedAdmin, targetAdmin));
+
+        userService.deleteById(authenticatedAdmin, targetAdmin.getId());
+
+        verify(taskExecutionRepository).deleteExecutorLinksByUserId(targetAdmin.getId());
+        verify(refreshTokenService).deleteAllByUserId(targetAdmin.getId());
+        verify(userRepository).delete(targetAdmin);
     }
 
     @Test
@@ -256,6 +287,48 @@ class UserServiceTests {
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
 
         verify(refreshTokenService, never()).revokeAllByUserId(user.getId());
+    }
+
+    @Test
+    void changeStatusPreventsSuspendingLastActiveGlobalAdmin() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(userRepository.findByRoleAndStatusForUpdate(UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE))
+            .thenReturn(List.of(admin));
+
+        assertThatThrownBy(() -> userService.changeStatus(
+            admin.getId(),
+            new UpdateUserStatusRequestDTO(UserStatusEnum.SUSPENDED)))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(userRepository, never()).save(any(User.class));
+        verify(refreshTokenService, never()).revokeAllByUserId(admin.getId());
+    }
+
+    @Test
+    void changeStatusAllowsSuspendingActiveGlobalAdminWhenAnotherActiveGlobalAdminExists() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        User otherAdmin = createUser(2L, UserRoleEnum.ROLE_ADMIN);
+        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(userRepository.findByRoleAndStatusForUpdate(UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE))
+            .thenReturn(List.of(admin, otherAdmin));
+
+        userService.changeStatus(admin.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.SUSPENDED));
+
+        assertThat(admin.getStatus()).isEqualTo(UserStatusEnum.SUSPENDED);
+        verify(userRepository).save(admin);
+        verify(refreshTokenService).revokeAllByUserId(admin.getId());
+    }
+
+    @Test
+    void changeStatusDoesNotCheckLastActiveGlobalAdminWhenAdminRemainsActive() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+
+        userService.changeStatus(admin.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
+
+        verify(userRepository, never()).findByRoleAndStatusForUpdate(any(), any());
+        verify(refreshTokenService, never()).revokeAllByUserId(admin.getId());
     }
 
     private User createUser(Long id, UserRoleEnum role) {
