@@ -80,7 +80,7 @@ public class SpaceMembershipService {
             }
             if (usersIds.contains(sm.getUser().getId()) && !sm.getSpaceMembershipStatusEnum().equals(SpaceMembershipStatusEnum.APPROVED)) {
                 featureAccessService.requireFeatureWithUsageLock(
-                    authenticatedUser, approvalFeature(sm.getSpaceUserRole()), sm.getSpace());
+                    requireSpaceCreator(sm.getSpace()), approvalFeature(sm.getSpaceUserRole()), sm.getSpace());
                 sm.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
             }
         });
@@ -123,7 +123,8 @@ public class SpaceMembershipService {
 
         if (willIncreaseApprovedRoleCount(spaceMembership, status, targetSpaceUserRole)) {
             featureAccessService.requireFeatureWithUsageLock(
-                authenticatedUser, approvalFeature(targetSpaceUserRole), spaceMembership.getSpace());
+                requireSpaceCreator(spaceMembership.getSpace()), approvalFeature(targetSpaceUserRole),
+                spaceMembership.getSpace());
         }
 
         if (Objects.nonNull(status)) spaceMembership.setSpaceMembershipStatusEnum(status);
@@ -143,6 +144,13 @@ public class SpaceMembershipService {
         return SpaceMembershipStatusEnum.APPROVED.equals(targetStatus)
             && (!SpaceMembershipStatusEnum.APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum())
                 || !spaceMembership.getSpaceUserRole().equals(targetSpaceUserRole));
+    }
+
+    private User requireSpaceCreator(Space space) {
+        if (Objects.isNull(space) || Objects.isNull(space.getCreator())) {
+            throw new IllegalStateException("Espaco sem criador definido");
+        }
+        return space.getCreator();
     }
 
     private void validateParticipationUpdatePermission(

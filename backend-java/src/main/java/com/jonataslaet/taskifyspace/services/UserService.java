@@ -97,12 +97,12 @@ public class UserService {
         logger.info("Attempting to delete user with ID {}", userId);
         User user = findUserById(userId);
         validateUserIsNotLastActiveGlobalAdmin(user);
+        validateUserIsNotCreatorOfAnySpace(userId);
         validateUserIsNotOnlyApprovedSpaceAdmin(userId);
 
         taskExecutionRepository.deleteExecutorLinksByUserId(userId);
         taskExecutionRepository.deleteExecutionsWithoutExecutors();
         taskRepository.clearCreatorByUserId(userId);
-        spaceRepository.clearCreatorByUserId(userId);
         refreshTokenService.deleteAllByUserId(userId);
 
         userRepository.delete(user);
@@ -192,6 +192,12 @@ public class UserService {
                 com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN);
         if (spacesWhereUserIsOnlyApprovedAdmin > 0) {
             throw new ForbiddenException("Usuario e o ultimo administrador aprovado de pelo menos um espaco");
+        }
+    }
+
+    private void validateUserIsNotCreatorOfAnySpace(Long userId) {
+        if (spaceRepository.existsByCreatorId(userId)) {
+            throw new ForbiddenException("Usuario e dono de pelo menos um espaco e nao pode ser removido");
         }
     }
 

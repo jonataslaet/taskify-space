@@ -100,7 +100,7 @@ class UserServiceTests {
         verify(taskExecutionRepository).deleteExecutorLinksByUserId(targetUser.getId());
         verify(taskExecutionRepository).deleteExecutionsWithoutExecutors();
         verify(taskRepository).clearCreatorByUserId(targetUser.getId());
-        verify(spaceRepository).clearCreatorByUserId(targetUser.getId());
+        verify(spaceRepository).existsByCreatorId(targetUser.getId());
         verify(refreshTokenService).deleteAllByUserId(targetUser.getId());
         verify(userRepository).delete(targetUser);
     }
@@ -130,6 +130,21 @@ class UserServiceTests {
         assertThatThrownBy(() -> userService.deleteById(admin, targetUser.getId()))
             .isInstanceOf(ForbiddenException.class);
 
+        verify(taskExecutionRepository, never()).deleteExecutorLinksByUserId(targetUser.getId());
+        verify(userRepository, never()).delete(any(User.class));
+    }
+
+    @Test
+    void deleteByIdPreventsRemovingSpaceCreator() {
+        User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
+        User targetUser = createUser(2L, UserRoleEnum.ROLE_USER);
+        when(userRepository.findById(targetUser.getId())).thenReturn(Optional.of(targetUser));
+        when(spaceRepository.existsByCreatorId(targetUser.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.deleteById(admin, targetUser.getId()))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(spaceMembershipRepository, never()).countSpacesWhereUserIsOnlyApprovedAdmin(any(), any(), any());
         verify(taskExecutionRepository, never()).deleteExecutorLinksByUserId(targetUser.getId());
         verify(userRepository, never()).delete(any(User.class));
     }

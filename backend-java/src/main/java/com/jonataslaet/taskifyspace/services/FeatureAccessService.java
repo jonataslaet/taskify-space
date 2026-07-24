@@ -52,14 +52,19 @@ public class FeatureAccessService {
 
     @Transactional(readOnly = true)
     public boolean hasFeature(User user, FeatureEnum feature, Space space) {
-        UsageGrant usageGrant = resolveUsageGrant(user, feature);
+        User featureOwner = resolveFeatureOwner(user, feature, space);
+        if (Objects.isNull(featureOwner)) {
+            return false;
+        }
+
+        UsageGrant usageGrant = resolveUsageGrant(featureOwner, feature);
         if (!usageGrant.granted()) {
             return false;
         }
         if (usageGrant.unlimited()) {
             return true;
         }
-        long currentUsage = countUsage(user, feature, space, usageGrant.periodStart(), usageGrant.periodEnd());
+        long currentUsage = countUsage(featureOwner, feature, space, usageGrant.periodStart(), usageGrant.periodEnd());
         return currentUsage < usageGrant.usageLimit();
     }
 
@@ -131,6 +136,23 @@ public class FeatureAccessService {
 
         return new UsageGrant(granted, unlimited, usageLimit, nullableGrantStart(granted, periodStart),
             nullableGrantEnd(granted, periodEnd));
+    }
+
+    private User resolveFeatureOwner(User user, FeatureEnum feature, Space space) {
+        if (!isSpaceOwnedFeature(feature)) {
+            return user;
+        }
+
+        return Objects.isNull(space) ? null : space.getCreator();
+    }
+
+    private boolean isSpaceOwnedFeature(FeatureEnum feature) {
+        return switch (feature) {
+            case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER,
+                 APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT -> true;
+            case CREATE_SPACE, CREATE_TASK -> false;
+        };
     }
 
     private long countUsage(

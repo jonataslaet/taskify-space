@@ -61,9 +61,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void sortsParticipantsByScoreDescending() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User user1 = userRepository.save(createUser("User 1", "score1@email.com"));
         User user2 = userRepository.save(createUser("User 2", "score2@email.com"));
@@ -101,9 +99,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void filtersParticipantsByNameAndSpaceUserRole() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User admin = userRepository.save(createUser("Jon Admin", "filter-admin@email.com"));
         User participant = userRepository.save(createUser("Jon Participant", "filter-participant@email.com"));
@@ -134,9 +130,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void filtersParticipantScoresByTaskCategories() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User user1 = userRepository.save(createUser("User 1", "category-score1@email.com"));
         User user2 = userRepository.save(createUser("User 2", "category-score2@email.com"));
@@ -173,9 +167,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void paginatesParticipantScoresBySelectedTaskCategories() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User user1 = userRepository.save(createUser("User 1", "selected-category1@email.com"));
         User user2 = userRepository.save(createUser("User 2", "selected-category2@email.com"));
@@ -212,9 +204,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void showsOnlyScoredTaskCategoriesForEachParticipant() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User user1 = userRepository.save(createUser("User 1", "actual-category1@email.com"));
         User user2 = userRepository.save(createUser("User 2", "actual-category2@email.com"));
@@ -259,9 +249,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void usesAllTaskCategoriesWhenFilterIsMissing() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User user1 = userRepository.save(createUser("User 1", "all-category1@email.com"));
         User user2 = userRepository.save(createUser("User 2", "all-category2@email.com"));
@@ -298,9 +286,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void findsApprovedUsersByIdsForAnySpaceRole() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User admin = userRepository.save(createUser("Admin", "admin@email.com"));
         User participant = userRepository.save(createUser("Participant", "participant@email.com"));
@@ -324,13 +310,9 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void allowsSameUserToHaveMembershipsInDifferentSpaces() {
-        Space firstSpace = new Space("Casa");
-        firstSpace.setActive(true);
-        firstSpace = spaceRepository.save(firstSpace);
+        Space firstSpace = saveSpace("Casa");
 
-        Space secondSpace = new Space("Trabalho");
-        secondSpace.setActive(true);
-        secondSpace = spaceRepository.save(secondSpace);
+        Space secondSpace = saveSpace("Trabalho");
 
         User user = userRepository.save(createUser("Participant", "multi-space@email.com"));
 
@@ -344,9 +326,7 @@ class TaskExecutionRepositoryTests {
 
     @Test
     void preventsSameUserFromHavingDuplicateMembershipInSameSpace() {
-        Space space = new Space("Casa");
-        space.setActive(true);
-        space = spaceRepository.save(space);
+        Space space = saveSpace("Casa");
 
         User user = userRepository.save(createUser("Participant", "same-space@email.com"));
 
@@ -365,6 +345,19 @@ class TaskExecutionRepositoryTests {
         user.setRole(UserRoleEnum.ROLE_USER);
         user.setStatus(UserStatusEnum.ACTIVE);
         return user;
+    }
+
+    private Space saveSpace(String name) {
+        User creator = userRepository.save(
+            createUser(name + " Creator", "creator-" + normalizedName(name) + "@email.com"));
+        Space space = new Space(name);
+        space.setActive(true);
+        space.setCreator(creator);
+        return spaceRepository.save(space);
+    }
+
+    private String normalizedName(String name) {
+        return name.toLowerCase().replaceAll("[^a-z0-9]+", "-");
     }
 
     private Task createTask(Space space, String description, String score) {

@@ -118,9 +118,15 @@ class TaskServiceJpaTests {
     }
 
     private Space createSpace(String name) {
+        User creator = userRepository.save(createUser("creator-" + normalizedName(name) + "@example.com"));
         Space space = new Space(name);
         space.setActive(true);
+        space.setCreator(creator);
         return space;
+    }
+
+    private String normalizedName(String name) {
+        return name.toLowerCase().replaceAll("[^a-z0-9]+", "-");
     }
 
     private Task createTask(Space space, String description) {

@@ -53,7 +53,7 @@ class ProductionDatabaseMigrationTests {
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
         assertThat(Arrays.stream(flyway.info().applied())
             .map(migration -> migration.getVersion().toString()))
-            .contains("1", "2", "3");
+            .contains("1", "2", "3", "4");
         assertThat(userRepository.existsByEmail("root@example.com")).isTrue();
     }
 }

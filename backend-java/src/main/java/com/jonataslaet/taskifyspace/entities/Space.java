@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -21,8 +22,8 @@ public class Space {
 
     private Instant createdAt;
 
-    @ManyToOne
-    @JoinColumn(name = "creator_id")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "creator_id", nullable = false, updatable = false)
     private User creator;
 
     @OneToMany(mappedBy = "space", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -74,7 +75,20 @@ public class Space {
     }
 
     public void setCreator(User creator) {
+        if (creator == null) {
+            throw new IllegalArgumentException("Creator is required");
+        }
+        if (this.creator != null && !sameCreator(creator)) {
+            throw new IllegalArgumentException("Creator cannot be changed");
+        }
         this.creator = creator;
+    }
+
+    private boolean sameCreator(User creator) {
+        if (this.creator.getId() != null && creator.getId() != null) {
+            return Objects.equals(this.creator.getId(), creator.getId());
+        }
+        return this.creator == creator;
     }
 
     public Set<TaskExecution> getTaskExecutions() {

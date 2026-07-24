@@ -4,6 +4,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -57,25 +58,29 @@ class SpaceMembershipServiceTests {
 
     @Test
     void updateParticipationPreservesStatusWhenOnlyRoleChanges() {
-        User authenticatedUser = createUser(1L);
-        User participant = createUser(2L);
+        User creator = createUser(1L);
+        User authenticatedAdmin = createUser(2L);
+        User participant = createUser(3L);
         Space space = new Space("Space");
         space.setId(10L);
+        space.setCreator(creator);
         SpaceMembership spaceMembership = new SpaceMembership(participant, space, ROLE_SPACE_PARTICIPANT);
         spaceMembership.setSpaceMembershipStatusEnum(APPROVED);
 
         when(spaceMembershipRepository.findByIdAndSpaceId(20L, space.getId()))
             .thenReturn(Optional.of(spaceMembership));
         when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
-            space.getId(), authenticatedUser.getId(), APPROVED, ROLE_SPACE_ADMIN))
+            space.getId(), authenticatedAdmin.getId(), APPROVED, ROLE_SPACE_ADMIN))
             .thenReturn(true);
         when(spaceMembershipRepository.save(spaceMembership)).thenReturn(spaceMembership);
 
         SpaceMembershipRecordDTO updatedMembership = spaceMembershipService.updateParticipation(
-            space.getId(), 20L, null, ROLE_SPACE_MANAGER, authenticatedUser);
+            space.getId(), 20L, null, ROLE_SPACE_MANAGER, authenticatedAdmin);
 
         ArgumentCaptor<SpaceMembership> spaceMembershipCaptor = ArgumentCaptor.forClass(SpaceMembership.class);
         verify(spaceMembershipRepository).save(spaceMembershipCaptor.capture());
+        verify(featureAccessService).requireFeatureWithUsageLock(
+            creator, FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, space);
         SpaceMembership savedMembership = spaceMembershipCaptor.getValue();
 
         assertThat(savedMembership.getSpaceMembershipStatusEnum()).isEqualTo(APPROVED);
@@ -199,6 +204,7 @@ class SpaceMembershipServiceTests {
     private Space createSpace() {
         Space space = new Space("Space");
         space.setId(10L);
+        space.setCreator(createUser(100L));
         return space;
     }
 

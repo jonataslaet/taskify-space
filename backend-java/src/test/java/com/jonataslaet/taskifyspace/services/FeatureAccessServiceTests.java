@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -125,6 +126,7 @@ class FeatureAccessServiceTests {
         User user = createUser(3L, UserRoleEnum.ROLE_USER);
         Space space = new Space();
         space.setId(10L);
+        space.setCreator(user);
         Subscription subscription = activeSubscription(
             user,
             new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 3L));
@@ -145,6 +147,7 @@ class FeatureAccessServiceTests {
         User user = createUser(4L, UserRoleEnum.ROLE_USER);
         Space space = new Space();
         space.setId(11L);
+        space.setCreator(user);
         Subscription subscription = activeSubscription(
             user,
             new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 3L));
@@ -158,6 +161,30 @@ class FeatureAccessServiceTests {
             user, FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, space);
 
         assertThat(hasFeature).isFalse();
+    }
+
+    @Test
+    void approvalFeatureUsesSpaceCreatorSubscriptionInsteadOfApproverSubscription() {
+        User creator = createUser(6L, UserRoleEnum.ROLE_USER);
+        User approver = createUser(7L, UserRoleEnum.ROLE_USER);
+        Space space = new Space();
+        space.setId(12L);
+        space.setCreator(creator);
+        Subscription creatorSubscription = activeSubscription(
+            creator,
+            new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 3L));
+
+        when(subscriptionRepository.findByUserId(creator.getId())).thenReturn(List.of(creatorSubscription));
+        when(spaceMembershipRepository.countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+            space.getId(), SpaceMembershipStatusEnum.APPROVED, SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT))
+            .thenReturn(3L);
+
+        boolean hasFeature = featureAccessService.hasFeature(
+            approver, FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, space);
+
+        assertThat(hasFeature).isFalse();
+        verify(subscriptionRepository).findByUserId(creator.getId());
+        verify(subscriptionRepository, never()).findByUserId(approver.getId());
     }
 
     private User createUser(Long id, UserRoleEnum role) {
