@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.controllers.dtos;
 
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import jakarta.validation.constraints.NotBlank;
 
 public record CredentialsRecordDTO(
@@ -9,4 +10,7 @@ public record CredentialsRecordDTO(
     @NotBlank(message = "Password is required")
     String password
 ) {
+    public CredentialsRecordDTO {
+        username = EmailUtils.normalize(username);
+    }
 }

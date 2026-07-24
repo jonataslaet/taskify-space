@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,7 +55,7 @@ public class AuthenticationService {
             throw new InvalidAuthenticationException(INVALID_LOGIN_MESSAGE);
         }
 
-        User user = userRepository.findByEmail(credentialsRecordDTO.username()).orElse(null);
+        User user = userRepository.findByEmail(EmailUtils.normalize(credentialsRecordDTO.username())).orElse(null);
         if (Objects.nonNull(user) && isMatchedPassword(credentialsRecordDTO, user.getPassword()) && user.isEnabled()) {
             String accessToken = tokenConfiguration.createAccessToken(user);
             String refreshToken = refreshTokenService.issue(user, deviceId, userAgent, ipAddress);
@@ -123,7 +124,7 @@ public class AuthenticationService {
             throw new InvalidRequestException("Email is required");
         }
 
-        passwordRecoveryRequestService.requestRecoveryToken(emailDTO.address().trim());
+        passwordRecoveryRequestService.requestRecoveryToken(EmailUtils.normalize(emailDTO.address()));
     }
 
     private boolean isMatchedPassword(CredentialsRecordDTO credentialsRecordDTO, String encodedPassword) {
@@ -142,7 +143,7 @@ public class AuthenticationService {
         List<PasswordRecovery> passwordRecoveries =
             passwordRecoveryService.getValidPasswordRecoveries(uuidToken, Instant.now());
         PasswordRecovery validPasswordRecovery = passwordRecoveries.getFirst();
-        User user = userRepository.findByEmail(validPasswordRecovery.getEmail()).orElseThrow(() ->
+        User user = userRepository.findByEmail(EmailUtils.normalize(validPasswordRecovery.getEmail())).orElseThrow(() ->
             new ResourceNotFoundException("Usuário não encontrado"));
         validPasswordRecovery.setExpiration(Instant.now());
         user.setPassword(passwordEncoder.encode(passwordRenovationDTO.newPassword()));

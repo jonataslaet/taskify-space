@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import com.jonataslaet.taskifyspace.validations.PasswordConstraint;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -46,6 +47,10 @@ public record UserRecordDTO(
     @PasswordConstraint(groups = UserView.PasswordPut.class)
     @JsonView({UserView.PasswordPut.class})
     String oldPassword) {
+
+    public UserRecordDTO {
+        email = EmailUtils.normalize(email);
+    }
 
     public interface UserView {
         interface CreateUser {}

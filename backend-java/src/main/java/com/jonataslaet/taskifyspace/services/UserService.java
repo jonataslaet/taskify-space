@@ -16,6 +16,7 @@ import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +62,8 @@ public class UserService {
 
     @Transactional
     public UserRecordDTO createUser(UserRecordDTO userRecordDTO) {
-        if (userRepository.existsByEmail(userRecordDTO.email())) {
+        String normalizedEmail = EmailUtils.normalize(userRecordDTO.email());
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new DuplicationException("Email already exists");
         }
 
@@ -72,6 +74,7 @@ public class UserService {
         UserRoleEnum.validateExistence(userRecordDTO.role());
         User user = UserMapper.toEntity(userRecordDTO);
 
+        user.setEmail(normalizedEmail);
         user.setStatus(UserStatusEnum.PENDING_EVALUATION);
         user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
         return UserMapper.toUserRecordDTO(userRepository.save(user));
@@ -120,9 +123,11 @@ public class UserService {
     public void updateUser(Long userId, UserRecordDTO userRecordDto) {
         logger.info("Updating user with ID {}", userId);
         User user = findUserById(userId);
+        String normalizedEmail = EmailUtils.normalize(userRecordDto.email());
+        validateEmailIsAvailableForUpdate(user, normalizedEmail);
 
         logger.debug("Updating editable profile fields for user ID {}", userId);
-        user.setEmail(userRecordDto.email());
+        user.setEmail(normalizedEmail);
         user.setName(userRecordDto.name());
 
         userRepository.save(user);
@@ -182,6 +187,12 @@ public class UserService {
                 logger.warn("User with ID {} not found for update", userId);
                 return new ResourceNotFoundException("User not found");
             });
+    }
+
+    private void validateEmailIsAvailableForUpdate(User user, String normalizedEmail) {
+        if (!Objects.equals(user.getEmail(), normalizedEmail) && userRepository.existsByEmail(normalizedEmail)) {
+            throw new DuplicationException("Email already exists");
+        }
     }
 
     private void validateAdminOrSelf(User authenticatedUser, Long userId) {

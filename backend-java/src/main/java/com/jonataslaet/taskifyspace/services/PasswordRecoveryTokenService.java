@@ -3,6 +3,7 @@ package com.jonataslaet.taskifyspace.services;
 import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import com.jonataslaet.taskifyspace.utils.TokenUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,8 @@ public class PasswordRecoveryTokenService {
 
     @Transactional
     public Optional<PasswordRecoveryEmail> createRecoveryToken(String email) {
-        User user = userRepository.findByEmailForUpdate(email).orElse(null);
+        String normalizedEmail = EmailUtils.normalize(email);
+        User user = userRepository.findByEmailForUpdate(normalizedEmail).orElse(null);
         if (Objects.isNull(user)) {
             return Optional.empty();
         }

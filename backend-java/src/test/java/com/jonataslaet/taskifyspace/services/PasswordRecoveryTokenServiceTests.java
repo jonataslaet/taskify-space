@@ -49,12 +49,13 @@ class PasswordRecoveryTokenServiceTests {
 
     @Test
     void createRecoveryTokenReturnsEmptyForMissingEmail() {
-        String email = "missing@example.com";
-        when(userRepository.findByEmailForUpdate(email)).thenReturn(Optional.empty());
+        String email = " Missing@Example.COM ";
+        when(userRepository.findByEmailForUpdate("missing@example.com")).thenReturn(Optional.empty());
 
         Optional<PasswordRecoveryEmail> result = passwordRecoveryTokenService.createRecoveryToken(email);
 
         assertThat(result).isEmpty();
+        verify(userRepository).findByEmailForUpdate("missing@example.com");
         verify(passwordRecoveryService, never()).expireValidPasswordRecoveriesByEmail(any(), any());
         verify(passwordRecoveryService, never()).savePasswordRecovery(any());
     }
@@ -64,7 +65,8 @@ class PasswordRecoveryTokenServiceTests {
         User user = createUser();
         when(userRepository.findByEmailForUpdate(user.getEmail())).thenReturn(Optional.of(user));
 
-        Optional<PasswordRecoveryEmail> result = passwordRecoveryTokenService.createRecoveryToken(user.getEmail());
+        Optional<PasswordRecoveryEmail> result =
+            passwordRecoveryTokenService.createRecoveryToken(" User@Example.COM ");
 
         assertThat(result).isPresent();
         assertThat(result.get().address()).isEqualTo(user.getEmail());

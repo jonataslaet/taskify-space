@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.entities;
 
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -32,7 +33,7 @@ public class PasswordRecovery {
 
     public PasswordRecovery(String tokenHash, String email, Instant expiration) {
         this.tokenHash = tokenHash;
-        this.email = email;
+        this.email = EmailUtils.normalize(email);
         this.expiration = expiration;
     }
 

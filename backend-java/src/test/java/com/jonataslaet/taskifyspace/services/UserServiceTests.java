@@ -5,6 +5,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
@@ -87,6 +88,48 @@ class UserServiceTests {
             .isInstanceOf(ForbiddenException.class);
 
         verify(userRepository, never()).findById(2L);
+    }
+
+    @Test
+    void createUserNormalizesEmailBeforeCheckingDuplicateAndSaving() {
+        UserRecordDTO createRequest = new UserRecordDTO(
+            null,
+            " User@Example.COM ",
+            "User",
+            UserStatusEnum.ACTIVE,
+            UserRoleEnum.ROLE_USER,
+            "Strong1!",
+            null);
+
+        when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
+        when(passwordEncoder.encode(createRequest.password())).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserRecordDTO createdUser = userService.createUser(createRequest);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getEmail()).isEqualTo("user@example.com");
+        assertThat(createdUser.email()).isEqualTo("user@example.com");
+    }
+
+    @Test
+    void createUserRejectsDuplicateNormalizedEmail() {
+        UserRecordDTO createRequest = new UserRecordDTO(
+            null,
+            " User@Example.COM ",
+            "User",
+            UserStatusEnum.ACTIVE,
+            UserRoleEnum.ROLE_USER,
+            "Strong1!",
+            null);
+
+        when(userRepository.existsByEmail("user@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.createUser(createRequest))
+            .isInstanceOf(DuplicationException.class);
+
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -191,7 +234,7 @@ class UserServiceTests {
 
         UserRecordDTO updateRequest = new UserRecordDTO(
             null,
-            "new@example.com",
+            " New@Example.COM ",
             "New Name",
             UserStatusEnum.SUSPENDED,
             UserRoleEnum.ROLE_ADMIN,
@@ -211,6 +254,28 @@ class UserServiceTests {
         assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.ACTIVE);
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+    }
+
+    @Test
+    void updateUserRejectsDuplicateNormalizedEmail() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setEmail("old@example.com");
+        UserRecordDTO updateRequest = new UserRecordDTO(
+            null,
+            " Taken@Example.COM ",
+            "New Name",
+            null,
+            null,
+            null,
+            null);
+
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.updateUser(user.getId(), updateRequest))
+            .isInstanceOf(DuplicationException.class);
+
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

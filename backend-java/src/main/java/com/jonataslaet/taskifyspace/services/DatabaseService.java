@@ -19,6 +19,7 @@ import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.PlanRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -65,10 +66,11 @@ public class DatabaseService {
     }
 
     private User createAdminJonatasLaet() {
-        User createdAdmin = userRepository.findByEmail(this.emailRoot).orElse(new User());
+        String normalizedEmailRoot = EmailUtils.normalize(this.emailRoot);
+        User createdAdmin = userRepository.findByEmail(normalizedEmailRoot).orElse(new User());
         if (ObjectUtils.isEmpty(createdAdmin.getEmail())) {
             createdAdmin.setRole(UserRoleEnum.ROLE_ADMIN);
-            createdAdmin.setEmail(this.emailRoot);
+            createdAdmin.setEmail(normalizedEmailRoot);
             createdAdmin.setPassword(passwordEncoder.encode(this.passwordRoot));
             createdAdmin.setName("Jonatas Laet");
             createdAdmin.setStatus(UserStatusEnum.ACTIVE);

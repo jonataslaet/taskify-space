@@ -2,6 +2,7 @@ package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -23,7 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     public User findByEmail(String username) throws UsernameNotFoundException {
-        return userRepository.findByEmail(username)
+        return userRepository.findByEmail(EmailUtils.normalize(username))
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
 }

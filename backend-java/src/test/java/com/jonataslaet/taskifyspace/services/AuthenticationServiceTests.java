@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -93,6 +94,21 @@ class AuthenticationServiceTests {
     }
 
     @Test
+    void loginNormalizesEmailBeforeLoadingUser() {
+        CredentialsRecordDTO credentials = new CredentialsRecordDTO(" User@Example.COM ", "Strong1!");
+        User user = createUser(UserStatusEnum.ACTIVE);
+
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(credentials.password(), user.getPassword())).thenReturn(true);
+        when(tokenConfiguration.createAccessToken(user)).thenReturn("access-token");
+        when(refreshTokenService.issue(user, "device", "agent", "127.0.0.1")).thenReturn("refresh-token");
+
+        authenticationService.login(credentials, "device", "agent", "127.0.0.1");
+
+        verify(userRepository).findByEmail("user@example.com");
+    }
+
+    @Test
     void refreshRejectsBlankRefreshTokenBeforeValidation() {
         assertThatThrownBy(() -> authenticationService.refresh(" ", "device", "agent", "127.0.0.1"))
             .isInstanceOf(InvalidAuthenticationException.class);
@@ -152,6 +168,7 @@ class AuthenticationServiceTests {
             "token-hash",
             user.getEmail(),
             Instant.now().plusSeconds(300));
+        ReflectionTestUtils.setField(passwordRecovery, "email", " User@Example.COM ");
         PasswordResetDTO passwordResetDTO = new PasswordResetDTO("Strong1!", "Strong1!");
 
         when(passwordRecoveryService.getValidPasswordRecoveries(anyString(), any(Instant.class)))
@@ -176,11 +193,11 @@ class AuthenticationServiceTests {
 
     @Test
     void recoveryTokenQueuesRequestWithoutLoadingUserSynchronously() {
-        String email = "user@example.com";
+        String email = " User@Example.COM ";
 
-        authenticationService.recoveryToken(new EmailDTO(" " + email + " "));
+        authenticationService.recoveryToken(new EmailDTO(email));
 
-        verify(passwordRecoveryRequestService).requestRecoveryToken(email);
+        verify(passwordRecoveryRequestService).requestRecoveryToken("user@example.com");
         verify(userRepository, never()).findByEmailForUpdate(anyString());
         verify(passwordRecoveryService, never()).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
         verify(passwordRecoveryService, never()).savePasswordRecovery(any(PasswordRecovery.class));
