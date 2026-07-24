@@ -23,13 +23,13 @@ public class RefreshToken {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "issued_at", nullable = false, columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
+    @Column(name = "issued_at", nullable = false)
     private Instant issuedAt;
 
-    @Column(name = "expires_at", nullable = false, columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
+    @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @Column(name = "revoked_at", columnDefinition = "TIMESTAMP WITHOUT TIME ZONE")
+    @Column(name = "revoked_at")
     private Instant revokedAt;
 
     // Facilita rotação/encadeamento
