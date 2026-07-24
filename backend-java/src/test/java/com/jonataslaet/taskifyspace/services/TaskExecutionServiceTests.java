@@ -25,6 +25,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TaskExecutionServiceTests {
 
+    private static final Set<SpaceUserRoleEnum> TASK_EXECUTION_SELF_REMOVAL_ROLES = Set.of(
+        SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+        SpaceUserRoleEnum.ROLE_SPACE_MANAGER,
+        SpaceUserRoleEnum.ROLE_SPACE_ADMIN
+    );
+
     @Mock
     private SpaceService spaceService;
 
@@ -51,7 +57,7 @@ class TaskExecutionServiceTests {
         taskExecutionService.removeCurrentUserFromTaskExecution(space.getId(), taskExecution.getId(), authenticatedUser);
 
         verify(spaceService).validateActiveParticipation(
-            authenticatedUser, space, Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
+            authenticatedUser, space, TASK_EXECUTION_SELF_REMOVAL_ROLES);
         verify(taskExecutionRepository).removeExecutorsFromTaskExecution(
             taskExecution, Set.of(authenticatedUser.getId()));
     }
@@ -70,7 +76,7 @@ class TaskExecutionServiceTests {
             .hasMessage("TaskExecution nao encontrada nesse espaco");
 
         verify(spaceService, never()).validateActiveParticipation(
-            authenticatedUser, taskExecutionSpace, Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
+            authenticatedUser, taskExecutionSpace, TASK_EXECUTION_SELF_REMOVAL_ROLES);
         verify(taskExecutionRepository, never()).removeExecutorsFromTaskExecution(
             taskExecution, Set.of(authenticatedUser.getId()));
     }

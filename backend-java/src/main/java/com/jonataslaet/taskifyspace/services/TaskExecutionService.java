@@ -14,6 +14,12 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class TaskExecutionService {
 
+    private static final Set<SpaceUserRoleEnum> TASK_EXECUTION_SELF_REMOVAL_ROLES = Set.of(
+        SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+        SpaceUserRoleEnum.ROLE_SPACE_MANAGER,
+        SpaceUserRoleEnum.ROLE_SPACE_ADMIN
+    );
+
     private final SpaceService spaceService;
     private final TaskExecutionRepository taskExecutionRepository;
 
@@ -30,7 +36,7 @@ public class TaskExecutionService {
         Space space = taskExecution.getSpace();
         validateTaskExecutionBelongsToSpace(taskExecution, spaceId);
         spaceService.validateActiveParticipation(
-            authenticatedUser, space, Set.of(SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT));
+            authenticatedUser, space, TASK_EXECUTION_SELF_REMOVAL_ROLES);
 
         taskExecutionRepository.removeExecutorsFromTaskExecution(taskExecution, Set.of(authenticatedUser.getId()));
     }
