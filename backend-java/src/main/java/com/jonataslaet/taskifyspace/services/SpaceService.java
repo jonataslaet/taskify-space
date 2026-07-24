@@ -16,6 +16,7 @@ import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
+import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.PENDING;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
 
@@ -103,13 +105,17 @@ public class SpaceService {
         SpaceUserRoleEnum spaceUserRole, SpaceMembershipStatusEnum spaceMembershipStatus) {
         Specification<@NonNull Space> authenticatedUserSpaces = (root, query, criteriaBuilder) -> {
             query.distinct(true);
-            var spaceMembershipJoin = root.join("spaceMemberships");
-            List<Predicate> predicates = new ArrayList<>();
-            predicates.add(criteriaBuilder.equal(
+            var spaceMembershipJoin = root.join("spaceMemberships", JoinType.LEFT);
+            spaceMembershipJoin.on(criteriaBuilder.equal(
                 spaceMembershipJoin.get("user").get("id"),
                 authenticatedUser.getId()
             ));
-            predicates.add(criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED));
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("active"), true));
+            predicates.add(criteriaBuilder.or(
+                criteriaBuilder.isNull(spaceMembershipJoin.get("id")),
+                spaceMembershipJoin.get("spaceMembershipStatusEnum").in(PENDING, APPROVED)
+            ));
 
             if (Objects.nonNull(spaceUserRole)) {
                 predicates.add(criteriaBuilder.equal(spaceMembershipJoin.get("spaceUserRole"), spaceUserRole));

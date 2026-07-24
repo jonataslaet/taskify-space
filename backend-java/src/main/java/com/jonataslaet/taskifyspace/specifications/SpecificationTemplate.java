@@ -34,8 +34,7 @@ public class SpecificationTemplate {
     public interface TaskSpecification extends Specification<@NonNull Task> {}
 
     @And({
-        @Spec(path = "name", spec = LikeIgnoreCase.class),
-        @Spec(path = "active", params = "active", spec = Equal.class)
+        @Spec(path = "name", spec = LikeIgnoreCase.class)
     })
     public interface SpaceSpecification extends Specification<@NonNull Space> {}
 

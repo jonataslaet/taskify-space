@@ -57,46 +57,56 @@ class SpaceServiceJpaTests {
     }
 
     @Test
-    void findAllReturnsOnlySpacesWhereUserHasApprovedMembership() {
+    void findAllReturnsOnlyActiveSpacesWhereUserHasNoMembershipOrAvailableMembership() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
         User otherUser = userRepository.save(createUser("other@example.com"));
 
+        Space noMembershipSpace = spaceRepository.save(createSpace("No membership"));
+        Space deniedSpace = spaceRepository.save(createSpace("Denied"));
+        Space cancelledSpace = spaceRepository.save(createSpace("Cancelled"));
         Space approvedSpace = spaceRepository.save(createSpace("Approved"));
         Space pendingSpace = spaceRepository.save(createSpace("Pending"));
-        Space blockedSpace = spaceRepository.save(createSpace("Blocked"));
         Space otherUserSpace = spaceRepository.save(createSpace("Other user"));
+        Space inactiveSpace = spaceRepository.save(createSpace("Inactive"));
+        inactiveSpace.setActive(false);
+        spaceRepository.save(inactiveSpace);
 
+        saveMembership(deniedSpace, authenticatedUser, SpaceMembershipStatusEnum.DENIED);
+        saveMembership(cancelledSpace, authenticatedUser, SpaceMembershipStatusEnum.CANCELLED);
         saveMembership(approvedSpace, authenticatedUser, SpaceMembershipStatusEnum.APPROVED);
         saveMembership(pendingSpace, authenticatedUser, SpaceMembershipStatusEnum.PENDING);
-        saveMembership(blockedSpace, authenticatedUser, SpaceMembershipStatusEnum.BLOCKED);
         saveMembership(otherUserSpace, otherUser, SpaceMembershipStatusEnum.APPROVED);
 
         Page<SpaceRecordDTO> spaces = spaceService.findAll(null, Pageable.unpaged(), authenticatedUser);
 
         List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
-        assertThat(spaceIds).containsExactly(approvedSpace.getId());
+        assertThat(spaceIds).containsExactlyInAnyOrder(
+            noMembershipSpace.getId(),
+            deniedSpace.getId(),
+            cancelledSpace.getId(),
+            otherUserSpace.getId());
     }
 
     @Test
-    void findAllFiltersRoleOnAuthenticatedUsersMembershipOnly() {
+    void findAllFiltersRoleOnAuthenticatedUsersAvailableMembershipOnly() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
-        User otherUser = userRepository.save(createUser("other@example.com"));
 
-        Space sharedSpace = spaceRepository.save(createSpace("Shared"));
-        Space adminSpace = spaceRepository.save(createSpace("Admin"));
+        Space deniedParticipantSpace = spaceRepository.save(createSpace("Denied participant"));
+        Space deniedAdminSpace = spaceRepository.save(createSpace("Denied admin"));
+        Space approvedAdminSpace = spaceRepository.save(createSpace("Approved admin"));
 
         saveMembership(
-            sharedSpace,
+            deniedParticipantSpace,
             authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
-            SpaceMembershipStatusEnum.APPROVED);
+            SpaceMembershipStatusEnum.DENIED);
         saveMembership(
-            sharedSpace,
-            otherUser,
+            deniedAdminSpace,
+            authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
-            SpaceMembershipStatusEnum.APPROVED);
+            SpaceMembershipStatusEnum.DENIED);
         saveMembership(
-            adminSpace,
+            approvedAdminSpace,
             authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
             SpaceMembershipStatusEnum.APPROVED);
@@ -105,31 +115,39 @@ class SpaceServiceJpaTests {
             null, Pageable.unpaged(), authenticatedUser, SpaceUserRoleEnum.ROLE_SPACE_ADMIN, null);
 
         List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
-        assertThat(spaceIds).containsExactly(adminSpace.getId());
+        assertThat(spaceIds).containsExactly(deniedAdminSpace.getId());
     }
 
     @Test
-    void findAllFiltersStatusOnAuthenticatedUsersMembershipOnly() {
+    void findAllFiltersStatusOnAuthenticatedUsersAvailableMembershipOnly() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
         User otherUser = userRepository.save(createUser("other@example.com"));
 
-        Space sharedSpace = spaceRepository.save(createSpace("Shared"));
+        Space deniedSpace = spaceRepository.save(createSpace("Denied"));
+        Space pendingSpace = spaceRepository.save(createSpace("Pending"));
+        Space otherUserPendingSpace = spaceRepository.save(createSpace("Other user pending"));
 
         saveMembership(
-            sharedSpace,
+            deniedSpace,
             authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
-            SpaceMembershipStatusEnum.APPROVED);
+            SpaceMembershipStatusEnum.DENIED);
         saveMembership(
-            sharedSpace,
+            pendingSpace,
+            authenticatedUser,
+            SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
+            SpaceMembershipStatusEnum.PENDING);
+        saveMembership(
+            otherUserPendingSpace,
             otherUser,
             SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
             SpaceMembershipStatusEnum.PENDING);
 
         Page<SpaceRecordDTO> spaces = spaceService.findAll(
-            null, Pageable.unpaged(), authenticatedUser, null, SpaceMembershipStatusEnum.PENDING);
+            null, Pageable.unpaged(), authenticatedUser, null, SpaceMembershipStatusEnum.DENIED);
 
-        assertThat(spaces.getContent()).isEmpty();
+        List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
+        assertThat(spaceIds).containsExactly(deniedSpace.getId());
     }
 
     private User createUser(String email) {
