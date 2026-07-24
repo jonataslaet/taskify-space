@@ -37,7 +37,6 @@ public class SecurityConfiguration {
     public static final String[] POST_PUBLIC = {
         "/auth/login", "/auth/refresh", "/auth/recovery-token", "/auth/new-password/*", "/users"
     };
-    public static final String[] ALL_PUBLIC = {"/actuator/health"};
 
     public SecurityConfiguration(TokenConfiguration tokenConfiguration, CorsConfigurationSource corsConfigurationSource,
                                  ObjectMapper mapper) {
@@ -52,7 +51,6 @@ public class SecurityConfiguration {
             .sessionManagement(customize ->
                 customize.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(ALL_PUBLIC).permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, GET_PUBLIC).permitAll()
                 .requestMatchers(HttpMethod.POST, POST_PUBLIC).permitAll()
