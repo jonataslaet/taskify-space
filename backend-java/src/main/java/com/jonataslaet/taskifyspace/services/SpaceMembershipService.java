@@ -90,10 +90,6 @@ public class SpaceMembershipService {
         spaceMembershipRepository.saveAll(spaceMemberships);
     }
 
-    public Set<SpaceMembership> getSpaceMemberships(Space space, Set<Long> usersIds) {
-        return spaceMembershipRepository.findBySpaceIdUsersIds(space.getId(), usersIds);
-    }
-
     public boolean hasSpaceMembership(User user) {
         return spaceMembershipRepository.existsByUserId(user.getId());
     }

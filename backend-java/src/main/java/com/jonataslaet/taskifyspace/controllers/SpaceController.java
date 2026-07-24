@@ -2,7 +2,6 @@ package com.jonataslaet.taskifyspace.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
