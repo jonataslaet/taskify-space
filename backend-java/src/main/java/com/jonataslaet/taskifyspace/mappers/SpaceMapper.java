@@ -21,7 +21,7 @@ public class SpaceMapper {
     }
 
     public static SpaceRecordDTO toDTO(Space space) {
-        return new SpaceRecordDTO(space.getId(), space.getName(), getSpaceAdminName(space), space.getActive(), null, null, null);
+        return new SpaceRecordDTO(space.getId(), space.getName(), getSpaceOwnerName(space), space.getActive(), null, null, null);
     }
 
     public static SpaceRecordDTO toDTO(Space space, User authenticatedUser) {
@@ -29,7 +29,7 @@ public class SpaceMapper {
         return new SpaceRecordDTO(
             space.getId(),
             space.getName(),
-            getSpaceAdminName(space),
+            getSpaceOwnerName(space),
             space.getActive(),
             Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceUserRole() : null,
             Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceMembershipStatusEnum() : null,
@@ -44,14 +44,9 @@ public class SpaceMapper {
             .count();
     }
 
-    private static String getSpaceAdminName(Space space) {
-        for (SpaceMembership spaceMembership: space.getSpaceMemberships()) {
-            if (Objects.nonNull(spaceMembership) && Objects.nonNull(spaceMembership.getSpaceUserRole()) &&
-                spaceMembership.getSpaceUserRole().equals(SpaceUserRoleEnum.ROLE_SPACE_ADMIN)) {
-                return spaceMembership.getUser().getName();
-            }
-        }
-        return null;
+    private static String getSpaceOwnerName(Space space) {
+        User creator = space.getCreator();
+        return Objects.nonNull(creator) ? creator.getName() : null;
     }
 
     private static SpaceMembership getAuthenticatedUserMembership(Space space, User authenticatedUser) {
