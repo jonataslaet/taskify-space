@@ -45,27 +45,33 @@ public class SubscriptionService {
         if (Objects.isNull(request)) {
             throw new InvalidRequestException("Dados da assinatura sao obrigatorios");
         }
-        User user = userService.findUserById(userId);
+        User user = userService.findUserByIdForUpdate(userId);
         Plan plan = planService.getPlanEntity(planId);
         if (!Boolean.TRUE.equals(plan.getActive())) {
             throw new InvalidRequestException("Plano inativo nao pode ser concedido");
         }
 
         Instant now = Instant.now(clock);
-        Optional<Subscription> activeSubscription = findActiveSubscription(userId, planId, now);
-        if (activeSubscription.isPresent()) {
-            return SubscriptionMapper.toDTO(activeSubscription.get());
-        }
-
         Instant periodStart = Objects.isNull(request.currentPeriodStart()) ? now : request.currentPeriodStart();
         if (Objects.nonNull(request.currentPeriodEnd()) && !request.currentPeriodEnd().isAfter(periodStart)) {
             throw new InvalidRequestException("Fim do periodo da assinatura deve ser posterior ao inicio");
+        }
+        SubscriptionStatusEnum status = request.status() == null ? SubscriptionStatusEnum.ACTIVE : request.status();
+
+        if (Subscription.grantsAccessStatus(status)) {
+            List<Subscription> accessSubscriptions = findAccessSubscriptionsForUpdate(userId, now);
+            Optional<Subscription> currentPlanSubscription = findSubscriptionForPlan(accessSubscriptions, planId);
+            if (currentPlanSubscription.isPresent()) {
+                cancelOtherAccessSubscriptions(accessSubscriptions, currentPlanSubscription.get(), now);
+                return SubscriptionMapper.toDTO(currentPlanSubscription.get());
+            }
+            cancelAccessSubscriptions(accessSubscriptions, now);
         }
 
         Subscription subscription = new Subscription();
         subscription.setUser(user);
         subscription.setPlan(plan);
-        subscription.setStatus(request.status() == null ? SubscriptionStatusEnum.ACTIVE : request.status());
+        subscription.setStatus(status);
         subscription.setProvider(request.provider() == null ? SubscriptionProviderEnum.INTERNAL : request.provider());
         subscription.setCurrentPeriodStart(periodStart);
         subscription.setCurrentPeriodEnd(request.currentPeriodEnd());
@@ -100,9 +106,66 @@ public class SubscriptionService {
             .orElseThrow(() -> new ResourceNotFoundException("Assinatura nao encontrada"));
     }
 
-    private Optional<Subscription> findActiveSubscription(Long userId, Long planId, Instant now) {
-        return subscriptionRepository.findByUserIdAndPlanId(userId, planId).stream()
-            .filter(subscription -> subscription.grantsAccessAt(now))
+    private List<Subscription> findAccessSubscriptionsForUpdate(Long userId, Instant now) {
+        List<Subscription> accessSubscriptions =
+            subscriptionRepository.findByUserIdAndStatusInForUpdate(userId, Subscription.accessStatuses());
+        List<Subscription> expiredSubscriptions = accessSubscriptions.stream()
+            .filter(subscription -> hasEndedAtOrBefore(subscription, now))
+            .toList();
+        expireSubscriptions(expiredSubscriptions);
+        return accessSubscriptions.stream()
+            .filter(Subscription::hasAccessStatus)
+            .toList();
+    }
+
+    private Optional<Subscription> findSubscriptionForPlan(List<Subscription> subscriptions, Long planId) {
+        return subscriptions.stream()
+            .filter(subscription -> Objects.equals(subscription.getPlan().getId(), planId))
             .findFirst();
+    }
+
+    private void expireSubscriptions(List<Subscription> subscriptions) {
+        if (subscriptions.isEmpty()) {
+            return;
+        }
+
+        subscriptions.forEach(subscription -> subscription.setStatus(SubscriptionStatusEnum.EXPIRED));
+        subscriptionRepository.saveAll(subscriptions);
+        subscriptionRepository.flush();
+    }
+
+    private void cancelOtherAccessSubscriptions(
+        List<Subscription> subscriptions,
+        Subscription preservedSubscription,
+        Instant now
+    ) {
+        List<Subscription> subscriptionsToCancel = subscriptions.stream()
+            .filter(subscription -> !sameSubscription(subscription, preservedSubscription))
+            .toList();
+        cancelAccessSubscriptions(subscriptionsToCancel, now);
+    }
+
+    private void cancelAccessSubscriptions(List<Subscription> subscriptions, Instant now) {
+        if (subscriptions.isEmpty()) {
+            return;
+        }
+
+        subscriptions.forEach(subscription -> {
+            subscription.setStatus(SubscriptionStatusEnum.CANCELED);
+            subscription.setCurrentPeriodEnd(now);
+        });
+        subscriptionRepository.saveAll(subscriptions);
+        subscriptionRepository.flush();
+    }
+
+    private boolean hasEndedAtOrBefore(Subscription subscription, Instant now) {
+        return Objects.nonNull(subscription.getCurrentPeriodEnd())
+            && !subscription.getCurrentPeriodEnd().isAfter(now);
+    }
+
+    private boolean sameSubscription(Subscription subscription, Subscription otherSubscription) {
+        return subscription == otherSubscription
+            || Objects.nonNull(subscription.getId())
+            && Objects.equals(subscription.getId(), otherSubscription.getId());
     }
 }

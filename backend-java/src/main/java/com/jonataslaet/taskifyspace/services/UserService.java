@@ -175,6 +175,15 @@ public class UserService {
             });
     }
 
+    public User findUserByIdForUpdate(Long userId) {
+        logger.debug("Finding user with ID {} for update", userId);
+        return userRepository.findByIdForUpdate(userId)
+            .orElseThrow(() -> {
+                logger.warn("User with ID {} not found for update", userId);
+                return new ResourceNotFoundException("User not found");
+            });
+    }
+
     private void validateAdminOrSelf(User authenticatedUser, Long userId) {
         if (UserRoleEnum.ROLE_ADMIN.equals(authenticatedUser.getRole())
             || authenticatedUser.getId().equals(userId)) {

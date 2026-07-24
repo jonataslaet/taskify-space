@@ -62,6 +62,18 @@ public class Subscription {
         return ACCESS_STATUSES.contains(status) && Boolean.TRUE.equals(plan.getActive()) && started && notEnded;
     }
 
+    public boolean hasAccessStatus() {
+        return grantsAccessStatus(status);
+    }
+
+    public static boolean grantsAccessStatus(SubscriptionStatusEnum status) {
+        return ACCESS_STATUSES.contains(status);
+    }
+
+    public static Set<SubscriptionStatusEnum> accessStatuses() {
+        return ACCESS_STATUSES;
+    }
+
     public Long getId() {
         return id;
     }

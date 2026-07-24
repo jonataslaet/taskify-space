@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -119,6 +120,24 @@ class FeatureAccessServiceTests {
         boolean hasFeature = featureAccessService.hasFeature(user, FeatureEnum.CREATE_SPACE);
 
         assertThat(hasFeature).isTrue();
+    }
+
+    @Test
+    void multipleActiveSubscriptionsAreRejectedInsteadOfAccumulated() {
+        User user = createUser(8L, UserRoleEnum.ROLE_USER);
+        Subscription basicSubscription = activeSubscription(
+            user,
+            new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L));
+        Subscription proSubscription = activeSubscription(
+            user,
+            new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 10L));
+
+        when(subscriptionRepository.findByUserId(user.getId()))
+            .thenReturn(List.of(basicSubscription, proSubscription));
+
+        assertThatThrownBy(() -> featureAccessService.hasFeature(user, FeatureEnum.CREATE_SPACE))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("mais de uma assinatura ativa");
     }
 
     @Test

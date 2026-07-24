@@ -147,10 +147,9 @@ public class DatabaseService {
     }
 
     private void grantInternalSubscription(User user, Plan plan) {
-        Instant now = Instant.now(clock);
-        boolean alreadyGranted = subscriptionRepository.findByUserIdAndPlanId(user.getId(), plan.getId()).stream()
-            .anyMatch(subscription -> subscription.grantsAccessAt(now));
-        if (alreadyGranted) {
+        boolean alreadyHasAccessSubscription = subscriptionRepository.findByUserId(user.getId()).stream()
+            .anyMatch(Subscription::hasAccessStatus);
+        if (alreadyHasAccessSubscription) {
             return;
         }
 

@@ -18,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class FeatureAccessService {
@@ -108,34 +110,41 @@ public class FeatureAccessService {
 
     private UsageGrant resolveUsageGrant(User user, FeatureEnum feature) {
         Instant now = Instant.now(clock);
-        long usageLimit = 0;
-        boolean granted = false;
-        boolean unlimited = false;
-        Instant periodStart = Instant.parse("9999-12-31T23:59:59Z");
-        Instant periodEnd = Instant.EPOCH;
+        return resolveActiveSubscription(user, now)
+            .map(subscription -> resolveUsageGrant(subscription, feature))
+            .orElseGet(this::emptyUsageGrant);
+    }
 
-        for (Subscription subscription : subscriptionRepository.findByUserId(user.getId())) {
-            if (!subscription.grantsAccessAt(now)) {
-                continue;
-            }
+    private Optional<Subscription> resolveActiveSubscription(User user, Instant now) {
+        List<Subscription> activeSubscriptions = subscriptionRepository.findByUserId(user.getId()).stream()
+            .filter(subscription -> subscription.grantsAccessAt(now))
+            .toList();
 
-            for (PlanFeatureLimit limit : subscription.getPlan().getFeatureLimits()) {
-                if (!limit.getFeature().equals(feature)) {
-                    continue;
-                }
-                granted = true;
-                periodStart = min(periodStart, nullableStart(subscription.getCurrentPeriodStart()));
-                periodEnd = max(periodEnd, nullableEnd(subscription.getCurrentPeriodEnd()));
-                if (Objects.isNull(limit.getUsageLimit())) {
-                    unlimited = true;
-                } else {
-                    usageLimit += limit.getUsageLimit();
-                }
+        if (activeSubscriptions.size() > 1) {
+            throw new IllegalStateException("Usuario possui mais de uma assinatura ativa");
+        }
+
+        return activeSubscriptions.stream().findFirst();
+    }
+
+    private UsageGrant resolveUsageGrant(Subscription subscription, FeatureEnum feature) {
+        for (PlanFeatureLimit limit : subscription.getPlan().getFeatureLimits()) {
+            if (limit.getFeature().equals(feature)) {
+                return new UsageGrant(
+                    true,
+                    Objects.isNull(limit.getUsageLimit()),
+                    Objects.isNull(limit.getUsageLimit()) ? 0L : limit.getUsageLimit(),
+                    nullableStart(subscription.getCurrentPeriodStart()),
+                    nullableEnd(subscription.getCurrentPeriodEnd())
+                );
             }
         }
 
-        return new UsageGrant(granted, unlimited, usageLimit, nullableGrantStart(granted, periodStart),
-            nullableGrantEnd(granted, periodEnd));
+        return emptyUsageGrant();
+    }
+
+    private UsageGrant emptyUsageGrant() {
+        return new UsageGrant(false, false, 0L, Instant.EPOCH, Instant.EPOCH);
     }
 
     private User resolveFeatureOwner(User user, FeatureEnum feature, Space space) {
@@ -197,22 +206,6 @@ public class FeatureAccessService {
 
     private Instant nullableEnd(Instant value) {
         return Objects.isNull(value) ? Instant.parse("9999-12-31T23:59:59Z") : value;
-    }
-
-    private Instant nullableGrantStart(boolean granted, Instant value) {
-        return granted ? value : Instant.EPOCH;
-    }
-
-    private Instant nullableGrantEnd(boolean granted, Instant value) {
-        return granted ? value : Instant.EPOCH;
-    }
-
-    private Instant max(Instant current, Instant candidate) {
-        return candidate.isAfter(current) ? candidate : current;
-    }
-
-    private Instant min(Instant current, Instant candidate) {
-        return candidate.isBefore(current) ? candidate : current;
     }
 
     private record UsageGrant(
