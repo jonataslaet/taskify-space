@@ -8,10 +8,8 @@ import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
-import com.jonataslaet.taskifyspace.utils.TokenUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +18,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 public class AuthenticationService {
@@ -28,29 +25,25 @@ public class AuthenticationService {
     private static final String INVALID_LOGIN_MESSAGE =
         "Email ou senha invalidos ou usuario pendente de avaliacao";
 
-    @Value("${security.email.password-recover.token.minutes}")
-    private Long tokenMinutes;
-
-    @Value("${security.email.password-recover.uri}")
-    private String passwordRecoveryUri;
-
     private final RefreshTokenService refreshTokenService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenConfiguration tokenConfiguration;
     private final PasswordRecoveryService passwordRecoveryService;
-    private final EmailService emailService;
+    private final PasswordRecoveryRequestService passwordRecoveryRequestService;
     private final Validator validator;
 
     public AuthenticationService(RefreshTokenService refreshTokenService, UserRepository userRepository,
         PasswordEncoder passwordEncoder, TokenConfiguration tokenConfiguration,
-        PasswordRecoveryService passwordRecoveryService, EmailService emailService, Validator validator) {
+        PasswordRecoveryService passwordRecoveryService,
+        PasswordRecoveryRequestService passwordRecoveryRequestService,
+        Validator validator) {
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenConfiguration = tokenConfiguration;
         this.passwordRecoveryService = passwordRecoveryService;
-        this.emailService = emailService;
+        this.passwordRecoveryRequestService = passwordRecoveryRequestService;
         this.validator = validator;
     }
 
@@ -125,35 +118,12 @@ public class AuthenticationService {
         passwordRecoveryService.savePasswordRecovery(passwordRecovery);
     }
 
-    @Transactional
     public void recoveryToken(EmailDTO emailDTO) {
         if (Objects.isNull(emailDTO) || isBlank(emailDTO.address())) {
             throw new InvalidRequestException("Email is required");
         }
 
-        User user = userRepository.findByEmailForUpdate(emailDTO.address()).orElse(null);
-        if (Objects.isNull(user)) {
-            return;
-        }
-
-        Instant now = Instant.now();
-        passwordRecoveryService.expireValidPasswordRecoveriesByEmail(user.getEmail(), now);
-        String uuidToken = UUID.randomUUID().toString();
-        PasswordRecovery passwordRecovery = new PasswordRecovery(
-            TokenUtils.sha256(uuidToken),
-            user.getEmail(),
-            now.plusSeconds(60 * tokenMinutes)
-        );
-        passwordRecoveryService.savePasswordRecovery(passwordRecovery);
-        String emailBody = "Clique no seguinte link para resetar sua senha: \n" + passwordRecoveryUri + uuidToken
-            + "\n\n Esse link expirará daqui a 30 minutos. " +
-            "Portanto, se esse email não foi solicitado por você, apenas o ignore.";
-        emailService.sendEmail(new SendingEmailDTO(
-            user.getEmail(),
-            null,
-            "Resetamento de senha",
-            emailBody
-        ));
+        passwordRecoveryRequestService.requestRecoveryToken(emailDTO.address().trim());
     }
 
     private boolean isMatchedPassword(CredentialsRecordDTO credentialsRecordDTO, String encodedPassword) {

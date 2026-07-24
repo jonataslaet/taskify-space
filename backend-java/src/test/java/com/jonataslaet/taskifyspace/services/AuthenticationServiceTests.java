@@ -10,6 +10,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -19,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -51,7 +51,7 @@ class AuthenticationServiceTests {
     private PasswordRecoveryService passwordRecoveryService;
 
     @Mock
-    private EmailService emailService;
+    private PasswordRecoveryRequestService passwordRecoveryRequestService;
 
     private Validator validator;
 
@@ -66,10 +66,8 @@ class AuthenticationServiceTests {
             passwordEncoder,
             tokenConfiguration,
             passwordRecoveryService,
-            emailService,
+            passwordRecoveryRequestService,
             validator);
-        ReflectionTestUtils.setField(authenticationService, "tokenMinutes", 30L);
-        ReflectionTestUtils.setField(authenticationService, "passwordRecoveryUri", "http://localhost/new-password/");
     }
 
     @Test
@@ -169,27 +167,23 @@ class AuthenticationServiceTests {
     }
 
     @Test
-    void recoveryTokenDoesNotRevealMissingEmail() {
-        String email = "missing@example.com";
-        when(userRepository.findByEmailForUpdate(email)).thenReturn(Optional.empty());
+    void recoveryTokenRejectsBlankEmailBeforeQueueingRequest() {
+        assertThatThrownBy(() -> authenticationService.recoveryToken(new EmailDTO(" ")))
+            .isInstanceOf(InvalidRequestException.class);
 
-        authenticationService.recoveryToken(new EmailDTO(email));
-
-        verify(passwordRecoveryService, never()).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
-        verify(passwordRecoveryService, never()).savePasswordRecovery(any(PasswordRecovery.class));
-        verify(emailService, never()).sendEmail(any());
+        verify(passwordRecoveryRequestService, never()).requestRecoveryToken(anyString());
     }
 
     @Test
-    void recoveryTokenCreatesRecoveryAndSendsEmailForExistingUser() {
-        User user = createUser(UserStatusEnum.ACTIVE);
-        when(userRepository.findByEmailForUpdate(user.getEmail())).thenReturn(Optional.of(user));
+    void recoveryTokenQueuesRequestWithoutLoadingUserSynchronously() {
+        String email = "user@example.com";
 
-        authenticationService.recoveryToken(new EmailDTO(user.getEmail()));
+        authenticationService.recoveryToken(new EmailDTO(" " + email + " "));
 
-        verify(passwordRecoveryService).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
-        verify(passwordRecoveryService).savePasswordRecovery(any(PasswordRecovery.class));
-        verify(emailService).sendEmail(any());
+        verify(passwordRecoveryRequestService).requestRecoveryToken(email);
+        verify(userRepository, never()).findByEmailForUpdate(anyString());
+        verify(passwordRecoveryService, never()).expireValidPasswordRecoveriesByEmail(anyString(), any(Instant.class));
+        verify(passwordRecoveryService, never()).savePasswordRecovery(any(PasswordRecovery.class));
     }
 
     private User createUser(UserStatusEnum status) {
