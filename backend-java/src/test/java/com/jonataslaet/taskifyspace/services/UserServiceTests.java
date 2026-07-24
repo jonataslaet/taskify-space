@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
@@ -164,6 +165,51 @@ class UserServiceTests {
         assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.ACTIVE);
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+    }
+
+    @Test
+    void updatePasswordRevokesRefreshTokensAfterPasswordChange() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        UserRecordDTO updateRequest = new UserRecordDTO(
+            null,
+            null,
+            null,
+            null,
+            null,
+            "NewPass1!",
+            "OldPass1!");
+
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(updateRequest.oldPassword(), user.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode(updateRequest.password())).thenReturn("encoded-new-password");
+
+        userService.updatePassword(user.getId(), updateRequest);
+
+        assertThat(user.getPassword()).isEqualTo("encoded-new-password");
+        verify(userRepository).save(user);
+        verify(refreshTokenService).revokeAllByUserId(user.getId());
+    }
+
+    @Test
+    void updatePasswordDoesNotRevokeRefreshTokensWhenOldPasswordDoesNotMatch() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        UserRecordDTO updateRequest = new UserRecordDTO(
+            null,
+            null,
+            null,
+            null,
+            null,
+            "NewPass1!",
+            "WrongOld1!");
+
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(updateRequest.oldPassword(), user.getPassword())).thenReturn(false);
+
+        assertThatThrownBy(() -> userService.updatePassword(user.getId(), updateRequest))
+            .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(userRepository, never()).save(any(User.class));
+        verify(refreshTokenService, never()).revokeAllByUserId(user.getId());
     }
 
     @Test

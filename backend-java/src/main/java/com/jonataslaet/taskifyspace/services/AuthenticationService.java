@@ -177,6 +177,7 @@ public class AuthenticationService {
         validPasswordRecovery.setExpiration(Instant.now());
         user.setPassword(passwordEncoder.encode(passwordRenovationDTO.newPassword()));
         saveUserAndPasswordRecovery(validPasswordRecovery, user);
+        refreshTokenService.revokeAllByUserId(user.getId());
     }
 
     private void validPasswordRenovation(PasswordResetDTO passwordRenovationDTO) {

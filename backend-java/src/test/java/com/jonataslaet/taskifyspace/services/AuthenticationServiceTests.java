@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -144,6 +145,27 @@ class AuthenticationServiceTests {
             .isInstanceOf(InvalidAuthenticationException.class);
 
         verify(passwordRecoveryService, never()).getValidPasswordRecoveries(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void resetPasswordRevokesRefreshTokensAfterPasswordChange() {
+        User user = createUser(UserStatusEnum.ACTIVE);
+        PasswordRecovery passwordRecovery = new PasswordRecovery(
+            "token-hash",
+            user.getEmail(),
+            Instant.now().plusSeconds(300));
+        PasswordResetDTO passwordResetDTO = new PasswordResetDTO("Strong1!", "Strong1!");
+
+        when(passwordRecoveryService.getValidPasswordRecoveries(anyString(), any(Instant.class)))
+            .thenReturn(List.of(passwordRecovery));
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(passwordResetDTO.newPassword())).thenReturn("encoded-new-password");
+
+        authenticationService.resetPassword("raw-token", passwordResetDTO);
+
+        verify(userRepository).save(user);
+        verify(passwordRecoveryService).savePasswordRecovery(passwordRecovery);
+        verify(refreshTokenService).revokeAllByUserId(user.getId());
     }
 
     @Test

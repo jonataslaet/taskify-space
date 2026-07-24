@@ -142,6 +142,7 @@ public class UserService {
         logger.debug("Old password validated for user ID {}", userId);
         user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
         userRepository.save(user);
+        refreshTokenService.revokeAllByUserId(userId);
 
         logger.info("Password updated successfully for user ID {}", userId);
     }
