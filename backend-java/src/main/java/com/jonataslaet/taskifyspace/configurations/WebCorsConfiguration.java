@@ -19,6 +19,8 @@ import java.util.List;
 @Configuration
 public class WebCorsConfiguration {
 
+    private static final String DEVICE_ID_HEADER = "X-Device-Id";
+
     @Value("${cors.origins:}")
     private String corsOrigins;
 
@@ -36,7 +38,7 @@ public class WebCorsConfiguration {
         corsConfig.setAllowCredentials(true);
         corsConfig.setAllowedHeaders(Arrays.asList(
             HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, HttpHeaders.ACCEPT,
-            HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+            DEVICE_ID_HEADER
         ));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
