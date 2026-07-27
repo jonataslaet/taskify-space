@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 
 @RestController
@@ -56,8 +58,10 @@ public class TaskController {
     @PostMapping("/{taskId}/spaces/{spaceId}")
     public ResponseEntity<@NonNull Void> finishTask(@PathVariable Long taskId,
         @PathVariable Long spaceId, @AuthenticationPrincipal User authenticatedUser,
-        @RequestParam(value = "usersIds", required = false) Set<Long> usersIds){
-        taskService.finishTask(taskId, spaceId, authenticatedUser, usersIds);
+        @RequestParam(value = "usersIds", required = false) Set<Long> usersIds,
+        @RequestParam(value = "executionDate", required = false)
+        @DateTimeFormat(pattern = "yyyy-MM-dd-HH-mm") LocalDateTime executionDate){
+        taskService.finishTask(taskId, spaceId, authenticatedUser, usersIds, executionDate);
         return ResponseEntity.noContent().build();
     }
 

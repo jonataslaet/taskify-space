@@ -21,6 +21,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 
@@ -101,6 +103,28 @@ class TaskServiceTests {
         assertThat(savedTaskExecution.getTask()).isSameAs(task);
         assertThat(savedTaskExecution.getSpace()).isSameAs(space);
         assertThat(savedTaskExecution.getExecutors()).containsExactly(authenticatedUser);
+    }
+
+    @Test
+    void finishTaskWithExecutionDateSetsTaskExecutionCreatedAt() {
+        User authenticatedUser = createUser(1L);
+        Space space = createSpace(10L);
+        Task task = createTask(20L, space);
+        LocalDateTime executionDate = LocalDateTime.of(2026, 7, 25, 14, 30);
+        addApprovedParticipant(space, authenticatedUser);
+
+        when(spaceService.getSpaceEntity(space.getId())).thenReturn(space);
+        when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
+        when(spaceMembershipService.getApprovedMembersBySpaceAndUsersIds(
+            eq(space), eq(Set.of(authenticatedUser.getId())))).thenReturn(Set.of(authenticatedUser));
+
+        taskService.finishTask(task.getId(), space.getId(), authenticatedUser, null, executionDate);
+
+        ArgumentCaptor<TaskExecution> taskExecutionCaptor = ArgumentCaptor.forClass(TaskExecution.class);
+        verify(taskExecutionRepository).save(taskExecutionCaptor.capture());
+
+        assertThat(taskExecutionCaptor.getValue().getCreatedAt())
+            .isEqualTo(executionDate.toInstant(ZoneOffset.UTC));
     }
 
     @Test

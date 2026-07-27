@@ -16,6 +16,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -64,6 +67,16 @@ public class TaskService {
 
     @Transactional
     public void finishTask(Long taskId, Long spaceId, User authenticatedUser, Set<Long> executorsIds) {
+        finishTask(taskId, spaceId, authenticatedUser, executorsIds, null);
+    }
+
+    @Transactional
+    public void finishTask(
+        Long taskId,
+        Long spaceId,
+        User authenticatedUser,
+        Set<Long> executorsIds,
+        LocalDateTime executionDate) {
 
         Space space = spaceService.getSpaceEntity(spaceId);
         spaceService.validActiveSpace(space);
@@ -78,7 +91,8 @@ public class TaskService {
         validActiveTask(task);
 
         TaskExecution taskExecution = getTaskExecution(task, space,
-            getApprovedExecutors(executorIds, approvedSpaceMemberships));
+            getApprovedExecutors(executorIds, approvedSpaceMemberships),
+            executionDate);
         taskExecutionRepository.save(taskExecution);
     }
 
@@ -106,9 +120,12 @@ public class TaskService {
         }
     }
 
-    private TaskExecution getTaskExecution(Task task, Space space, Set<Long> usersIds) {
+    private TaskExecution getTaskExecution(Task task, Space space, Set<Long> usersIds, LocalDateTime executionDate) {
         Set<User> users = spaceMembershipService.getApprovedMembersBySpaceAndUsersIds(space, usersIds);
-        return new TaskExecution(task, space, users);
+        TaskExecution taskExecution = new TaskExecution(task, space, users);
+        if (Objects.nonNull(executionDate)) taskExecution.setCreatedAt(executionDate.toInstant(ZoneOffset.UTC));
+        else taskExecution.setCreatedAt(LocalDateTime.now().toInstant(ZoneOffset.UTC));
+        return taskExecution;
     }
 
     private void validActiveTask(Task task) {
