@@ -3,6 +3,7 @@ package com.jonataslaet.taskifyspace.controllers.dtos;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,6 +40,10 @@ public record TaskRecordDTO(
     @NotNull(groups = TaskView.CreateTask.class, message = "Categoria da tarefa e obrigatoria")
     @JsonView({TaskView.CreateTask.class, TaskView.ReadTask.class, TaskView.UpdateTask.class})
     TaskCategoryEnum category,
+
+    @Valid
+    @JsonView({TaskView.CreateTask.class, TaskView.ReadTask.class, TaskView.UpdateTask.class})
+    TaskScheduleRecordDTO schedule,
 
     @JsonView({TaskView.ReadTask.class})
     Boolean active,

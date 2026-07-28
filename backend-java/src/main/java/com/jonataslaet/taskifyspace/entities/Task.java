@@ -1,17 +1,7 @@
 package com.jonataslaet.taskifyspace.entities;
 
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,6 +33,13 @@ public class Task {
     @ManyToOne
     @JoinColumn(name = "space_id", nullable = false)
     private Space space;
+
+    @OneToOne(
+        mappedBy = "task",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
+    )
+    private TaskSchedule schedule;
 
     public Task() {}
 
@@ -108,6 +105,21 @@ public class Task {
 
     public void setCreator(User creator) {
         this.creator = creator;
+    }
+
+    public TaskSchedule getSchedule() {
+        return schedule;
+    }
+
+    public void setSchedule(TaskSchedule schedule) {
+        if (this.schedule == schedule) return;
+        if (this.schedule != null) {
+            this.schedule.setTask(null);
+        }
+        this.schedule = schedule;
+        if (schedule != null) {
+            schedule.setTask(this);
+        }
     }
 
     @PrePersist

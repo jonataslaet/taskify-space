@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.TaskScheduleRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -189,6 +191,7 @@ class TaskServiceTests {
             new BigDecimal("20.0"),
             null,
             null,
+            null,
             null);
 
         when(taskRepository.findById(task.getId())).thenReturn(Optional.of(task));
@@ -200,6 +203,35 @@ class TaskServiceTests {
         assertThat(updatedTask.score()).isEqualByComparingTo("20.0");
         assertThat(updatedTask.category()).isEqualTo(TaskCategoryEnum.OPERATIONAL);
         assertThat(updatedTask.active()).isTrue();
+    }
+
+    @Test
+    void createTaskPersistsScheduleFromPayload() {
+        User authenticatedUser = createUser(1L);
+        Space space = createSpace(10L);
+        TaskRecordDTO taskRecordDTO = new TaskRecordDTO(
+            null,
+            space.getId(),
+            "Scheduled task",
+            BigDecimal.TEN,
+            TaskCategoryEnum.OPERATIONAL,
+            new TaskScheduleRecordDTO(Set.of(DayOfWeek.MONDAY), null),
+            null,
+            null);
+
+        when(spaceService.getSpaceEntity(space.getId())).thenReturn(space);
+        when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskRecordDTO createdTask = taskService.createTask(authenticatedUser, taskRecordDTO);
+
+        ArgumentCaptor<Task> taskCaptor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(taskCaptor.capture());
+        Task savedTask = taskCaptor.getValue();
+
+        assertThat(savedTask.getSchedule()).isNotNull();
+        assertThat(savedTask.getSchedule().getTask()).isSameAs(savedTask);
+        assertThat(savedTask.getSchedule().getDaysOfWeek()).containsExactly(DayOfWeek.MONDAY);
+        assertThat(createdTask.schedule().daysOfWeek()).containsExactly(DayOfWeek.MONDAY);
     }
 
     @Test

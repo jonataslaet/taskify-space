@@ -40,6 +40,7 @@ class TaskAndSpaceRecordDTOValidationTests {
             BigDecimal.ZERO,
             null,
             null,
+            null,
             null);
 
         Set<String> fields = violatedFields(
@@ -50,13 +51,14 @@ class TaskAndSpaceRecordDTOValidationTests {
 
     @Test
     void taskUpdateAllowsPartialPayloadButRejectsInvalidProvidedFields() {
-        TaskRecordDTO partialTask = new TaskRecordDTO(null, null, null, null, null, null, null);
+        TaskRecordDTO partialTask = new TaskRecordDTO(null, null, null, null, null, null, null, null);
         TaskRecordDTO invalidTask = new TaskRecordDTO(
             -1L,
             -1L,
             "",
             new BigDecimal("1.001"),
             TaskCategoryEnum.OPERATIONAL,
+            null,
             null,
             null);
 
@@ -65,6 +67,36 @@ class TaskAndSpaceRecordDTOValidationTests {
         Set<String> fields = violatedFields(
             validator.validate(invalidTask, TaskRecordDTO.TaskView.UpdateTask.class));
         assertThat(fields).contains("id", "spaceId", "description", "score");
+    }
+
+    @Test
+    void taskScheduleRejectsEmptyScheduleAndInvalidDayOfMonth() {
+        TaskRecordDTO emptyScheduleTask = new TaskRecordDTO(
+            null,
+            1L,
+            "Task",
+            BigDecimal.ONE,
+            TaskCategoryEnum.OPERATIONAL,
+            new TaskScheduleRecordDTO(Set.of(), null),
+            null,
+            null);
+        TaskRecordDTO invalidDayOfMonthTask = new TaskRecordDTO(
+            null,
+            1L,
+            "Task",
+            BigDecimal.ONE,
+            TaskCategoryEnum.OPERATIONAL,
+            new TaskScheduleRecordDTO(null, 32),
+            null,
+            null);
+
+        Set<String> emptyScheduleFields = violatedFields(
+            validator.validate(emptyScheduleTask, TaskRecordDTO.TaskView.CreateTask.class));
+        Set<String> invalidDayOfMonthFields = violatedFields(
+            validator.validate(invalidDayOfMonthTask, TaskRecordDTO.TaskView.CreateTask.class));
+
+        assertThat(emptyScheduleFields).contains("schedule.validSchedule");
+        assertThat(invalidDayOfMonthFields).contains("schedule.dayOfMonth");
     }
 
     @Test

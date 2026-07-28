@@ -9,6 +9,7 @@ import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
+import com.jonataslaet.taskifyspace.validations.TaskSchedulerValidator;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,15 +39,18 @@ public class TaskService {
     private final SpaceMembershipService spaceMembershipService;
     private final TaskExecutionRepository taskExecutionRepository;
     private final FeatureAccessService featureAccessService;
+    private final TaskSchedulerValidator taskSchedulerValidator;
 
     public TaskService(TaskRepository taskRepository,
                        SpaceService spaceService, SpaceMembershipService spaceMembershipService,
-                       TaskExecutionRepository taskExecutionRepository, FeatureAccessService featureAccessService) {
+                       TaskExecutionRepository taskExecutionRepository, FeatureAccessService featureAccessService,
+                       TaskSchedulerValidator taskSchedulerValidator) {
         this.taskRepository = taskRepository;
         this.spaceService = spaceService;
         this.spaceMembershipService = spaceMembershipService;
         this.taskExecutionRepository = taskExecutionRepository;
         this.featureAccessService = featureAccessService;
+        this.taskSchedulerValidator = taskSchedulerValidator;
     }
 
     @Transactional
@@ -61,6 +65,7 @@ public class TaskService {
             throw new DuplicationException("Essa tarefa já existe");
         }
         Task task = TaskMapper.toEntity(taskRecordDTO, space, authenticatedUser);
+        taskSchedulerValidator.validate(task.getSchedule());
         task.setActive(false);
         return TaskMapper.toDTO(taskRepository.save(task));
     }
@@ -160,7 +165,9 @@ public class TaskService {
 
         if (Objects.nonNull(taskRecordDTO.score())) taskEntity.setScore(taskRecordDTO.score());
         if (Objects.nonNull(taskRecordDTO.category())) taskEntity.setCategory(taskRecordDTO.category());
-
+        if (Objects.nonNull(taskRecordDTO.schedule())) TaskMapper.applySchedule(taskEntity, taskRecordDTO.schedule());
+        else taskEntity.setSchedule(null);
+        taskSchedulerValidator.validate(taskEntity.getSchedule());
         return TaskMapper.toDTO(taskRepository.save(taskEntity));
     }
 

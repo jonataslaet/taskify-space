@@ -5,6 +5,7 @@ import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.TaskExecution;
+import com.jonataslaet.taskifyspace.entities.TaskSchedule;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Set;
 
@@ -105,6 +107,24 @@ class TaskServiceJpaTests {
 
         assertThat(taskExecutionRepository.findAll()).isEmpty();
         assertThat(taskRepository.findById(task.getId())).isEmpty();
+    }
+
+    @Test
+    void saveTaskCascadesSchedule() {
+        Space space = spaceRepository.save(createSpace("Scheduled Space"));
+        Task task = createTask(space, "Scheduled task");
+        TaskSchedule schedule = new TaskSchedule();
+        schedule.setDaysOfWeek(Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY));
+        schedule.setDayOfMonth(15);
+        task.setSchedule(schedule);
+
+        Task savedTask = taskRepository.saveAndFlush(task);
+
+        assertThat(savedTask.getSchedule().getId()).isNotNull();
+        assertThat(savedTask.getSchedule().getTask()).isSameAs(savedTask);
+        assertThat(savedTask.getSchedule().getDaysOfWeek())
+            .containsExactlyInAnyOrder(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
+        assertThat(savedTask.getSchedule().getDayOfMonth()).isEqualTo(15);
     }
 
     private User createUser(String email) {
