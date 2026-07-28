@@ -1,10 +1,23 @@
 package com.jonataslaet.taskifyspace.entities;
 
-import jakarta.persistence.*;
+import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
 
 @Entity
@@ -31,17 +44,26 @@ public class TaskSchedule {
     )
     private Task task;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(
-        name = "task_schedule_week_days",
-        joinColumns = @JoinColumn(name = "task_schedule_id")
+        name = "task_schedule_local_dates",
+        joinColumns = @JoinColumn(name = "task_schedule_id"),
+        uniqueConstraints = {
+            @UniqueConstraint(
+                name = "uk_task_schedule_local_date",
+                columnNames = {
+                    "task_schedule_id",
+                    "local_date"
+                }
+            )
+        }
     )
-    @Enumerated(EnumType.STRING)
-    @Column(name = "week_day", nullable = false)
-    private Set<DayOfWeek> daysOfWeek = new HashSet<>();
+    @Column(name = "local_date", nullable = false)
+    private Set<LocalDate> localDates = new HashSet<>();
 
-    @Column(name = "day_of_month")
-    private Integer dayOfMonth;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "frequence", nullable = false)
+    private FrequenceEnum frequenceEnum;
 
     public TaskSchedule() {
     }
@@ -54,12 +76,12 @@ public class TaskSchedule {
         return task;
     }
 
-    public Set<DayOfWeek> getDaysOfWeek() {
-        return daysOfWeek;
+    public Set<LocalDate> getLocalDates() {
+        return localDates;
     }
 
-    public Integer getDayOfMonth() {
-        return dayOfMonth;
+    public FrequenceEnum getFrequenceEnum() {
+        return frequenceEnum;
     }
 
     public void setId(Long id) {
@@ -70,11 +92,13 @@ public class TaskSchedule {
         this.task = task;
     }
 
-    public void setDaysOfWeek(Set<DayOfWeek> daysOfWeek) {
-        this.daysOfWeek = Objects.nonNull(daysOfWeek) ? new HashSet<>(daysOfWeek) : new HashSet<>();
+    public void setLocalDates(Set<LocalDate> localDates) {
+        this.localDates = localDates == null
+            ? new HashSet<>()
+            : new HashSet<>(localDates);
     }
 
-    public void setDayOfMonth(Integer dayOfMonth) {
-        this.dayOfMonth = dayOfMonth;
+    public void setFrequenceEnum(FrequenceEnum frequenceEnum) {
+        this.frequenceEnum = frequenceEnum;
     }
 }

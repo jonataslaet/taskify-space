@@ -3,6 +3,7 @@ package com.jonataslaet.taskifyspace.services;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
+import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -10,13 +11,16 @@ import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.validations.TaskSchedulerValidator;
+import jakarta.persistence.criteria.JoinType;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -165,8 +169,7 @@ public class TaskService {
 
         if (Objects.nonNull(taskRecordDTO.score())) taskEntity.setScore(taskRecordDTO.score());
         if (Objects.nonNull(taskRecordDTO.category())) taskEntity.setCategory(taskRecordDTO.category());
-        if (Objects.nonNull(taskRecordDTO.schedule())) TaskMapper.applySchedule(taskEntity, taskRecordDTO.schedule());
-        else taskEntity.setSchedule(null);
+        TaskMapper.applySchedule(taskEntity, taskRecordDTO.schedule());
         taskSchedulerValidator.validate(taskEntity.getSchedule());
         return TaskMapper.toDTO(taskRepository.save(taskEntity));
     }
@@ -201,6 +204,105 @@ public class TaskService {
         if (Objects.nonNull(TaskSpecification)) {
             finalSpecification = authenticatedUserTasks.and(TaskSpecification);
         }
+
+        return taskRepository.findAll(finalSpecification, pageable).map(TaskMapper::toDTO);
+    }
+
+    public Page<@NonNull TaskRecordDTO> findAllScheduledTasks(Long spaceId,
+        Specification<@NonNull Task> taskSpecification, Pageable pageable, User authenticatedUser) {
+
+        LocalDate currentDate = LocalDate.now();
+
+        Specification<@NonNull Task> scheduledTasksSpecification =
+            (root, query, criteriaBuilder) -> {
+                query.distinct(true);
+                var scheduleJoin = root.join("schedule", JoinType.INNER);
+
+                var localDatesJoin = scheduleJoin.join("localDates", JoinType.INNER);
+                var oncePredicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(
+                        scheduleJoin.get("frequenceEnum"),
+                        FrequenceEnum.ONCE
+                    ),
+                    criteriaBuilder.equal(
+                        localDatesJoin,
+                        currentDate
+                    )
+                );
+                var dailyPredicate = criteriaBuilder.equal(
+                    scheduleJoin.get("frequenceEnum"),
+                    FrequenceEnum.DAILY
+                );
+                var localDateDayOfMonth = criteriaBuilder.function(
+                    "date_part",
+                    Double.class,
+                    criteriaBuilder.literal("day"),
+                    localDatesJoin
+                );
+                var monthlyPredicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(
+                        scheduleJoin.get("frequenceEnum"),
+                        FrequenceEnum.MONTHLY
+                    ),
+                    criteriaBuilder.equal(
+                        localDateDayOfMonth,
+                        (double) currentDate.getDayOfMonth()
+                    )
+                );
+                var localDateDayOfWeek = criteriaBuilder.function(
+                    "date_part",
+                    Double.class,
+                    criteriaBuilder.literal("isodow"),
+                    localDatesJoin
+                );
+                var weeklyPredicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(
+                        scheduleJoin.get("frequenceEnum"),
+                        FrequenceEnum.WEEKLY
+                    ),
+                    criteriaBuilder.equal(
+                        localDateDayOfWeek,
+                        (double) currentDate.getDayOfWeek().getValue()
+                    )
+                );
+
+                var localDateMonth = criteriaBuilder.function(
+                    "date_part",
+                    Double.class,
+                    criteriaBuilder.literal("month"),
+                    localDatesJoin
+                );
+
+                var yearlyPredicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(
+                        scheduleJoin.get("frequenceEnum"),
+                        FrequenceEnum.YEARLY
+                    ),
+                    criteriaBuilder.equal(
+                        localDateMonth,
+                        (double) currentDate.getMonthValue()
+                    ),
+                    criteriaBuilder.equal(
+                        localDateDayOfMonth,
+                        (double) currentDate.getDayOfMonth()
+                    )
+                );
+
+                var scheduledForCurrentDatePredicate = criteriaBuilder.or(
+                    oncePredicate, dailyPredicate, weeklyPredicate, monthlyPredicate, yearlyPredicate);
+                var activePredicate = criteriaBuilder.isTrue(root.get("active"));
+                var spacePredicate = criteriaBuilder.equal(root.get("space").get("id"), spaceId);
+                var spaceMembershipJoin = root.join("space").join("spaceMemberships");
+                var spaceMembershipJoinPredicate = criteriaBuilder.equal(
+                    spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED);
+                var authenticatedUserMembershipPredicate =
+                    criteriaBuilder.equal(spaceMembershipJoin.get("user").get("id"), authenticatedUser.getId());
+                return criteriaBuilder.and(activePredicate, spacePredicate, scheduledForCurrentDatePredicate,
+                    authenticatedUserMembershipPredicate, spaceMembershipJoinPredicate);
+            };
+
+        Specification<@NonNull Task> finalSpecification =  Objects.nonNull(taskSpecification) ?
+            scheduledTasksSpecification.and(taskSpecification) : scheduledTasksSpecification;
 
         return taskRepository.findAll(finalSpecification, pageable).map(TaskMapper::toDTO);
     }

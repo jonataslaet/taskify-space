@@ -8,6 +8,7 @@ import com.jonataslaet.taskifyspace.entities.TaskSchedule;
 import com.jonataslaet.taskifyspace.entities.User;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Set;
 
@@ -25,15 +26,18 @@ public class TaskMapper {
     }
 
     public static void applySchedule(Task task, TaskScheduleRecordDTO scheduleRecordDTO) {
-        if (Objects.isNull(scheduleRecordDTO)) return;
+        if (Objects.isNull(scheduleRecordDTO)) {
+            task.setSchedule(null);
+            return;
+        }
 
-        TaskSchedule schedule = Objects.nonNull(task.getSchedule()) ? task.getSchedule() : new TaskSchedule();
-        if (Objects.nonNull(scheduleRecordDTO.daysOfWeek())) {
-            schedule.setDaysOfWeek(scheduleRecordDTO.daysOfWeek());
-        }
-        if (Objects.nonNull(scheduleRecordDTO.dayOfMonth())) {
-            schedule.setDayOfMonth(scheduleRecordDTO.dayOfMonth());
-        }
+        TaskSchedule schedule = Objects.nonNull(task.getSchedule())
+            ? task.getSchedule()
+            : new TaskSchedule();
+
+        schedule.setLocalDates(scheduleRecordDTO.localDates());
+        schedule.setFrequenceEnum(scheduleRecordDTO.frequence());
+
         task.setSchedule(schedule);
     }
 
@@ -46,9 +50,10 @@ public class TaskMapper {
 
     private static TaskScheduleRecordDTO toScheduleDTO(TaskSchedule schedule) {
         if (Objects.isNull(schedule)) return null;
-        Set<DayOfWeek> daysOfWeek = Objects.isNull(schedule.getDaysOfWeek())
-            ? null
-            : Set.copyOf(schedule.getDaysOfWeek());
-        return new TaskScheduleRecordDTO(daysOfWeek, schedule.getDayOfMonth());
+
+        Set<LocalDate> localDates = Objects.isNull(schedule.getLocalDates()) ?
+            Set.of() : Set.copyOf(schedule.getLocalDates());
+
+        return new TaskScheduleRecordDTO(localDates, schedule.getFrequenceEnum());
     }
 }

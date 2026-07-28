@@ -3,26 +3,32 @@ package com.jonataslaet.taskifyspace.validations;
 import com.jonataslaet.taskifyspace.entities.TaskSchedule;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
+
 @Component
 public class TaskSchedulerValidator {
 
     public void validate(TaskSchedule schedule) {
-        if (schedule == null) return;
-
-        boolean hasDaysOfWeek = schedule.getDaysOfWeek() != null && !schedule.getDaysOfWeek().isEmpty();
-
-        boolean hasDayOfMonth = schedule.getDayOfMonth() != null;
-
-        if (hasDaysOfWeek && hasDayOfMonth) {
-            throw new IllegalArgumentException("Days of week and day of month cannot be configured simultaneously");
+        if (Objects.isNull(schedule)) {
+            return;
         }
 
-        if (hasDayOfMonth && (schedule.getDayOfMonth() < 1 || schedule.getDayOfMonth() > 31)) {
-            throw new IllegalArgumentException("Day of month must be between 1 and 31");
+        if (Objects.isNull(schedule.getFrequenceEnum())) {
+            throw new IllegalArgumentException(
+                "Task schedule frequency must be informed"
+            );
         }
 
-        if (!hasDaysOfWeek && !hasDayOfMonth) {
-            throw new IllegalArgumentException("At least one scheduling rule must be configured");
+        if (Objects.isNull(schedule.getLocalDates()) || schedule.getLocalDates().isEmpty()) {
+            throw new IllegalArgumentException(
+                "At least one scheduling date must be configured"
+            );
+        }
+
+        if (schedule.getLocalDates().stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException(
+                "Scheduling dates cannot contain null values"
+            );
         }
     }
 }

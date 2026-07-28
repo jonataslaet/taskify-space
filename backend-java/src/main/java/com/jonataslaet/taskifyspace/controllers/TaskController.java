@@ -37,6 +37,14 @@ public class TaskController {
         this.taskService = taskService;
     }
 
+    @GetMapping("/spaces/{spaceId}/schedules")
+    public ResponseEntity<@NonNull Page<@NonNull TaskRecordDTO>> readAllScheduledTasks(@PathVariable Long spaceId,
+        SpecificationTemplate.TaskSpecification taskSpecification, Pageable pageable,
+        @AuthenticationPrincipal User authenticatedUser) {
+        Page<@NonNull TaskRecordDTO> taskModelPage = taskService.findAllScheduledTasks(spaceId, taskSpecification, pageable, authenticatedUser);
+        return ResponseEntity.status(HttpStatus.OK).body(taskModelPage);
+    }
+
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull TaskRecordDTO>> readAllTasks(
         SpecificationTemplate.TaskSpecification taskSpecification,
