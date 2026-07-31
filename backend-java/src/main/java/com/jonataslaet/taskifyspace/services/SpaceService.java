@@ -46,9 +46,9 @@ public class SpaceService {
     private final TaskRepository taskRepository;
     private final TaskExecutionRepository taskExecutionRepository;
 
-    public SpaceService(
-        SpaceRepository spaceRepository, SpaceMembershipService spaceMembershipService,
-        FeatureAccessService featureAccessService, TaskRepository taskRepository, TaskExecutionRepository taskExecutionRepository) {
+    public SpaceService(SpaceRepository spaceRepository, SpaceMembershipService spaceMembershipService,
+        FeatureAccessService featureAccessService, TaskRepository taskRepository,
+        TaskExecutionRepository taskExecutionRepository) {
         this.spaceRepository = spaceRepository;
         this.spaceMembershipService = spaceMembershipService;
         this.featureAccessService = featureAccessService;

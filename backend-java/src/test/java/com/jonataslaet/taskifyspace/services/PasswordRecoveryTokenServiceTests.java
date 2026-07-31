@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordRecoveryEmail;
 import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;

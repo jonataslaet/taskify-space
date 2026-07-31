@@ -110,12 +110,9 @@ public class SubscriptionService {
         List<Subscription> accessSubscriptions =
             subscriptionRepository.findByUserIdAndStatusInForUpdate(userId, Subscription.accessStatuses());
         List<Subscription> expiredSubscriptions = accessSubscriptions.stream()
-            .filter(subscription -> hasEndedAtOrBefore(subscription, now))
-            .toList();
+            .filter(subscription -> hasEndedAtOrBefore(subscription, now)).toList();
         expireSubscriptions(expiredSubscriptions);
-        return accessSubscriptions.stream()
-            .filter(Subscription::hasAccessStatus)
-            .toList();
+        return accessSubscriptions.stream().filter(Subscription::hasAccessStatus).toList();
     }
 
     private Optional<Subscription> findSubscriptionForPlan(List<Subscription> subscriptions, Long planId) {
@@ -125,20 +122,15 @@ public class SubscriptionService {
     }
 
     private void expireSubscriptions(List<Subscription> subscriptions) {
-        if (subscriptions.isEmpty()) {
-            return;
-        }
+        if (subscriptions.isEmpty()) return;
 
         subscriptions.forEach(subscription -> subscription.setStatus(SubscriptionStatusEnum.EXPIRED));
         subscriptionRepository.saveAll(subscriptions);
         subscriptionRepository.flush();
     }
 
-    private void cancelOtherAccessSubscriptions(
-        List<Subscription> subscriptions,
-        Subscription preservedSubscription,
-        Instant now
-    ) {
+    private void cancelOtherAccessSubscriptions(List<Subscription> subscriptions, Subscription preservedSubscription,
+        Instant now) {
         List<Subscription> subscriptionsToCancel = subscriptions.stream()
             .filter(subscription -> !sameSubscription(subscription, preservedSubscription))
             .toList();
@@ -146,9 +138,7 @@ public class SubscriptionService {
     }
 
     private void cancelAccessSubscriptions(List<Subscription> subscriptions, Instant now) {
-        if (subscriptions.isEmpty()) {
-            return;
-        }
+        if (subscriptions.isEmpty()) return;
 
         subscriptions.forEach(subscription -> {
             subscription.setStatus(SubscriptionStatusEnum.CANCELED);
@@ -164,8 +154,7 @@ public class SubscriptionService {
     }
 
     private boolean sameSubscription(Subscription subscription, Subscription otherSubscription) {
-        return subscription == otherSubscription
-            || Objects.nonNull(subscription.getId())
+        return subscription == otherSubscription || Objects.nonNull(subscription.getId())
             && Objects.equals(subscription.getId(), otherSubscription.getId());
     }
 }

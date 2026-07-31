@@ -18,9 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PathVariable;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -80,11 +78,7 @@ public class TaskService {
     }
 
     @Transactional
-    public void finishTask(
-        Long taskId,
-        Long spaceId,
-        User authenticatedUser,
-        Set<Long> executorsIds,
+    public void finishTask(Long taskId, Long spaceId, User authenticatedUser, Set<Long> executorsIds,
         LocalDateTime executionDate) {
 
         Space space = spaceService.getSpaceEntity(spaceId);
@@ -100,8 +94,7 @@ public class TaskService {
         validActiveTask(task);
 
         TaskExecution taskExecution = getTaskExecution(task, space,
-            getApprovedExecutors(executorIds, approvedSpaceMemberships),
-            executionDate);
+            getApprovedExecutors(executorIds, approvedSpaceMemberships), executionDate);
         taskExecutionRepository.save(taskExecution);
     }
 
@@ -138,9 +131,7 @@ public class TaskService {
     }
 
     private void validActiveTask(Task task) {
-        if (!task.isActive()) {
-            throw new ForbiddenException("Essa tarefa está inativa no momento");
-        }
+        if (!task.isActive()) throw new ForbiddenException("Essa tarefa está inativa no momento");
     }
 
     public TaskRecordDTO getTaskById(User authenticatedUser, Long TaskId) {
@@ -150,8 +141,7 @@ public class TaskService {
     }
 
     public Task getTaskEntity(Long TaskId) {
-        return taskRepository.findById(TaskId).orElseThrow(() ->
-            new ResourceNotFoundException("Tarefa não encontrada"));
+        return taskRepository.findById(TaskId).orElseThrow(() -> new ResourceNotFoundException("Tarefa não encontrada"));
     }
 
     @Transactional
@@ -201,9 +191,7 @@ public class TaskService {
             );
         };
         Specification<@NonNull Task> finalSpecification = authenticatedUserTasks;
-        if (Objects.nonNull(TaskSpecification)) {
-            finalSpecification = authenticatedUserTasks.and(TaskSpecification);
-        }
+        if (Objects.nonNull(TaskSpecification)) finalSpecification = authenticatedUserTasks.and(TaskSpecification);
 
         return taskRepository.findAll(finalSpecification, pageable).map(TaskMapper::toDTO);
     }
@@ -216,87 +204,58 @@ public class TaskService {
         Specification<@NonNull Task> scheduledTasksSpecification =
             (root, query, criteriaBuilder) -> {
                 query.distinct(true);
+
                 var scheduleJoin = root.join("schedule", JoinType.INNER);
 
                 var localDatesJoin = scheduleJoin.join("localDates", JoinType.INNER);
+
                 var oncePredicate = criteriaBuilder.and(
-                    criteriaBuilder.equal(
-                        scheduleJoin.get("frequenceEnum"),
-                        FrequenceEnum.ONCE
-                    ),
-                    criteriaBuilder.equal(
-                        localDatesJoin,
-                        currentDate
-                    )
-                );
-                var dailyPredicate = criteriaBuilder.equal(
-                    scheduleJoin.get("frequenceEnum"),
-                    FrequenceEnum.DAILY
-                );
-                var localDateDayOfMonth = criteriaBuilder.function(
-                    "date_part",
-                    Double.class,
-                    criteriaBuilder.literal("day"),
-                    localDatesJoin
-                );
-                var monthlyPredicate = criteriaBuilder.and(
-                    criteriaBuilder.equal(
-                        scheduleJoin.get("frequenceEnum"),
-                        FrequenceEnum.MONTHLY
-                    ),
-                    criteriaBuilder.equal(
-                        localDateDayOfMonth,
-                        (double) currentDate.getDayOfMonth()
-                    )
-                );
-                var localDateDayOfWeek = criteriaBuilder.function(
-                    "date_part",
-                    Double.class,
-                    criteriaBuilder.literal("isodow"),
-                    localDatesJoin
-                );
-                var weeklyPredicate = criteriaBuilder.and(
-                    criteriaBuilder.equal(
-                        scheduleJoin.get("frequenceEnum"),
-                        FrequenceEnum.WEEKLY
-                    ),
-                    criteriaBuilder.equal(
-                        localDateDayOfWeek,
-                        (double) currentDate.getDayOfWeek().getValue()
-                    )
+                    criteriaBuilder.equal(scheduleJoin.get("frequenceEnum"), FrequenceEnum.ONCE),
+                    criteriaBuilder.equal(localDatesJoin, currentDate)
                 );
 
-                var localDateMonth = criteriaBuilder.function(
-                    "date_part",
-                    Double.class,
-                    criteriaBuilder.literal("month"),
-                    localDatesJoin
+                var dailyPredicate = criteriaBuilder.equal(scheduleJoin.get("frequenceEnum"), FrequenceEnum.DAILY);
+
+                var localDateDayOfMonth = criteriaBuilder.function("date_part", Double.class,
+                    criteriaBuilder.literal("day"), localDatesJoin
                 );
+
+                var monthlyPredicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(scheduleJoin.get("frequenceEnum"), FrequenceEnum.MONTHLY),
+                    criteriaBuilder.equal(localDateDayOfMonth, (double) currentDate.getDayOfMonth())
+                );
+
+                var localDateDayOfWeek = criteriaBuilder.function("date_part", Double.class,
+                    criteriaBuilder.literal("isodow"), localDatesJoin);
+
+                var weeklyPredicate = criteriaBuilder.and(
+                    criteriaBuilder.equal(scheduleJoin.get("frequenceEnum"), FrequenceEnum.WEEKLY),
+                    criteriaBuilder.equal(localDateDayOfWeek, (double) currentDate.getDayOfWeek().getValue()));
+
+                var localDateMonth = criteriaBuilder.function("date_part", Double.class,
+                    criteriaBuilder.literal("month"), localDatesJoin);
 
                 var yearlyPredicate = criteriaBuilder.and(
-                    criteriaBuilder.equal(
-                        scheduleJoin.get("frequenceEnum"),
-                        FrequenceEnum.YEARLY
-                    ),
-                    criteriaBuilder.equal(
-                        localDateMonth,
-                        (double) currentDate.getMonthValue()
-                    ),
-                    criteriaBuilder.equal(
-                        localDateDayOfMonth,
-                        (double) currentDate.getDayOfMonth()
-                    )
+                    criteriaBuilder.equal(scheduleJoin.get("frequenceEnum"), FrequenceEnum.YEARLY),
+                    criteriaBuilder.equal(localDateMonth, (double) currentDate.getMonthValue()),
+                    criteriaBuilder.equal(localDateDayOfMonth, (double) currentDate.getDayOfMonth())
                 );
 
                 var scheduledForCurrentDatePredicate = criteriaBuilder.or(
                     oncePredicate, dailyPredicate, weeklyPredicate, monthlyPredicate, yearlyPredicate);
+
                 var activePredicate = criteriaBuilder.isTrue(root.get("active"));
+
                 var spacePredicate = criteriaBuilder.equal(root.get("space").get("id"), spaceId);
+
                 var spaceMembershipJoin = root.join("space").join("spaceMemberships");
+
                 var spaceMembershipJoinPredicate = criteriaBuilder.equal(
                     spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED);
+
                 var authenticatedUserMembershipPredicate =
                     criteriaBuilder.equal(spaceMembershipJoin.get("user").get("id"), authenticatedUser.getId());
+
                 return criteriaBuilder.and(activePredicate, spacePredicate, scheduledForCurrentDatePredicate,
                     authenticatedUserMembershipPredicate, spaceMembershipJoinPredicate);
             };

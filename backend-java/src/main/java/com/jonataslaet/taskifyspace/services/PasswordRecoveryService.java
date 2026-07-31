@@ -25,7 +25,7 @@ public class PasswordRecoveryService {
     public List<PasswordRecovery> getValidPasswordRecoveries(String uuidToken, Instant now) {
         String tokenHash = TokenUtils.sha256(uuidToken);
         List<PasswordRecovery> passwordRecoveries =
-                passwordRecoveryRepository.findValidPasswordRecoveries(tokenHash, now);
+            passwordRecoveryRepository.findValidPasswordRecoveries(tokenHash, now);
         validPasswordRecoveries(passwordRecoveries);
         return passwordRecoveries;
     }

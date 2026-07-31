@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordRecoveryEmail;
 import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
@@ -46,10 +47,8 @@ public class PasswordRecoveryTokenService {
         passwordRecoveryService.expireValidPasswordRecoveriesByEmail(user.getEmail(), now);
 
         String rawToken = UUID.randomUUID().toString();
-        PasswordRecovery passwordRecovery = new PasswordRecovery(
-            TokenUtils.sha256(rawToken),
-            user.getEmail(),
-            now.plusSeconds(60 * tokenMinutes)
+        PasswordRecovery passwordRecovery = new PasswordRecovery(TokenUtils.sha256(rawToken),
+            user.getEmail(), now.plusSeconds(60 * tokenMinutes)
         );
         passwordRecoveryService.savePasswordRecovery(passwordRecovery);
 

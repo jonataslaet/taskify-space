@@ -32,9 +32,7 @@ public class PlanService {
     @Transactional
     public PlanRecordDTO createPlan(PlanRecordDTO dto) {
         validatePlan(dto);
-        if (planRepository.existsByCodeIgnoreCase(dto.code())) {
-            throw new DuplicationException("Plano ja existe");
-        }
+        if (planRepository.existsByCodeIgnoreCase(dto.code())) throw new DuplicationException("Plano ja existe");
         Plan plan = PlanMapper.toEntity(dto);
         return PlanMapper.toDTO(planRepository.save(plan));
     }
@@ -71,9 +69,7 @@ public class PlanService {
     }
 
     private void validatePlan(PlanRecordDTO dto) {
-        if (Objects.isNull(dto)) {
-            throw new InvalidRequestException("Plano e obrigatorio");
-        }
+        if (Objects.isNull(dto)) throw new InvalidRequestException("Plano e obrigatorio");
         if (Objects.isNull(dto.featureLimits()) || dto.featureLimits().isEmpty()) {
             throw new InvalidRequestException("Limites de funcionalidades do plano sao obrigatorios");
         }
@@ -92,13 +88,9 @@ public class PlanService {
     }
 
     private FeatureEnum validateFeatureLimit(PlanFeatureLimitRecordDTO limit) {
-        if (Objects.isNull(limit)) {
-            throw new InvalidRequestException("Limite de funcionalidade nao pode ser nulo");
-        }
+        if (Objects.isNull(limit)) throw new InvalidRequestException("Limite de funcionalidade nao pode ser nulo");
         FeatureEnum feature = limit.feature();
-        if (Objects.isNull(feature)) {
-            throw new InvalidRequestException("Funcionalidade do limite e obrigatoria");
-        }
+        if (Objects.isNull(feature)) throw new InvalidRequestException("Funcionalidade do limite e obrigatoria");
         if (Objects.nonNull(limit.usageLimit()) && limit.usageLimit() <= 0) {
             throw new InvalidRequestException("Limite de uso deve ser positivo quando informado");
         }

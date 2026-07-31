@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
-import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
 
 @Service
 @Transactional(readOnly = true)
@@ -41,10 +40,8 @@ public class SpaceMembershipService {
     private final ParticipantRepository participantRepository;
     private final FeatureAccessService featureAccessService;
 
-    public SpaceMembershipService(
-        SpaceMembershipRepository spaceMembershipRepository,
-        ParticipantRepository participantRepository,
-        FeatureAccessService featureAccessService) {
+    public SpaceMembershipService(SpaceMembershipRepository spaceMembershipRepository,
+        ParticipantRepository participantRepository, FeatureAccessService featureAccessService) {
         this.spaceMembershipRepository = spaceMembershipRepository;
         this.participantRepository = participantRepository;
         this.featureAccessService = featureAccessService;
@@ -54,10 +51,7 @@ public class SpaceMembershipService {
     public void setSpaceMembership(Space space, User user, SpaceUserRoleEnum role) {
         boolean userAlreadyParticipatesInSpace = spaceMembershipRepository
             .existsBySpaceIdAndUserId(space.getId(), user.getId());
-        if (userAlreadyParticipatesInSpace) {
-            return;
-        }
-
+        if (userAlreadyParticipatesInSpace) return;
         SpaceMembership spaceMembership = new SpaceMembership(user, space, role);
         if (role.equals(SpaceUserRoleEnum.ROLE_SPACE_ADMIN))
             spaceMembership.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
@@ -74,8 +68,7 @@ public class SpaceMembershipService {
 
         spaceMemberships.stream().filter(sm -> sm.getUser().isEnabled()).forEach(sm -> {
             if (!hasAuthenticatedUserAsAdmin.get() && sm.getSpaceUserRole().equals(
-                SpaceUserRoleEnum.ROLE_SPACE_ADMIN) && sm.getUser().getId().equals(
-                authenticatedUser.getId())) {
+                SpaceUserRoleEnum.ROLE_SPACE_ADMIN) && sm.getUser().getId().equals(authenticatedUser.getId())) {
                 hasAuthenticatedUserAsAdmin.set(true);
             }
             if (usersIds.contains(sm.getUser().getId()) && !sm.getSpaceMembershipStatusEnum().equals(SpaceMembershipStatusEnum.APPROVED)) {
@@ -95,32 +88,26 @@ public class SpaceMembershipService {
     }
 
     @Transactional
-    public SpaceMembershipRecordDTO updateParticipation(
-        Long spaceId, Long spaceMembershipId, SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole,
-        User authenticatedUser) {
+    public SpaceMembershipRecordDTO updateParticipation(Long spaceId, Long spaceMembershipId,
+        SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole, User authenticatedUser) {
 
         SpaceMembership spaceMembership = spaceMembershipRepository.findByIdAndSpaceId(spaceMembershipId, spaceId)
             .orElseThrow(() -> new ResourceNotFoundException("Participação não encontrada"));
 
-        if (Objects.isNull(status) && Objects.isNull(spaceUserRole)) {
-            return SpaceMembershipMapper.toDTO(spaceMembership);
-        }
+        if (Objects.isNull(status) && Objects.isNull(spaceUserRole)) return SpaceMembershipMapper.toDTO(spaceMembership);
 
-        SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole)
-            ? spaceUserRole
-            : spaceMembership.getSpaceUserRole();
-        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status)
-            ? status
-            : spaceMembership.getSpaceMembershipStatusEnum();
+        SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole) ?
+            spaceUserRole : spaceMembership.getSpaceUserRole();
+        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status) ?
+            status : spaceMembership.getSpaceMembershipStatusEnum();
 
         validateParticipationUpdatePermission(spaceMembership, spaceUserRole, targetSpaceUserRole, authenticatedUser);
         validNotDuplicateParticipation(spaceMembership);
         validateSpaceKeepsApprovedAdmin(spaceMembership, targetStatus, targetSpaceUserRole);
 
         if (willIncreaseApprovedRoleCount(spaceMembership, status, targetSpaceUserRole)) {
-            featureAccessService.requireFeatureWithUsageLock(
-                requireSpaceCreator(spaceMembership.getSpace()), approvalFeature(targetSpaceUserRole),
-                spaceMembership.getSpace());
+            featureAccessService.requireFeatureWithUsageLock(requireSpaceCreator(spaceMembership.getSpace()),
+                approvalFeature(targetSpaceUserRole), spaceMembership.getSpace());
         }
 
         if (Objects.nonNull(status)) spaceMembership.setSpaceMembershipStatusEnum(status);
@@ -129,13 +116,10 @@ public class SpaceMembershipService {
         return SpaceMembershipMapper.toDTO(spaceMembershipRepository.save(spaceMembership));
     }
 
-    private boolean willIncreaseApprovedRoleCount(
-        SpaceMembership spaceMembership,
-        SpaceMembershipStatusEnum status,
+    private boolean willIncreaseApprovedRoleCount(SpaceMembership spaceMembership, SpaceMembershipStatusEnum status,
         SpaceUserRoleEnum targetSpaceUserRole) {
-        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status)
-            ? status
-            : spaceMembership.getSpaceMembershipStatusEnum();
+        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status) ?
+            status : spaceMembership.getSpaceMembershipStatusEnum();
 
         return SpaceMembershipStatusEnum.APPROVED.equals(targetStatus)
             && (!SpaceMembershipStatusEnum.APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum())
@@ -149,36 +133,25 @@ public class SpaceMembershipService {
         return space.getCreator();
     }
 
-    private void validateParticipationUpdatePermission(
-        SpaceMembership spaceMembership,
-        SpaceUserRoleEnum requestedSpaceUserRole,
-        SpaceUserRoleEnum targetSpaceUserRole,
-        User authenticatedUser) {
-        if (!requiresSpaceAdmin(spaceMembership, requestedSpaceUserRole, targetSpaceUserRole)) {
-            return;
-        }
+    private void validateParticipationUpdatePermission(SpaceMembership spaceMembership,
+        SpaceUserRoleEnum requestedSpaceUserRole, SpaceUserRoleEnum targetSpaceUserRole, User authenticatedUser) {
+        if (!requiresSpaceAdmin(spaceMembership, requestedSpaceUserRole, targetSpaceUserRole)) return;
 
         boolean authenticatedUserIsApprovedAdmin =
             spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
-                spaceMembership.getSpace().getId(),
-                authenticatedUser.getId(),
-                APPROVED,
-                ROLE_SPACE_ADMIN);
+                spaceMembership.getSpace().getId(), authenticatedUser.getId(), APPROVED, ROLE_SPACE_ADMIN);
 
         if (!authenticatedUserIsApprovedAdmin) {
             throw new ForbiddenException("Somente administradores do espaço podem alterar administradores ou gerentes");
         }
     }
 
-    private boolean requiresSpaceAdmin(
-        SpaceMembership spaceMembership,
-        SpaceUserRoleEnum requestedSpaceUserRole,
+    private boolean requiresSpaceAdmin(SpaceMembership spaceMembership, SpaceUserRoleEnum requestedSpaceUserRole,
         SpaceUserRoleEnum targetSpaceUserRole) {
         boolean roleChangeWasRequested = Objects.nonNull(requestedSpaceUserRole)
             && !spaceMembership.getSpaceUserRole().equals(requestedSpaceUserRole);
 
-        return roleChangeWasRequested
-            || isPrivilegedRole(spaceMembership.getSpaceUserRole())
+        return roleChangeWasRequested || isPrivilegedRole(spaceMembership.getSpaceUserRole())
             || isPrivilegedRole(targetSpaceUserRole);
     }
 
@@ -186,24 +159,17 @@ public class SpaceMembershipService {
         return ROLE_SPACE_ADMIN.equals(spaceUserRole) || ROLE_SPACE_MANAGER.equals(spaceUserRole);
     }
 
-    private void validateSpaceKeepsApprovedAdmin(
-        SpaceMembership spaceMembership,
-        SpaceMembershipStatusEnum targetStatus,
+    private void validateSpaceKeepsApprovedAdmin(SpaceMembership spaceMembership, SpaceMembershipStatusEnum targetStatus,
         SpaceUserRoleEnum targetSpaceUserRole) {
-        boolean currentlyApprovedAdmin = isApprovedAdmin(
-            spaceMembership.getSpaceMembershipStatusEnum(),
+        boolean currentlyApprovedAdmin = isApprovedAdmin(spaceMembership.getSpaceMembershipStatusEnum(),
             spaceMembership.getSpaceUserRole());
         boolean willRemainApprovedAdmin = isApprovedAdmin(targetStatus, targetSpaceUserRole);
 
-        if (!currentlyApprovedAdmin || willRemainApprovedAdmin) {
-            return;
-        }
+        if (!currentlyApprovedAdmin || willRemainApprovedAdmin) return;
 
         Set<SpaceMembership> approvedAdmins =
             spaceMembershipRepository.findBySpaceIdAndStatusAndSpaceUserRoleForUpdate(
-                spaceMembership.getSpace().getId(),
-                APPROVED,
-                ROLE_SPACE_ADMIN);
+                spaceMembership.getSpace().getId(), APPROVED, ROLE_SPACE_ADMIN);
 
         if (approvedAdmins.size() <= 1) {
             throw new ForbiddenException("O espaço precisa manter pelo menos um administrador aprovado");
@@ -238,12 +204,9 @@ public class SpaceMembershipService {
     public Page<@NonNull SpaceMembershipRecordDTO> readParticipations(
         Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authUser) {
 
-        boolean currentUserParticipatesInThisSpace =
-            spaceMembershipRepository
-                .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
-                    spaceId,
-                    authUser.getId(),
-                    SpaceMembershipStatusEnum.APPROVED);
+        boolean currentUserParticipatesInThisSpace = spaceMembershipRepository
+            .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
+                spaceId, authUser.getId(), SpaceMembershipStatusEnum.APPROVED);
 
         if (!currentUserParticipatesInThisSpace) {
             throw new ForbiddenException("Usuário não possui permissão para visualizar as participações desse espaço");
@@ -259,18 +222,14 @@ public class SpaceMembershipService {
         Pageable pageable, Long spaceId, Long authUserId, String name, SpaceUserRoleEnum spaceUserRole,
         List<TaskCategoryEnum> taskCategories) {
 
-        boolean currentUserParticipatesInThisSpace =
-            spaceMembershipRepository
-                .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
-                    spaceId,
-                    authUserId,
-                    SpaceMembershipStatusEnum.APPROVED);
+        boolean currentUserParticipatesInThisSpace = spaceMembershipRepository
+            .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
+                spaceId, authUserId,  SpaceMembershipStatusEnum.APPROVED);
 
         if (!currentUserParticipatesInThisSpace) {
             throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
         }
 
-        return participantRepository.findParticipantsWithScores(
-            spaceId, pageable, name, spaceUserRole, taskCategories);
+        return participantRepository.findParticipantsWithScores(spaceId, pageable, name, spaceUserRole, taskCategories);
     }
 }

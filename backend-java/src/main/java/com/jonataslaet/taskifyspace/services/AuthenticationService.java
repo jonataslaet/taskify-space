@@ -90,13 +90,8 @@ public class AuthenticationService {
         String newToken = tokenConfiguration.createAccessToken(user);
         String newRefreshToken = refreshTokenService.rotate(refreshToken, deviceId, userAgent, ipAddress);
 
-        return new AuthenticationResponseRecordDTO(
-            user.getId(),
-            user.getEmail(),
-            user.getName(),
-            newToken,
-            newRefreshToken,
-            user.getRole()
+        return new AuthenticationResponseRecordDTO(user.getId(),user.getEmail(), user.getName(), newToken,
+            newRefreshToken, user.getRole()
         );
     }
 
@@ -107,15 +102,12 @@ public class AuthenticationService {
     }
 
     private boolean hasMissingCredentials(CredentialsRecordDTO credentialsRecordDTO) {
-        return Objects.isNull(credentialsRecordDTO)
-            || isBlank(credentialsRecordDTO.username())
+        return Objects.isNull(credentialsRecordDTO) || isBlank(credentialsRecordDTO.username())
             || isBlank(credentialsRecordDTO.password());
     }
 
     private void validateRequiredRefreshToken(String refreshToken) {
-        if (isBlank(refreshToken)) {
-            throw new InvalidAuthenticationException("Refresh token obrigatorio");
-        }
+        if (isBlank(refreshToken)) throw new InvalidAuthenticationException("Refresh token obrigatorio");
     }
 
     private boolean isBlank(String value) {
@@ -147,9 +139,7 @@ public class AuthenticationService {
     }
 
     private void validateEnabledUser(User user) {
-        if (!user.isEnabled()) {
-            throw new InvalidAuthenticationException("Usuario nao esta ativo");
-        }
+        if (!user.isEnabled()) throw new InvalidAuthenticationException("Usuario nao esta ativo");
     }
 
     @Transactional
@@ -167,16 +157,13 @@ public class AuthenticationService {
     }
 
     private void validPasswordRenovation(PasswordResetDTO passwordRenovationDTO) {
-        if (Objects.isNull(passwordRenovationDTO)
-            || Objects.isNull(passwordRenovationDTO.newPassword())
+        if (Objects.isNull(passwordRenovationDTO) || Objects.isNull(passwordRenovationDTO.newPassword())
             || Objects.isNull(passwordRenovationDTO.newPasswordConfirmation())) {
             throw new InvalidAuthenticationException("Nova senha e confirmacao sao obrigatorias");
         }
 
         Set<ConstraintViolation<PasswordResetDTO>> violations = validator.validate(passwordRenovationDTO);
-        if (!violations.isEmpty()) {
-            throw new InvalidAuthenticationException("Nova senha invalida");
-        }
+        if (!violations.isEmpty()) throw new InvalidAuthenticationException("Nova senha invalida");
 
         if (!Objects.equals(passwordRenovationDTO.newPassword(), passwordRenovationDTO.newPasswordConfirmation())) {
             throw new InvalidAuthenticationException("A senha e a confirmação dela devem ser exatamente iguais");

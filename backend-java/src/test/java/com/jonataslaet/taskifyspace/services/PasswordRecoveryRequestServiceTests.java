@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordRecoveryEmail;
 import com.jonataslaet.taskifyspace.controllers.dtos.SendingEmailDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -57,12 +57,8 @@ public class RefreshTokenService {
             .orElseThrow(() -> new InvalidAuthenticationException("Refresh token inválido"));
 
         Instant now = Instant.now(clock);
-        if (token.getRevokedAt() != null) {
-            throw new InvalidAuthenticationException("Refresh token revogado");
-        }
-        if (now.isAfter(token.getExpiresAt())) {
-            throw new InvalidAuthenticationException("Refresh token expirado");
-        }
+        if (token.getRevokedAt() != null) throw new InvalidAuthenticationException("Refresh token revogado");
+        if (now.isAfter(token.getExpiresAt())) throw new InvalidAuthenticationException("Refresh token expirado");
         if (token.getReplacedByHash() != null) {
             throw new InvalidAuthenticationException("Refresh token já foi rotacionado");
         }
@@ -80,9 +76,7 @@ public class RefreshTokenService {
 
         // marca encadeamento e revogação lógica do antigo
         int rotatedTokens = refreshTokenRepository.rotateActiveToken(old.getTokenHash(), newHash, now);
-        if (rotatedTokens != 1) {
-            throw new InvalidAuthenticationException("Refresh token ja foi rotacionado");
-        }
+        if (rotatedTokens != 1) throw new InvalidAuthenticationException("Refresh token ja foi rotacionado");
 
         // cria o novo
         RefreshToken newer = new RefreshToken();

@@ -3,6 +3,8 @@ package com.jonataslaet.taskifyspace.services;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
+import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
@@ -63,13 +65,9 @@ public class UserService {
     @Transactional
     public UserRecordDTO createUser(UserRecordDTO userRecordDTO) {
         String normalizedEmail = EmailUtils.normalize(userRecordDTO.email());
-        if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new DuplicationException("Email already exists");
-        }
+        if (userRepository.existsByEmail(normalizedEmail)) throw new DuplicationException("Email already exists");
 
-        if(userRecordDTO.role().equals(UserRoleEnum.ROLE_ADMIN)){
-            throw new ForbiddenException("Role admin is not allowed");
-        }
+        if(userRecordDTO.role().equals(UserRoleEnum.ROLE_ADMIN)) throw new ForbiddenException("Role admin is not allowed");
 
         UserRoleEnum.validateExistence(userRecordDTO.role());
         User user = UserMapper.toEntity(userRecordDTO);
@@ -205,11 +203,8 @@ public class UserService {
     }
 
     private void validateUserIsNotOnlyApprovedSpaceAdmin(Long userId) {
-        long spacesWhereUserIsOnlyApprovedAdmin =
-            spaceMembershipRepository.countSpacesWhereUserIsOnlyApprovedAdmin(
-                userId,
-                com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED,
-                com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN);
+        long spacesWhereUserIsOnlyApprovedAdmin = spaceMembershipRepository.countSpacesWhereUserIsOnlyApprovedAdmin(
+            userId, SpaceMembershipStatusEnum.APPROVED, SpaceUserRoleEnum.ROLE_SPACE_ADMIN);
         if (spacesWhereUserIsOnlyApprovedAdmin > 0) {
             throw new ForbiddenException("Usuario e o ultimo administrador aprovado de pelo menos um espaco");
         }
@@ -230,13 +225,10 @@ public class UserService {
     }
 
     private void validateUserIsNotLastActiveGlobalAdmin(User user) {
-        if (!isActiveGlobalAdmin(user)) {
-            return;
-        }
+        if (!isActiveGlobalAdmin(user)) return;
 
         int activeGlobalAdmins = userRepository.findByRoleAndStatusForUpdate(
-            UserRoleEnum.ROLE_ADMIN,
-            UserStatusEnum.ACTIVE).size();
+            UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE).size();
 
         if (activeGlobalAdmins <= 1) {
             throw new ForbiddenException("Sistema precisa manter pelo menos um administrador global ativo");
@@ -244,7 +236,6 @@ public class UserService {
     }
 
     private boolean isActiveGlobalAdmin(User user) {
-        return UserRoleEnum.ROLE_ADMIN.equals(user.getRole())
-            && UserStatusEnum.ACTIVE.equals(user.getStatus());
+        return UserRoleEnum.ROLE_ADMIN.equals(user.getRole()) && UserStatusEnum.ACTIVE.equals(user.getStatus());
     }
 }

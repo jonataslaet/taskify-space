@@ -32,13 +32,9 @@ public class FeatureAccessService {
     private final UserRepository userRepository;
     private final Clock clock;
 
-    public FeatureAccessService(
-        SubscriptionRepository subscriptionRepository,
-        SpaceMembershipRepository spaceMembershipRepository,
-        SpaceRepository spaceRepository,
-        TaskRepository taskRepository,
-        UserRepository userRepository,
-        Clock clock) {
+    public FeatureAccessService(SubscriptionRepository subscriptionRepository,
+        SpaceMembershipRepository spaceMembershipRepository, SpaceRepository spaceRepository,
+        TaskRepository taskRepository, UserRepository userRepository, Clock clock) {
         this.subscriptionRepository = subscriptionRepository;
         this.spaceMembershipRepository = spaceMembershipRepository;
         this.spaceRepository = spaceRepository;
@@ -55,23 +51,13 @@ public class FeatureAccessService {
     @Transactional(readOnly = true)
     public boolean hasFeature(User user, FeatureEnum feature, Space space) {
         User featureOwner = resolveFeatureOwner(user, feature, space);
-        if (Objects.isNull(featureOwner)) {
-            return false;
-        }
+        if (Objects.isNull(featureOwner)) return false;
 
         UsageGrant usageGrant = resolveUsageGrant(featureOwner, feature);
-        if (!usageGrant.granted()) {
-            return false;
-        }
-        if (usageGrant.unlimited()) {
-            return true;
-        }
+        if (!usageGrant.granted()) return false;
+        if (usageGrant.unlimited()) return true;
         long currentUsage = countUsage(featureOwner, feature, space, usageGrant.periodStart(), usageGrant.periodEnd());
         return currentUsage < usageGrant.usageLimit();
-    }
-
-    public void requireFeature(User user, FeatureEnum feature) {
-        requireFeature(user, feature, null);
     }
 
     public void requireFeature(User user, FeatureEnum feature, Space space) {
@@ -117,8 +103,7 @@ public class FeatureAccessService {
 
     private Optional<Subscription> resolveActiveSubscription(User user, Instant now) {
         List<Subscription> activeSubscriptions = subscriptionRepository.findByUserId(user.getId()).stream()
-            .filter(subscription -> subscription.grantsAccessAt(now))
-            .toList();
+            .filter(subscription -> subscription.grantsAccessAt(now)).toList();
 
         if (activeSubscriptions.size() > 1) {
             throw new IllegalStateException("Usuario possui mais de uma assinatura ativa");
@@ -130,9 +115,7 @@ public class FeatureAccessService {
     private UsageGrant resolveUsageGrant(Subscription subscription, FeatureEnum feature) {
         for (PlanFeatureLimit limit : subscription.getPlan().getFeatureLimits()) {
             if (limit.getFeature().equals(feature)) {
-                return new UsageGrant(
-                    true,
-                    Objects.isNull(limit.getUsageLimit()),
+                return new UsageGrant(true, Objects.isNull(limit.getUsageLimit()),
                     Objects.isNull(limit.getUsageLimit()) ? 0L : limit.getUsageLimit(),
                     nullableStart(subscription.getCurrentPeriodStart()),
                     nullableEnd(subscription.getCurrentPeriodEnd())
@@ -148,10 +131,7 @@ public class FeatureAccessService {
     }
 
     private User resolveFeatureOwner(User user, FeatureEnum feature, Space space) {
-        if (!isSpaceOwnedFeature(feature)) {
-            return user;
-        }
-
+        if (!isSpaceOwnedFeature(feature)) return user;
         return Objects.isNull(space) ? null : space.getCreator();
     }
 
@@ -164,39 +144,22 @@ public class FeatureAccessService {
         };
     }
 
-    private long countUsage(
-        User user,
-        FeatureEnum feature,
-        Space space,
-        Instant periodStart,
-        Instant periodEnd
-    ) {
+    private long countUsage(User user, FeatureEnum feature, Space space, Instant periodStart, Instant periodEnd) {
         return switch (feature) {
             case CREATE_SPACE ->
                 spaceRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                    user.getId(),
-                    periodStart,
-                    periodEnd
-                );
+                    user.getId(), periodStart, periodEnd);
 
             case CREATE_TASK ->
                 taskRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-                    user.getId(),
-                    periodStart,
-                    periodEnd
-                );
+                    user.getId(), periodStart, periodEnd);
 
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
                  APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER,
                  APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT ->
-                Objects.isNull(space)
-                    ? Long.MAX_VALUE
-                    : spaceMembershipRepository
-                      .countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
-                          space.getId(),
-                          SpaceMembershipStatusEnum.APPROVED,
-                          feature.approvalSpaceUserRole()
-                      );
+                Objects.isNull(space) ? Long.MAX_VALUE : spaceMembershipRepository
+                .countBySpaceIdAndSpaceMembershipStatusEnumAndSpaceUserRole(
+                  space.getId(), SpaceMembershipStatusEnum.APPROVED, feature.approvalSpaceUserRole());
         };
     }
 
@@ -208,11 +171,6 @@ public class FeatureAccessService {
         return Objects.isNull(value) ? Instant.parse("9999-12-31T23:59:59Z") : value;
     }
 
-    private record UsageGrant(
-        boolean granted,
-        boolean unlimited,
-        long usageLimit,
-        Instant periodStart,
-        Instant periodEnd
-    ) {}
+    private record UsageGrant(boolean granted, boolean unlimited,
+        long usageLimit, Instant periodStart, Instant periodEnd) {}
 }
