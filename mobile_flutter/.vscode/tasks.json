@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "wait-for-emulator",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "C:\\Users\\jonat\\workspaces\\taskify-space\\mobile_flutter\\.vscode\\wait-for-emulator.bat"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
