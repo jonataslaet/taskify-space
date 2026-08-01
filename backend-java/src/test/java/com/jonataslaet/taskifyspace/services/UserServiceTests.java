@@ -260,6 +260,33 @@ class UserServiceTests {
     }
 
     @Test
+    void deletePendingRegistrationUserDeletesUserOnlyWhenStatusIsPending() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setStatus(UserStatusEnum.PENDING_EVALUATION);
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+
+        boolean deleted = userService.deletePendingRegistrationUser(user.getId());
+
+        assertThat(deleted).isTrue();
+        verify(taskExecutionRepository).deleteExecutorLinksByUserId(user.getId());
+        verify(refreshTokenService).deleteAllByUserId(user.getId());
+        verify(userRepository).delete(user);
+    }
+
+    @Test
+    void deletePendingRegistrationUserDoesNotDeleteUserWhenStatusChanged() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setStatus(UserStatusEnum.ACTIVE);
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+
+        boolean deleted = userService.deletePendingRegistrationUser(user.getId());
+
+        assertThat(deleted).isFalse();
+        verify(userRepository, never()).delete(any(User.class));
+        verify(refreshTokenService, never()).deleteAllByUserId(user.getId());
+    }
+
+    @Test
     void updateUserPreservesRoleStatusAndPassword() {
         User user = new User();
         user.setId(1L);

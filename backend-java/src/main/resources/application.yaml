@@ -34,6 +34,8 @@ security:
       uri: ${REGISTRATION_CONFIRMATION_URI:http://localhost:8080/users/confirm-registration/}
       token:
         minutes: ${REGISTRATION_CONFIRMATION_TOKEN_MINUTES:5}
+      cleanup:
+        fixed-delay: ${REGISTRATION_CONFIRMATION_CLEANUP_FIXED_DELAY:60000}
   password:
     root: ${PASSWORD_ROOT}
   jwt:

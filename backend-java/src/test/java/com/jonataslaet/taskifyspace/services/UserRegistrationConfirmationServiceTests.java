@@ -54,7 +54,7 @@ class UserRegistrationConfirmationServiceTests {
         User user = createUser(UserStatusEnum.PENDING_EVALUATION);
         UserRegistrationConfirmation confirmation = new UserRegistrationConfirmation(
             TokenUtils.sha256(rawToken), user, NOW.plusSeconds(60));
-        when(confirmationRepository.findValidConfirmationsForUpdate(TokenUtils.sha256(rawToken), NOW))
+        when(confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken)))
             .thenReturn(List.of(confirmation));
 
         confirmationService.confirmRegistration(rawToken);
@@ -71,7 +71,7 @@ class UserRegistrationConfirmationServiceTests {
         User user = createUser(UserStatusEnum.ACTIVE);
         UserRegistrationConfirmation confirmation = new UserRegistrationConfirmation(
             TokenUtils.sha256(rawToken), user, NOW.plusSeconds(60));
-        when(confirmationRepository.findValidConfirmationsForUpdate(TokenUtils.sha256(rawToken), NOW))
+        when(confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken)))
             .thenReturn(List.of(confirmation));
 
         confirmationService.confirmRegistration(rawToken);
@@ -84,7 +84,7 @@ class UserRegistrationConfirmationServiceTests {
     @Test
     void confirmRegistrationRejectsInvalidOrExpiredToken() {
         String rawToken = "raw-token";
-        when(confirmationRepository.findValidConfirmationsForUpdate(TokenUtils.sha256(rawToken), NOW))
+        when(confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken)))
             .thenReturn(List.of());
 
         assertThatThrownBy(() -> confirmationService.confirmRegistration(rawToken))
@@ -95,12 +95,50 @@ class UserRegistrationConfirmationServiceTests {
     }
 
     @Test
+    void confirmRegistrationDeletesPendingUserWhenTokenIsExpired() {
+        String rawToken = "raw-token";
+        User user = createUser(UserStatusEnum.PENDING_EVALUATION);
+        UserRegistrationConfirmation confirmation = new UserRegistrationConfirmation(
+            TokenUtils.sha256(rawToken), user, NOW);
+        when(confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken)))
+            .thenReturn(List.of(confirmation));
+        when(confirmationRepository.existsByUserIdAndUsedAtIsNullAndExpirationAfter(user.getId(), NOW))
+            .thenReturn(false);
+
+        assertThatThrownBy(() -> confirmationService.confirmRegistration(rawToken))
+            .isInstanceOf(TokenExpirationException.class);
+
+        verify(userService).deletePendingRegistrationUser(user.getId());
+        verify(userService, never()).changeStatus(any(), any());
+        verify(confirmationRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmRegistrationDoesNotDeletePendingUserWhenAnotherConfirmationIsStillValid() {
+        String rawToken = "raw-token";
+        User user = createUser(UserStatusEnum.PENDING_EVALUATION);
+        UserRegistrationConfirmation confirmation = new UserRegistrationConfirmation(
+            TokenUtils.sha256(rawToken), user, NOW);
+        when(confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken)))
+            .thenReturn(List.of(confirmation));
+        when(confirmationRepository.existsByUserIdAndUsedAtIsNullAndExpirationAfter(user.getId(), NOW))
+            .thenReturn(true);
+
+        assertThatThrownBy(() -> confirmationService.confirmRegistration(rawToken))
+            .isInstanceOf(TokenExpirationException.class);
+
+        verify(userService, never()).deletePendingRegistrationUser(any());
+        verify(userService, never()).changeStatus(any(), any());
+        verify(confirmationRepository, never()).save(any());
+    }
+
+    @Test
     void confirmRegistrationRejectsUserThatIsNotPendingOrActive() {
         String rawToken = "raw-token";
         User user = createUser(UserStatusEnum.SUSPENDED);
         UserRegistrationConfirmation confirmation = new UserRegistrationConfirmation(
             TokenUtils.sha256(rawToken), user, NOW.plusSeconds(60));
-        when(confirmationRepository.findValidConfirmationsForUpdate(TokenUtils.sha256(rawToken), NOW))
+        when(confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken)))
             .thenReturn(List.of(confirmation));
 
         assertThatThrownBy(() -> confirmationService.confirmRegistration(rawToken))

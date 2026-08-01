@@ -33,14 +33,18 @@ public class UserRegistrationConfirmationService {
         this.clock = clock;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = TokenExpirationException.class)
     public void confirmRegistration(String rawToken) {
         if (Objects.isNull(rawToken) || rawToken.isBlank()) {
             throw invalidTokenException();
         }
 
         Instant now = Instant.now(clock);
-        UserRegistrationConfirmation confirmation = findValidConfirmation(rawToken, now);
+        UserRegistrationConfirmation confirmation = findUnusedConfirmation(rawToken);
+        if (!confirmation.getExpiration().isAfter(now)) {
+            deletePendingUserForExpiredConfirmation(confirmation, now);
+            throw invalidTokenException();
+        }
         User user = confirmation.getUser();
 
         if (UserStatusEnum.ACTIVE.equals(user.getStatus())) {
@@ -58,9 +62,9 @@ public class UserRegistrationConfirmationService {
         confirmationRepository.save(confirmation);
     }
 
-    private UserRegistrationConfirmation findValidConfirmation(String rawToken, Instant now) {
-        List<UserRegistrationConfirmation> confirmations = confirmationRepository.findValidConfirmationsForUpdate(
-            TokenUtils.sha256(rawToken), now);
+    private UserRegistrationConfirmation findUnusedConfirmation(String rawToken) {
+        List<UserRegistrationConfirmation> confirmations =
+            confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken));
         if (Objects.isNull(confirmations) || confirmations.isEmpty()) {
             throw invalidTokenException();
         }
@@ -68,6 +72,19 @@ public class UserRegistrationConfirmationService {
             throw new InvalidRequestException("Token de confirmacao de cadastro duplicado");
         }
         return confirmations.getFirst();
+    }
+
+    private void deletePendingUserForExpiredConfirmation(UserRegistrationConfirmation confirmation, Instant now) {
+        User user = confirmation.getUser();
+        if (Objects.isNull(user)) {
+            return;
+        }
+
+        boolean hasAnotherValidConfirmation =
+            confirmationRepository.existsByUserIdAndUsedAtIsNullAndExpirationAfter(user.getId(), now);
+        if (!hasAnotherValidConfirmation) {
+            userService.deletePendingRegistrationUser(user.getId());
+        }
     }
 
     private TokenExpirationException invalidTokenException() {

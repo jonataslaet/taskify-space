@@ -110,6 +110,26 @@ public class UserService {
     public void deleteById(Long userId) {
         logger.info("Attempting to delete user with ID {}", userId);
         User user = findUserById(userId);
+        deleteUser(user);
+        logger.info("User with ID {} deleted successfully", userId);
+    }
+
+    @Transactional
+    public boolean deletePendingRegistrationUser(Long userId) {
+        logger.info("Attempting to delete pending registration user with ID {}", userId);
+        User user = findUserByIdForUpdate(userId);
+        if (!UserStatusEnum.PENDING_EVALUATION.equals(user.getStatus())) {
+            logger.info("User with ID {} was not deleted because status is {}", userId, user.getStatus());
+            return false;
+        }
+
+        deleteUser(user);
+        logger.info("Pending registration user with ID {} deleted successfully", userId);
+        return true;
+    }
+
+    private void deleteUser(User user) {
+        Long userId = user.getId();
         validateUserIsNotLastActiveGlobalAdmin(user);
         validateUserIsNotCreatorOfAnySpace(userId);
         validateUserIsNotOnlyApprovedSpaceAdmin(userId);
@@ -120,7 +140,6 @@ public class UserService {
         refreshTokenService.deleteAllByUserId(userId);
 
         userRepository.delete(user);
-        logger.info("User with ID {} deleted successfully", userId);
     }
 
     @Transactional
