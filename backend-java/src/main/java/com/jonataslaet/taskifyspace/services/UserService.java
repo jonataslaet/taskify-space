@@ -48,6 +48,7 @@ public class UserService {
     private final SpaceRepository spaceRepository;
     private final TaskRepository taskRepository;
     private final TaskExecutionRepository taskExecutionRepository;
+    private final UserApprovalSubscriptionService userApprovalSubscriptionService;
 
     public UserService(
         UserRepository userRepository,
@@ -56,7 +57,8 @@ public class UserService {
         SpaceMembershipRepository spaceMembershipRepository,
         SpaceRepository spaceRepository,
         TaskRepository taskRepository,
-        TaskExecutionRepository taskExecutionRepository) {
+        TaskExecutionRepository taskExecutionRepository,
+        UserApprovalSubscriptionService userApprovalSubscriptionService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -64,6 +66,7 @@ public class UserService {
         this.spaceRepository = spaceRepository;
         this.taskRepository = taskRepository;
         this.taskExecutionRepository = taskExecutionRepository;
+        this.userApprovalSubscriptionService = userApprovalSubscriptionService;
     }
 
     @Transactional
@@ -163,10 +166,12 @@ public class UserService {
         logger.info("Changing user status to {}", updateUserStatusRequestDTO.status());
         User user = findUserById(userId);
         UserStatusEnum previousStatus = user.getStatus();
-        validateStatusChangeDoesNotRemoveLastActiveGlobalAdmin(user, updateUserStatusRequestDTO.status());
-        user.setStatus(updateUserStatusRequestDTO.status());
+        UserStatusEnum targetStatus = updateUserStatusRequestDTO.status();
+        validateStatusChangeDoesNotRemoveLastActiveGlobalAdmin(user, targetStatus);
+        user.setStatus(targetStatus);
         userRepository.save(user);
-        if (!Objects.equals(previousStatus, updateUserStatusRequestDTO.status())) {
+        grantBasicPlanIfPendingUserWasApproved(user, previousStatus, targetStatus);
+        if (!Objects.equals(previousStatus, targetStatus)) {
             refreshTokenService.revokeAllByUserId(userId);
         }
         logger.info("User status changed successfully to {}", userId);
@@ -199,6 +204,13 @@ public class UserService {
     private void validatePasswordConfirmationMatches(CreateUserRequestDTO request) {
         if (!Objects.equals(request.password(), request.passwordConfirmation())) {
             throw new InvalidRequestException("Password confirmation does not match");
+        }
+    }
+
+    private void grantBasicPlanIfPendingUserWasApproved(
+        User user, UserStatusEnum previousStatus, UserStatusEnum targetStatus) {
+        if (UserStatusEnum.PENDING_EVALUATION.equals(previousStatus) && UserStatusEnum.ACTIVE.equals(targetStatus)) {
+            userApprovalSubscriptionService.grantBasicPlanForApprovedUserWithoutPlan(user);
         }
     }
 

@@ -60,6 +60,9 @@ class UserServiceTests {
     @Mock
     private TaskExecutionRepository taskExecutionRepository;
 
+    @Mock
+    private UserApprovalSubscriptionService userApprovalSubscriptionService;
+
     private UserService userService;
 
     @BeforeEach
@@ -71,7 +74,8 @@ class UserServiceTests {
             spaceMembershipRepository,
             spaceRepository,
             taskRepository,
-            taskExecutionRepository);
+            taskExecutionRepository,
+            userApprovalSubscriptionService);
     }
 
     @Test
@@ -356,6 +360,28 @@ class UserServiceTests {
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.SUSPENDED));
 
         verify(refreshTokenService).revokeAllByUserId(user.getId());
+    }
+
+    @Test
+    void changeStatusGrantsBasicPlanWhenPendingUserIsApproved() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setStatus(UserStatusEnum.PENDING_EVALUATION);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
+
+        verify(userApprovalSubscriptionService).grantBasicPlanForApprovedUserWithoutPlan(user);
+    }
+
+    @Test
+    void changeStatusDoesNotGrantBasicPlanWhenUserWasNotPending() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setStatus(UserStatusEnum.SUSPENDED);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
+
+        verify(userApprovalSubscriptionService, never()).grantBasicPlanForApprovedUserWithoutPlan(any());
     }
 
     @Test
