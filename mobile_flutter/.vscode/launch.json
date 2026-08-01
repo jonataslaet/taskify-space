@@ -6,7 +6,10 @@
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
-      "args": ["-d", "emulator-5554"],
+      "deviceId": "emulator-5554",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://10.0.2.2:8080"
+      ],
       "cwd": "${workspaceFolder}"
     }
   ]
