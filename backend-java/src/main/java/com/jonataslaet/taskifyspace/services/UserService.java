@@ -1,7 +1,11 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserRequestDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserResponseDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserPasswordRequestDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.ReadUserResponseDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
@@ -63,32 +67,31 @@ public class UserService {
     }
 
     @Transactional
-    public UserRecordDTO createUser(UserRecordDTO userRecordDTO) {
-        String normalizedEmail = EmailUtils.normalize(userRecordDTO.email());
+    public CreateUserResponseDTO createUser(CreateUserRequestDTO request) {
+        validatePasswordConfirmationMatches(request);
+        String normalizedEmail = EmailUtils.normalize(request.email());
         if (userRepository.existsByEmail(normalizedEmail)) throw new DuplicationException("Email already exists");
 
-        if(userRecordDTO.role().equals(UserRoleEnum.ROLE_ADMIN)) throw new ForbiddenException("Role admin is not allowed");
-
-        UserRoleEnum.validateExistence(userRecordDTO.role());
-        User user = UserMapper.toEntity(userRecordDTO);
+        User user = UserMapper.toEntity(request);
 
         user.setEmail(normalizedEmail);
         user.setStatus(UserStatusEnum.PENDING_EVALUATION);
-        user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
-        return UserMapper.toUserRecordDTO(userRepository.save(user));
+        user.setRole(UserRoleEnum.ROLE_USER);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        return UserMapper.toCreateUserResponseDTO(userRepository.save(user));
     }
 
-    public Page<@NonNull UserRecordDTO> findAll(Specification<@NonNull User> userSpecification , Pageable pageable) {
+    public Page<@NonNull ReadUserResponseDTO> findAll(Specification<@NonNull User> userSpecification , Pageable pageable) {
         logger.info("Fetching all users with filters: {} and pageable: {}", userSpecification, pageable);
         return userRepository.findAll(userSpecification, pageable).map(UserMapper::toUserRecordDTO);
     }
 
-    public UserRecordDTO findById(Long userId) {
+    public ReadUserResponseDTO findById(Long userId) {
         logger.info("Fetching user with ID {}", userId);
         return UserMapper.toUserRecordDTO(findUserById(userId));
     }
 
-    public UserRecordDTO findById(User authenticatedUser, Long userId) {
+    public ReadUserResponseDTO findById(User authenticatedUser, Long userId) {
         validateAdminOrSelf(authenticatedUser, userId);
         return findById(userId);
     }
@@ -118,33 +121,33 @@ public class UserService {
 
 
     @Transactional
-    public void updateUser(Long userId, UserRecordDTO userRecordDto) {
+    public void updateUser(Long userId, UpdateUserRequestDTO request) {
         logger.info("Updating user with ID {}", userId);
         User user = findUserById(userId);
-        String normalizedEmail = EmailUtils.normalize(userRecordDto.email());
+        String normalizedEmail = EmailUtils.normalize(request.email());
         validateEmailIsAvailableForUpdate(user, normalizedEmail);
 
         logger.debug("Updating editable profile fields for user ID {}", userId);
         user.setEmail(normalizedEmail);
-        user.setName(userRecordDto.name());
+        user.setName(request.name());
 
         userRepository.save(user);
         logger.info("User with ID {} updated successfully", userId);
     }
 
     @Transactional
-    public void updatePassword(Long userId, UserRecordDTO userRecordDTO) {
+    public void updatePassword(Long userId, UpdateUserPasswordRequestDTO request) {
         logger.info("Updating password for user with ID {}", userId);
 
         User user = findUserById(userId);
 
-        if (!passwordEncoder.matches(userRecordDTO.oldPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.oldPassword(), user.getPassword())) {
             logger.warn("Password mismatch for user ID {}", userId);
             throw new InvalidCredentialsException("Old password does not match");
         }
 
         logger.debug("Old password validated for user ID {}", userId);
-        user.setPassword(passwordEncoder.encode(userRecordDTO.password()));
+        user.setPassword(passwordEncoder.encode(request.password()));
         userRepository.save(user);
         refreshTokenService.revokeAllByUserId(userId);
 
@@ -190,6 +193,12 @@ public class UserService {
     private void validateEmailIsAvailableForUpdate(User user, String normalizedEmail) {
         if (!Objects.equals(user.getEmail(), normalizedEmail) && userRepository.existsByEmail(normalizedEmail)) {
             throw new DuplicationException("Email already exists");
+        }
+    }
+
+    private void validatePasswordConfirmationMatches(CreateUserRequestDTO request) {
+        if (!Objects.equals(request.password(), request.passwordConfirmation())) {
+            throw new InvalidRequestException("Password confirmation does not match");
         }
     }
 

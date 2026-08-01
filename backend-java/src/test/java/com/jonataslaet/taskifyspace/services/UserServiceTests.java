@@ -1,7 +1,11 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserRequestDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserResponseDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserPasswordRequestDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.ReadUserResponseDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
@@ -75,7 +79,7 @@ class UserServiceTests {
         User authenticatedUser = createUser(1L, UserRoleEnum.ROLE_USER);
         when(userRepository.findById(authenticatedUser.getId())).thenReturn(Optional.of(authenticatedUser));
 
-        UserRecordDTO foundUser = userService.findById(authenticatedUser, authenticatedUser.getId());
+        ReadUserResponseDTO foundUser = userService.findById(authenticatedUser, authenticatedUser.getId());
 
         assertThat(foundUser.id()).isEqualTo(authenticatedUser.getId());
     }
@@ -92,43 +96,58 @@ class UserServiceTests {
 
     @Test
     void createUserNormalizesEmailBeforeCheckingDuplicateAndSaving() {
-        UserRecordDTO createRequest = new UserRecordDTO(
-            null,
+        CreateUserRequestDTO createRequest = new CreateUserRequestDTO(
             " User@Example.COM ",
             "User",
-            UserStatusEnum.ACTIVE,
-            UserRoleEnum.ROLE_USER,
             "Strong1!",
-            null);
+            "Strong1!");
 
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode(createRequest.password())).thenReturn("encoded-password");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        UserRecordDTO createdUser = userService.createUser(createRequest);
+        CreateUserResponseDTO createdUser = userService.createUser(createRequest);
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());
-        assertThat(userCaptor.getValue().getEmail()).isEqualTo("user@example.com");
+        User savedUser = userCaptor.getValue();
+
+        assertThat(savedUser.getEmail()).isEqualTo("user@example.com");
+        assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
+        assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.PENDING_EVALUATION);
         assertThat(createdUser.email()).isEqualTo("user@example.com");
+        assertThat(createdUser.role()).isEqualTo(UserRoleEnum.ROLE_USER);
+        assertThat(createdUser.status()).isEqualTo(UserStatusEnum.PENDING_EVALUATION);
     }
 
     @Test
     void createUserRejectsDuplicateNormalizedEmail() {
-        UserRecordDTO createRequest = new UserRecordDTO(
-            null,
+        CreateUserRequestDTO createRequest = new CreateUserRequestDTO(
             " User@Example.COM ",
             "User",
-            UserStatusEnum.ACTIVE,
-            UserRoleEnum.ROLE_USER,
             "Strong1!",
-            null);
+            "Strong1!");
 
         when(userRepository.existsByEmail("user@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> userService.createUser(createRequest))
             .isInstanceOf(DuplicationException.class);
 
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void createUserRejectsPasswordConfirmationMismatch() {
+        CreateUserRequestDTO createRequest = new CreateUserRequestDTO(
+            "user@example.com",
+            "User",
+            "Strong1!",
+            "Other1!");
+
+        assertThatThrownBy(() -> userService.createUser(createRequest))
+            .isInstanceOf(InvalidRequestException.class);
+
+        verify(userRepository, never()).existsByEmail(any());
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -232,14 +251,9 @@ class UserServiceTests {
         user.setStatus(UserStatusEnum.ACTIVE);
         user.setPassword("encoded-password");
 
-        UserRecordDTO updateRequest = new UserRecordDTO(
-            null,
+        UpdateUserRequestDTO updateRequest = new UpdateUserRequestDTO(
             " New@Example.COM ",
-            "New Name",
-            UserStatusEnum.SUSPENDED,
-            UserRoleEnum.ROLE_ADMIN,
-            "new-password",
-            "old-password");
+            "New Name");
 
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
@@ -260,14 +274,9 @@ class UserServiceTests {
     void updateUserRejectsDuplicateNormalizedEmail() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
         user.setEmail("old@example.com");
-        UserRecordDTO updateRequest = new UserRecordDTO(
-            null,
+        UpdateUserRequestDTO updateRequest = new UpdateUserRequestDTO(
             " Taken@Example.COM ",
-            "New Name",
-            null,
-            null,
-            null,
-            null);
+            "New Name");
 
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
@@ -281,12 +290,7 @@ class UserServiceTests {
     @Test
     void updatePasswordRevokesRefreshTokensAfterPasswordChange() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
-        UserRecordDTO updateRequest = new UserRecordDTO(
-            null,
-            null,
-            null,
-            null,
-            null,
+        UpdateUserPasswordRequestDTO updateRequest = new UpdateUserPasswordRequestDTO(
             "NewPass1!",
             "OldPass1!");
 
@@ -304,12 +308,7 @@ class UserServiceTests {
     @Test
     void updatePasswordDoesNotRevokeRefreshTokensWhenOldPasswordDoesNotMatch() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
-        UserRecordDTO updateRequest = new UserRecordDTO(
-            null,
-            null,
-            null,
-            null,
-            null,
+        UpdateUserPasswordRequestDTO updateRequest = new UpdateUserPasswordRequestDTO(
             "NewPass1!",
             "WrongOld1!");
 

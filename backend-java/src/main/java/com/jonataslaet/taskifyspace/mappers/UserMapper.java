@@ -1,24 +1,29 @@
 package com.jonataslaet.taskifyspace.mappers;
 
-import com.jonataslaet.taskifyspace.controllers.dtos.UserRecordDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserRequestDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserResponseDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.ReadUserResponseDTO;
 import com.jonataslaet.taskifyspace.entities.User;
-import org.springframework.beans.BeanUtils;
 
 import java.util.Objects;
 
 public class UserMapper {
 
-    public static User toEntity(UserRecordDTO userRecordDTO) {
+    public static User toEntity(CreateUserRequestDTO request) {
         User user = new User();
-        BeanUtils.copyProperties(userRecordDTO, user);
+        user.setEmail(request.email());
+        user.setName(request.name());
         return user;
     }
 
-    public static UserRecordDTO toUserRecordDTO(User user) {
+    public static CreateUserResponseDTO toCreateUserResponseDTO(User user) {
         if (Objects.isNull(user)) return null;
-        return new UserRecordDTO(user.getId(), user.getEmail(),
-            user.getName(), user.getStatus(), user.getRole(), null, null
-        );
+        return new CreateUserResponseDTO(user.getId(), user.getEmail(), user.getName(), user.getStatus(), user.getRole());
+    }
+
+    public static ReadUserResponseDTO toUserRecordDTO(User user) {
+        if (Objects.isNull(user)) return null;
+        return new ReadUserResponseDTO(user.getId(), user.getEmail(), user.getName(), user.getStatus(), user.getRole());
     }
 
 }
