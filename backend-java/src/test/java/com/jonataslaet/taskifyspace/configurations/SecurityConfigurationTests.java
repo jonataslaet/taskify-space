@@ -19,6 +19,12 @@ class SecurityConfigurationTests {
     }
 
     @Test
+    void registrationConfirmationEndpointIsPublicGetRoute() {
+        assertThat(SecurityConfiguration.GET_PUBLIC)
+            .contains("/users/confirm-registration/*");
+    }
+
+    @Test
     void authenticationEntryPointHandlesExceptionWithoutCause() throws Exception {
         ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
         SecurityConfiguration securityConfiguration = new SecurityConfiguration(null, null, mapper);

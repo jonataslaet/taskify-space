@@ -33,7 +33,9 @@ public class SecurityConfiguration {
     private final TokenConfiguration tokenConfiguration;
     private final CorsConfigurationSource corsConfigurationSource;
     private final ObjectMapper mapper;
-    public static final String[] GET_PUBLIC = {"/public/**", "/privacy-policy"};
+    public static final String[] GET_PUBLIC = {
+        "/public/**", "/privacy-policy", "/users/confirm-registration/*"
+    };
     public static final String[] POST_PUBLIC = {
         "/auth/login", "/auth/refresh", "/auth/recovery-token", "/auth/new-password/*", "/users"
     };

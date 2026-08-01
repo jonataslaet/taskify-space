@@ -11,6 +11,7 @@ import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.events.UserCreatedEvent;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
@@ -26,6 +27,7 @@ import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -49,6 +51,7 @@ public class UserService {
     private final TaskRepository taskRepository;
     private final TaskExecutionRepository taskExecutionRepository;
     private final UserApprovalSubscriptionService userApprovalSubscriptionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public UserService(
         UserRepository userRepository,
@@ -58,7 +61,8 @@ public class UserService {
         SpaceRepository spaceRepository,
         TaskRepository taskRepository,
         TaskExecutionRepository taskExecutionRepository,
-        UserApprovalSubscriptionService userApprovalSubscriptionService) {
+        UserApprovalSubscriptionService userApprovalSubscriptionService,
+        ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -67,6 +71,7 @@ public class UserService {
         this.taskRepository = taskRepository;
         this.taskExecutionRepository = taskExecutionRepository;
         this.userApprovalSubscriptionService = userApprovalSubscriptionService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -81,7 +86,9 @@ public class UserService {
         user.setStatus(UserStatusEnum.PENDING_EVALUATION);
         user.setRole(UserRoleEnum.ROLE_USER);
         user.setPassword(passwordEncoder.encode(request.password()));
-        return UserMapper.toCreateUserResponseDTO(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        eventPublisher.publishEvent(new UserCreatedEvent(savedUser.getId()));
+        return UserMapper.toCreateUserResponseDTO(savedUser);
     }
 
     public Page<@NonNull ReadUserResponseDTO> findAll(Specification<@NonNull User> userSpecification , Pageable pageable) {

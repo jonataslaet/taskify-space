@@ -21,4 +21,15 @@ public class AsyncConfiguration {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "userRegistrationTaskExecutor")
+    public Executor userRegistrationTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("user-registration-");
+        executor.initialize();
+        return executor;
+    }
 }

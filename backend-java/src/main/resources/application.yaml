@@ -30,6 +30,10 @@ security:
       uri: ${PASSWORD_RECOVER_URI:http://localhost:5173/new-password/}
       token:
         minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES}
+    registration-confirmation:
+      uri: ${REGISTRATION_CONFIRMATION_URI:http://localhost:8080/users/confirm-registration/}
+      token:
+        minutes: ${REGISTRATION_CONFIRMATION_TOKEN_MINUTES:5}
   password:
     root: ${PASSWORD_ROOT}
   jwt:

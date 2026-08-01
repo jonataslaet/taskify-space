@@ -9,6 +9,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.ReadUserResponseDTO;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
+import com.jonataslaet.taskifyspace.events.UserCreatedEvent;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -63,6 +65,9 @@ class UserServiceTests {
     @Mock
     private UserApprovalSubscriptionService userApprovalSubscriptionService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private UserService userService;
 
     @BeforeEach
@@ -75,7 +80,8 @@ class UserServiceTests {
             spaceRepository,
             taskRepository,
             taskExecutionRepository,
-            userApprovalSubscriptionService);
+            userApprovalSubscriptionService,
+            eventPublisher);
     }
 
     @Test
@@ -108,7 +114,11 @@ class UserServiceTests {
 
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode(createRequest.password())).thenReturn("encoded-password");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            user.setId(10L);
+            return user;
+        });
 
         CreateUserResponseDTO createdUser = userService.createUser(createRequest);
 
@@ -122,6 +132,10 @@ class UserServiceTests {
         assertThat(createdUser.email()).isEqualTo("user@example.com");
         assertThat(createdUser.role()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(createdUser.status()).isEqualTo(UserStatusEnum.PENDING_EVALUATION);
+
+        ArgumentCaptor<UserCreatedEvent> eventCaptor = ArgumentCaptor.forClass(UserCreatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().userId()).isEqualTo(10L);
     }
 
     @Test

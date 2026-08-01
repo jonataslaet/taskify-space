@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.SendingEmailDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -19,7 +20,7 @@ public class EmailService {
         this.javaMailSender = javaMailSender;
     }
 
-    public void sendEmail(com.jonataslaet.taskifyspace.controllers.dtos.SendingEmailDTO sendingEmailDTO) {
+    public void sendEmail(SendingEmailDTO sendingEmailDTO) {
         try {
             SimpleMailMessage simpleMailMessage = new SimpleMailMessage();
             simpleMailMessage.setSentDate(new Date());

@@ -7,6 +7,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.ReadUserResponseDTO;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.services.UserRegistrationConfirmationService;
 import com.jonataslaet.taskifyspace.services.UserService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
 import jakarta.validation.Valid;
@@ -23,16 +24,26 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/users")
 public class UserController {
 
-    final UserService userService;
+    private final UserService userService;
+    private final UserRegistrationConfirmationService userRegistrationConfirmationService;
 
-    public UserController(UserService userService) {
+    public UserController(
+        UserService userService,
+        UserRegistrationConfirmationService userRegistrationConfirmationService) {
         this.userService = userService;
+        this.userRegistrationConfirmationService = userRegistrationConfirmationService;
     }
 
     @PostMapping
     public ResponseEntity<@NonNull CreateUserResponseDTO> createUser(
         @RequestBody @Valid CreateUserRequestDTO request){
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
+    }
+
+    @GetMapping("/confirm-registration/{token}")
+    public ResponseEntity<@NonNull Void> confirmRegistration(@PathVariable String token) {
+        userRegistrationConfirmationService.confirmRegistration(token);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{userId}")
