@@ -9,6 +9,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,6 +41,12 @@ public class User implements UserDetails {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private UserRoleEnum role;
+
+    @Column(name = "email_confirmed_at")
+    private Instant emailConfirmedAt;
+
+    @Column(name = "registration_confirmation_expires_at")
+    private Instant registrationConfirmationExpiresAt;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<SpaceMembership> memberships = new HashSet<>();
@@ -118,6 +125,42 @@ public class User implements UserDetails {
 
     public void setRole(UserRoleEnum role) {
         this.role = role;
+    }
+
+    public Instant getEmailConfirmedAt() {
+        return emailConfirmedAt;
+    }
+
+    public void setEmailConfirmedAt(Instant emailConfirmedAt) {
+        this.emailConfirmedAt = emailConfirmedAt;
+    }
+
+    public Instant getRegistrationConfirmationExpiresAt() {
+        return registrationConfirmationExpiresAt;
+    }
+
+    public void setRegistrationConfirmationExpiresAt(Instant registrationConfirmationExpiresAt) {
+        this.registrationConfirmationExpiresAt = registrationConfirmationExpiresAt;
+    }
+
+    public void requestEmailConfirmation(Instant expiration) {
+        this.emailConfirmedAt = null;
+        this.registrationConfirmationExpiresAt = expiration;
+    }
+
+    public void confirmEmail(Instant confirmedAt) {
+        this.emailConfirmedAt = confirmedAt;
+        this.registrationConfirmationExpiresAt = null;
+    }
+
+    public boolean isRegistrationConfirmationPending() {
+        return UserStatusEnum.PENDING_EVALUATION.equals(status) && emailConfirmedAt == null;
+    }
+
+    public boolean hasExpiredPendingRegistrationConfirmation(Instant now) {
+        return isRegistrationConfirmationPending()
+            && registrationConfirmationExpiresAt != null
+            && !registrationConfirmationExpiresAt.isAfter(now);
     }
 
     @Override

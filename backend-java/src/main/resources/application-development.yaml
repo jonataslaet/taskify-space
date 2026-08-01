@@ -14,3 +14,9 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.orm.jdbc.bind: TRACE
+
+security:
+  email:
+    registration-confirmation:
+      cleanup:
+        enabled: ${REGISTRATION_CONFIRMATION_CLEANUP_ENABLED:false}

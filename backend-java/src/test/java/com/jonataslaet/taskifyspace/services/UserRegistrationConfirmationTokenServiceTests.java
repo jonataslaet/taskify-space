@@ -69,11 +69,26 @@ class UserRegistrationConfirmationTokenServiceTests {
         assertThat(confirmation.getUser()).isSameAs(user);
         assertThat(confirmation.getExpiration()).isEqualTo(NOW.plusSeconds(300));
         assertThat(confirmation.getTokenHash()).isEqualTo(TokenUtils.sha256(result.get().token()));
+        assertThat(user.getEmailConfirmedAt()).isNull();
+        assertThat(user.getRegistrationConfirmationExpiresAt()).isEqualTo(NOW.plusSeconds(300));
     }
 
     @Test
     void createConfirmationTokenReturnsEmptyWhenUserIsNotPending() {
         User user = createUser(UserStatusEnum.ACTIVE);
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+
+        Optional<UserRegistrationConfirmationEmail> result = tokenService.createConfirmationToken(user.getId());
+
+        assertThat(result).isEmpty();
+        verify(confirmationRepository, never()).expireValidConfirmationsByUserId(any(), any());
+        verify(confirmationRepository, never()).save(any());
+    }
+
+    @Test
+    void createConfirmationTokenReturnsEmptyWhenPendingUserAlreadyConfirmedEmail() {
+        User user = createUser(UserStatusEnum.PENDING_EVALUATION);
+        user.confirmEmail(NOW.minusSeconds(60));
         when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         Optional<UserRegistrationConfirmationEmail> result = tokenService.createConfirmationToken(user.getId());

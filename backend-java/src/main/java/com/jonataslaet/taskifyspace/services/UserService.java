@@ -27,6 +27,7 @@ import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +36,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 
 @Service
@@ -52,6 +55,10 @@ public class UserService {
     private final TaskExecutionRepository taskExecutionRepository;
     private final UserApprovalSubscriptionService userApprovalSubscriptionService;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
+
+    @Value("${security.email.registration-confirmation.token.minutes:5}")
+    private Long registrationConfirmationTokenMinutes = 5L;
 
     public UserService(
         UserRepository userRepository,
@@ -62,7 +69,8 @@ public class UserService {
         TaskRepository taskRepository,
         TaskExecutionRepository taskExecutionRepository,
         UserApprovalSubscriptionService userApprovalSubscriptionService,
-        ApplicationEventPublisher eventPublisher) {
+        ApplicationEventPublisher eventPublisher,
+        Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
@@ -72,6 +80,7 @@ public class UserService {
         this.taskExecutionRepository = taskExecutionRepository;
         this.userApprovalSubscriptionService = userApprovalSubscriptionService;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Transactional
@@ -86,6 +95,7 @@ public class UserService {
         user.setStatus(UserStatusEnum.PENDING_EVALUATION);
         user.setRole(UserRoleEnum.ROLE_USER);
         user.setPassword(passwordEncoder.encode(request.password()));
+        user.requestEmailConfirmation(registrationConfirmationExpiration());
         User savedUser = userRepository.save(user);
         eventPublisher.publishEvent(new UserCreatedEvent(savedUser.getId()));
         return UserMapper.toCreateUserResponseDTO(savedUser);
@@ -115,16 +125,16 @@ public class UserService {
     }
 
     @Transactional
-    public boolean deletePendingRegistrationUser(Long userId) {
-        logger.info("Attempting to delete pending registration user with ID {}", userId);
+    public boolean deleteExpiredPendingRegistrationUser(Long userId, Instant now) {
+        logger.info("Attempting to delete expired pending registration user with ID {}", userId);
         User user = findUserByIdForUpdate(userId);
-        if (!UserStatusEnum.PENDING_EVALUATION.equals(user.getStatus())) {
-            logger.info("User with ID {} was not deleted because status is {}", userId, user.getStatus());
+        if (!user.hasExpiredPendingRegistrationConfirmation(now)) {
+            logger.info("User with ID {} was not deleted because registration confirmation is not expired", userId);
             return false;
         }
 
         deleteUser(user);
-        logger.info("Pending registration user with ID {} deleted successfully", userId);
+        logger.info("Expired pending registration user with ID {} deleted successfully", userId);
         return true;
     }
 
@@ -190,7 +200,7 @@ public class UserService {
         }
 
         logger.info("Changing user status to {}", updateUserStatusRequestDTO.status());
-        User user = findUserById(userId);
+        User user = findUserByIdForUpdate(userId);
         UserStatusEnum previousStatus = user.getStatus();
         UserStatusEnum targetStatus = updateUserStatusRequestDTO.status();
         validateStatusChangeDoesNotRemoveLastActiveGlobalAdmin(user, targetStatus);
@@ -231,6 +241,10 @@ public class UserService {
         if (!Objects.equals(request.password(), request.passwordConfirmation())) {
             throw new InvalidRequestException("Password confirmation does not match");
         }
+    }
+
+    private Instant registrationConfirmationExpiration() {
+        return Instant.now(clock).plusSeconds(60 * registrationConfirmationTokenMinutes);
     }
 
     private void grantBasicPlanIfPendingUserWasApproved(

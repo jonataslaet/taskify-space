@@ -35,7 +35,7 @@ class UserRegistrationConfirmationRequestServiceTests {
         ReflectionTestUtils.setField(
             requestService,
             "registrationConfirmationUri",
-            "http://localhost:8080/users/confirm-registration/");
+            "http://localhost:5173/confirm-registration?token=");
     }
 
     @Test
@@ -61,7 +61,7 @@ class UserRegistrationConfirmationRequestServiceTests {
         assertThat(sendingEmailDTO.to()).isEqualTo("user@example.com");
         assertThat(sendingEmailDTO.subject()).isEqualTo("Confirmacao de cadastro");
         assertThat(sendingEmailDTO.body())
-            .contains("http://localhost:8080/users/confirm-registration/raw-token")
+            .contains("http://localhost:5173/confirm-registration?token=raw-token")
             .contains("5 minutos");
     }
 }

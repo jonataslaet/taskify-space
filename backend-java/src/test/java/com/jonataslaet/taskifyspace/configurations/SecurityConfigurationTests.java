@@ -19,9 +19,11 @@ class SecurityConfigurationTests {
     }
 
     @Test
-    void registrationConfirmationEndpointIsPublicGetRoute() {
+    void registrationConfirmationEndpointIsPublicPostRoute() {
+        assertThat(SecurityConfiguration.POST_PUBLIC)
+            .contains("/users/confirm-registration");
         assertThat(SecurityConfiguration.GET_PUBLIC)
-            .contains("/users/confirm-registration/*");
+            .doesNotContain("/users/confirm-registration/*");
     }
 
     @Test

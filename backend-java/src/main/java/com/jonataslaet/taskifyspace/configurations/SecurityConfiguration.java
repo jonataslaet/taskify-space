@@ -34,10 +34,11 @@ public class SecurityConfiguration {
     private final CorsConfigurationSource corsConfigurationSource;
     private final ObjectMapper mapper;
     public static final String[] GET_PUBLIC = {
-        "/public/**", "/privacy-policy", "/users/confirm-registration/*"
+        "/public/**", "/privacy-policy"
     };
     public static final String[] POST_PUBLIC = {
-        "/auth/login", "/auth/refresh", "/auth/recovery-token", "/auth/new-password/*", "/users"
+        "/auth/login", "/auth/refresh", "/auth/recovery-token", "/auth/new-password/*", "/users",
+        "/users/confirm-registration"
     };
 
     public SecurityConfiguration(TokenConfiguration tokenConfiguration, CorsConfigurationSource corsConfigurationSource,

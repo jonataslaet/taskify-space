@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,5 +37,23 @@ public interface UserRepository extends JpaRepository<@NonNull User, @NonNull Lo
     List<User> findByRoleAndStatusForUpdate(
         @Param("role") UserRoleEnum role,
         @Param("status") UserStatusEnum status);
+
+    @Query(
+        value = """
+            SELECT u.id
+            FROM users u
+            WHERE u.status = :status
+                AND u.email_confirmed_at IS NULL
+                AND u.registration_confirmation_expires_at IS NOT NULL
+                AND u.registration_confirmation_expires_at <= :now
+            ORDER BY u.id ASC
+            LIMIT :limit
+            FOR UPDATE SKIP LOCKED
+            """,
+        nativeQuery = true)
+    List<Long> findExpiredUnconfirmedRegistrationUserIdsForUpdate(
+        @Param("now") Instant now,
+        @Param("status") String status,
+        @Param("limit") int limit);
 
 }

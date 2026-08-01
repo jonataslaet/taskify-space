@@ -12,6 +12,12 @@ spring:
       hibernate:
         format_sql: false
 
+security:
+  email:
+    registration-confirmation:
+      cleanup:
+        enabled: ${REGISTRATION_CONFIRMATION_CLEANUP_ENABLED:true}
+
 logging:
   level:
     org.hibernate.SQL: OFF

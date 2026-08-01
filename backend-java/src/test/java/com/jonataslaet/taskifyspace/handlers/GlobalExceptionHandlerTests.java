@@ -4,6 +4,7 @@ import com.jonataslaet.taskifyspace.controllers.dtos.StandardErrorRecordDTO;
 import com.jonataslaet.taskifyspace.exceptions.EmailException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidCredentialsException;
 import com.jonataslaet.taskifyspace.exceptions.RateLimitExceededException;
+import com.jonataslaet.taskifyspace.exceptions.RegistrationConfirmationException;
 import com.jonataslaet.taskifyspace.exceptions.TokenExpirationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -98,6 +99,24 @@ class GlobalExceptionHandlerTests {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
         assertResponseStatusException(response.getBody(), HttpStatus.TOO_MANY_REQUESTS, "Muitas tentativas", request);
+    }
+
+    @Test
+    void handlesRegistrationConfirmationExceptionWithMachineReadableCode() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/users/confirm-registration");
+
+        var response = handler.handleRegistrationConfirmationException(
+            RegistrationConfirmationException.expiredRegistrationDeleted(),
+            request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.GONE);
+        assertResponseStatusException(
+            response.getBody(),
+            HttpStatus.GONE,
+            "Cadastro expirado e removido. Faca um novo cadastro.",
+            request);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("REGISTRATION_CONFIRMATION_EXPIRED_USER_DELETED");
     }
 
     private void assertResponseStatusException(

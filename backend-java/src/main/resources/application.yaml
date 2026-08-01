@@ -31,11 +31,13 @@ security:
       token:
         minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES}
     registration-confirmation:
-      uri: ${REGISTRATION_CONFIRMATION_URI:http://localhost:8080/users/confirm-registration/}
+      uri: ${REGISTRATION_CONFIRMATION_URI:http://localhost:5173/confirm-registration?token=}
       token:
         minutes: ${REGISTRATION_CONFIRMATION_TOKEN_MINUTES:5}
       cleanup:
+        enabled: ${REGISTRATION_CONFIRMATION_CLEANUP_ENABLED:false}
         fixed-delay: ${REGISTRATION_CONFIRMATION_CLEANUP_FIXED_DELAY:60000}
+        batch-size: ${REGISTRATION_CONFIRMATION_CLEANUP_BATCH_SIZE:100}
   password:
     root: ${PASSWORD_ROOT}
   jwt:

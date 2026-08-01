@@ -28,6 +28,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +43,8 @@ import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTests {
+
+    private static final Instant NOW = Instant.parse("2026-08-01T12:00:00Z");
 
     @Mock
     private UserRepository userRepository;
@@ -81,7 +86,8 @@ class UserServiceTests {
             taskRepository,
             taskExecutionRepository,
             userApprovalSubscriptionService,
-            eventPublisher);
+            eventPublisher,
+            Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -129,6 +135,8 @@ class UserServiceTests {
         assertThat(savedUser.getEmail()).isEqualTo("user@example.com");
         assertThat(savedUser.getRole()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(savedUser.getStatus()).isEqualTo(UserStatusEnum.PENDING_EVALUATION);
+        assertThat(savedUser.getEmailConfirmedAt()).isNull();
+        assertThat(savedUser.getRegistrationConfirmationExpiresAt()).isEqualTo(NOW.plusSeconds(300));
         assertThat(createdUser.email()).isEqualTo("user@example.com");
         assertThat(createdUser.role()).isEqualTo(UserRoleEnum.ROLE_USER);
         assertThat(createdUser.status()).isEqualTo(UserStatusEnum.PENDING_EVALUATION);
@@ -260,12 +268,13 @@ class UserServiceTests {
     }
 
     @Test
-    void deletePendingRegistrationUserDeletesUserOnlyWhenStatusIsPending() {
+    void deleteExpiredPendingRegistrationUserDeletesOnlyExpiredUnconfirmedPendingUser() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
         user.setStatus(UserStatusEnum.PENDING_EVALUATION);
+        user.requestEmailConfirmation(NOW.minusSeconds(1));
         when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
-        boolean deleted = userService.deletePendingRegistrationUser(user.getId());
+        boolean deleted = userService.deleteExpiredPendingRegistrationUser(user.getId(), NOW);
 
         assertThat(deleted).isTrue();
         verify(taskExecutionRepository).deleteExecutorLinksByUserId(user.getId());
@@ -274,12 +283,28 @@ class UserServiceTests {
     }
 
     @Test
-    void deletePendingRegistrationUserDoesNotDeleteUserWhenStatusChanged() {
+    void deleteExpiredPendingRegistrationUserDoesNotDeleteUserWhenStatusChanged() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
         user.setStatus(UserStatusEnum.ACTIVE);
+        user.requestEmailConfirmation(NOW.minusSeconds(1));
         when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
-        boolean deleted = userService.deletePendingRegistrationUser(user.getId());
+        boolean deleted = userService.deleteExpiredPendingRegistrationUser(user.getId(), NOW);
+
+        assertThat(deleted).isFalse();
+        verify(userRepository, never()).delete(any(User.class));
+        verify(refreshTokenService, never()).deleteAllByUserId(user.getId());
+    }
+
+    @Test
+    void deleteExpiredPendingRegistrationUserDoesNotDeleteConfirmedPendingUser() {
+        User user = createUser(1L, UserRoleEnum.ROLE_USER);
+        user.setStatus(UserStatusEnum.PENDING_EVALUATION);
+        user.confirmEmail(NOW.minusSeconds(60));
+        user.setRegistrationConfirmationExpiresAt(NOW.minusSeconds(1));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+
+        boolean deleted = userService.deleteExpiredPendingRegistrationUser(user.getId(), NOW);
 
         assertThat(deleted).isFalse();
         verify(userRepository, never()).delete(any(User.class));
@@ -372,7 +397,7 @@ class UserServiceTests {
         assertThatThrownBy(() -> userService.changeStatus(1L, null))
             .isInstanceOf(InvalidRequestException.class);
 
-        verify(userRepository, never()).findById(1L);
+        verify(userRepository, never()).findByIdForUpdate(1L);
         verify(refreshTokenService, never()).revokeAllByUserId(1L);
     }
 
@@ -381,7 +406,7 @@ class UserServiceTests {
         assertThatThrownBy(() -> userService.changeStatus(1L, new UpdateUserStatusRequestDTO(null)))
             .isInstanceOf(InvalidRequestException.class);
 
-        verify(userRepository, never()).findById(1L);
+        verify(userRepository, never()).findByIdForUpdate(1L);
         verify(refreshTokenService, never()).revokeAllByUserId(1L);
     }
 
@@ -396,7 +421,7 @@ class UserServiceTests {
     @Test
     void changeStatusRevokesRefreshTokensWhenStatusChanges() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.SUSPENDED));
 
@@ -407,7 +432,7 @@ class UserServiceTests {
     void changeStatusGrantsBasicPlanWhenPendingUserIsApproved() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
         user.setStatus(UserStatusEnum.PENDING_EVALUATION);
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
 
@@ -418,7 +443,7 @@ class UserServiceTests {
     void changeStatusDoesNotGrantBasicPlanWhenUserWasNotPending() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
         user.setStatus(UserStatusEnum.SUSPENDED);
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
 
@@ -428,7 +453,7 @@ class UserServiceTests {
     @Test
     void changeStatusDoesNotRevokeRefreshTokensWhenStatusIsUnchanged() {
         User user = createUser(1L, UserRoleEnum.ROLE_USER);
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
 
@@ -438,7 +463,7 @@ class UserServiceTests {
     @Test
     void changeStatusPreventsSuspendingLastActiveGlobalAdmin() {
         User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
-        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdForUpdate(admin.getId())).thenReturn(Optional.of(admin));
         when(userRepository.findByRoleAndStatusForUpdate(UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE))
             .thenReturn(List.of(admin));
 
@@ -455,7 +480,7 @@ class UserServiceTests {
     void changeStatusAllowsSuspendingActiveGlobalAdminWhenAnotherActiveGlobalAdminExists() {
         User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
         User otherAdmin = createUser(2L, UserRoleEnum.ROLE_ADMIN);
-        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdForUpdate(admin.getId())).thenReturn(Optional.of(admin));
         when(userRepository.findByRoleAndStatusForUpdate(UserRoleEnum.ROLE_ADMIN, UserStatusEnum.ACTIVE))
             .thenReturn(List.of(admin, otherAdmin));
 
@@ -469,7 +494,7 @@ class UserServiceTests {
     @Test
     void changeStatusDoesNotCheckLastActiveGlobalAdminWhenAdminRemainsActive() {
         User admin = createUser(1L, UserRoleEnum.ROLE_ADMIN);
-        when(userRepository.findById(admin.getId())).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdForUpdate(admin.getId())).thenReturn(Optional.of(admin));
 
         userService.changeStatus(admin.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
 

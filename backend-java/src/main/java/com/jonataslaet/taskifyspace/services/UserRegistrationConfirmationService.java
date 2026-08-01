@@ -5,8 +5,9 @@ import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.UserRegistrationConfirmation;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
-import com.jonataslaet.taskifyspace.exceptions.TokenExpirationException;
+import com.jonataslaet.taskifyspace.exceptions.RegistrationConfirmationException;
 import com.jonataslaet.taskifyspace.repositories.UserRegistrationConfirmationRepository;
+import com.jonataslaet.taskifyspace.repositories.UserRegistrationConfirmationRepository.ConfirmationReference;
 import com.jonataslaet.taskifyspace.utils.TokenUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,21 +34,20 @@ public class UserRegistrationConfirmationService {
         this.clock = clock;
     }
 
-    @Transactional(noRollbackFor = TokenExpirationException.class)
+    @Transactional(noRollbackFor = RegistrationConfirmationException.class)
     public void confirmRegistration(String rawToken) {
         if (Objects.isNull(rawToken) || rawToken.isBlank()) {
             throw invalidTokenException();
         }
 
         Instant now = Instant.now(clock);
-        UserRegistrationConfirmation confirmation = findUnusedConfirmation(rawToken);
-        if (!confirmation.getExpiration().isAfter(now)) {
-            deletePendingUserForExpiredConfirmation(confirmation, now);
-            throw invalidTokenException();
-        }
-        User user = confirmation.getUser();
+        String tokenHash = TokenUtils.sha256(rawToken);
+        ConfirmationReference reference = findUnusedConfirmationReference(tokenHash);
+        User user = userService.findUserByIdForUpdate(reference.getUserId());
+        UserRegistrationConfirmation confirmation = findUnusedConfirmationForUpdate(reference.getId(), tokenHash, user);
 
         if (UserStatusEnum.ACTIVE.equals(user.getStatus())) {
+            user.confirmEmail(now);
             confirmation.markUsed(now);
             confirmationRepository.save(confirmation);
             return;
@@ -57,14 +57,22 @@ public class UserRegistrationConfirmationService {
             throw new InvalidRequestException("Cadastro nao pode ser confirmado no status atual do usuario");
         }
 
+        if (!confirmation.getExpiration().isAfter(now)) {
+            boolean userDeleted = userService.deleteExpiredPendingRegistrationUser(user.getId(), now);
+            throw userDeleted
+                ? RegistrationConfirmationException.expiredRegistrationDeleted()
+                : RegistrationConfirmationException.expiredToken();
+        }
+
+        user.confirmEmail(now);
         confirmation.markUsed(now);
         userService.changeStatus(user.getId(), new UpdateUserStatusRequestDTO(UserStatusEnum.ACTIVE));
         confirmationRepository.save(confirmation);
     }
 
-    private UserRegistrationConfirmation findUnusedConfirmation(String rawToken) {
-        List<UserRegistrationConfirmation> confirmations =
-            confirmationRepository.findUnusedConfirmationsForUpdate(TokenUtils.sha256(rawToken));
+    private ConfirmationReference findUnusedConfirmationReference(String tokenHash) {
+        List<ConfirmationReference> confirmations =
+            confirmationRepository.findUnusedConfirmationReferencesByTokenHash(tokenHash);
         if (Objects.isNull(confirmations) || confirmations.isEmpty()) {
             throw invalidTokenException();
         }
@@ -74,20 +82,22 @@ public class UserRegistrationConfirmationService {
         return confirmations.getFirst();
     }
 
-    private void deletePendingUserForExpiredConfirmation(UserRegistrationConfirmation confirmation, Instant now) {
-        User user = confirmation.getUser();
-        if (Objects.isNull(user)) {
-            return;
+    private UserRegistrationConfirmation findUnusedConfirmationForUpdate(
+        Long confirmationId,
+        String tokenHash,
+        User user) {
+        UserRegistrationConfirmation confirmation = confirmationRepository.findByIdForUpdate(confirmationId)
+            .orElseThrow(this::invalidTokenException);
+        if (!Objects.equals(tokenHash, confirmation.getTokenHash())
+            || Objects.nonNull(confirmation.getUsedAt())
+            || Objects.isNull(confirmation.getUser())
+            || !Objects.equals(user.getId(), confirmation.getUser().getId())) {
+            throw invalidTokenException();
         }
-
-        boolean hasAnotherValidConfirmation =
-            confirmationRepository.existsByUserIdAndUsedAtIsNullAndExpirationAfter(user.getId(), now);
-        if (!hasAnotherValidConfirmation) {
-            userService.deletePendingRegistrationUser(user.getId());
-        }
+        return confirmation;
     }
 
-    private TokenExpirationException invalidTokenException() {
-        return new TokenExpirationException("Token de confirmacao de cadastro invalido ou expirado");
+    private RegistrationConfirmationException invalidTokenException() {
+        return RegistrationConfirmationException.invalidToken();
     }
 }

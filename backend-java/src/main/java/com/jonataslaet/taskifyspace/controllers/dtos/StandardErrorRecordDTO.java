@@ -12,6 +12,8 @@ public class StandardErrorRecordDTO {
 
     private String message;
 
+    private String code;
+
     private String path;
 
     public StandardErrorRecordDTO() {
@@ -47,6 +49,14 @@ public class StandardErrorRecordDTO {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public String getPath() {

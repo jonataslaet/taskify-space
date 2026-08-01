@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidAuthenticationException;
 import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.RateLimitExceededException;
+import com.jonataslaet.taskifyspace.exceptions.RegistrationConfirmationException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
@@ -153,6 +154,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
             .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
             .body(error);
+    }
+
+    @ExceptionHandler(RegistrationConfirmationException.class)
+    public ResponseEntity<@NonNull StandardErrorRecordDTO> handleRegistrationConfirmationException(
+        RegistrationConfirmationException ex,
+        HttpServletRequest request) {
+        StandardErrorRecordDTO error = new StandardErrorRecordDTO();
+        error.setTimestamp(Instant.now());
+        error.setStatus(ex.getStatus().value());
+        error.setError("Confirmacao de cadastro");
+        error.setCode(ex.getCode());
+        error.setMessage(ex.getMessage());
+        error.setPath(request.getRequestURI());
+
+        return ResponseEntity.status(ex.getStatus()).body(error);
     }
 
     @ExceptionHandler(Exception.class)

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
     "security.email.root=root@example.com",
     "security.email.password-recover.token.minutes=30",
     "security.email.registration-confirmation.token.minutes=5",
+    "security.email.registration-confirmation.cleanup.enabled=false",
     "security.password.root=RootPass1!",
     "security.jwt.secret=test-secret"
 })
@@ -54,7 +55,7 @@ class ProductionDatabaseMigrationTests {
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
         assertThat(Arrays.stream(flyway.info().applied())
             .map(migration -> migration.getVersion().toString()))
-            .contains("1", "2", "3", "4", "5", "6", "7", "8");
+            .contains("1", "2", "3", "4", "5", "6", "7", "8", "9");
         assertThat(userRepository.existsByEmail("root@example.com")).isTrue();
     }
 }

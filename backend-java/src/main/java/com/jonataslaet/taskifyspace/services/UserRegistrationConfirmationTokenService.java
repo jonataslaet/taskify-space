@@ -3,7 +3,6 @@ package com.jonataslaet.taskifyspace.services;
 import com.jonataslaet.taskifyspace.controllers.dtos.UserRegistrationConfirmationEmail;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.UserRegistrationConfirmation;
-import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.repositories.UserRegistrationConfirmationRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import com.jonataslaet.taskifyspace.utils.TokenUtils;
@@ -39,18 +38,20 @@ public class UserRegistrationConfirmationTokenService {
     @Transactional
     public Optional<UserRegistrationConfirmationEmail> createConfirmationToken(Long userId) {
         User user = userRepository.findByIdForUpdate(userId).orElse(null);
-        if (Objects.isNull(user) || !UserStatusEnum.PENDING_EVALUATION.equals(user.getStatus())) {
+        if (Objects.isNull(user) || !user.isRegistrationConfirmationPending()) {
             return Optional.empty();
         }
 
         Instant now = Instant.now(clock);
+        Instant expiration = now.plusSeconds(60 * tokenMinutes);
+        user.requestEmailConfirmation(expiration);
         confirmationRepository.expireValidConfirmationsByUserId(user.getId(), now);
 
         String rawToken = UUID.randomUUID().toString();
         UserRegistrationConfirmation confirmation = new UserRegistrationConfirmation(
             TokenUtils.sha256(rawToken),
             user,
-            now.plusSeconds(60 * tokenMinutes));
+            expiration);
         confirmationRepository.save(confirmation);
 
         return Optional.of(new UserRegistrationConfirmationEmail(user.getEmail(), rawToken));
