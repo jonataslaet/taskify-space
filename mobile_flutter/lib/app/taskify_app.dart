@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
-import 'package:mobile_flutter/features/auth/presentation/authenticated_page.dart';
 import 'package:mobile_flutter/features/auth/presentation/login_page.dart';
+import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
 
 class TaskifyApp extends StatefulWidget {
-  const TaskifyApp({required this.authenticationRepository, super.key});
+  const TaskifyApp({
+    required this.authenticationRepository,
+    required this.spacesRepository,
+    super.key,
+  });
 
   final AuthenticationRepository authenticationRepository;
+  final SpacesRepository spacesRepository;
 
   @override
   State<TaskifyApp> createState() => _TaskifyAppState();
@@ -67,9 +73,10 @@ class _TaskifyAppState extends State<TaskifyApp> {
                   setState(() => _session = session);
                 },
               )
-            : AuthenticatedPage(
-                key: const ValueKey('authenticated-page'),
+            : SpacesPage(
+                key: const ValueKey('spaces-page'),
                 session: _session!,
+                spacesRepository: widget.spacesRepository,
               ),
       ),
     );

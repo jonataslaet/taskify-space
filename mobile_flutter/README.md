@@ -44,6 +44,16 @@ A primeira tela chama `POST /auth/login` com `username` (o e-mail) e
 envia em `X-Device-Id`. Em caso de sucesso, access token e refresh token são
 armazenados juntos no armazenamento seguro, sem serem exibidos ou registrados.
 
+Depois que a sessão é armazenada, o aplicativo chama `GET /spaces` com o access
+token no cabeçalho `Authorization: Bearer <token>` e apresenta a primeira página
+de espaços. Campos de participação ausentes na resposta são tratados como
+opcionais.
+
+A listagem permite combinar a busca parcial por `name` com os filtros
+`spaceUserRole` e `spaceMembershipStatus`. A interface oferece somente os status
+`PENDING` e `APPROVED`, que são os estados admitidos pela regra-base dessa
+listagem.
+
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. Nesta primeira entrega, a allowlist contém
 somente `10.0.2.2`, para o Android Emulator. O manifest principal contém a
