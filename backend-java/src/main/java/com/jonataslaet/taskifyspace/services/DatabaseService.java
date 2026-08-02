@@ -190,7 +190,7 @@ public class DatabaseService {
 
         Plan premiumPlan = this.createPlan("PREMIUM", "Premium", "Plano completo para equipes maiores",
             Set.of(
-                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 10L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 20L),
                 new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 250L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 5L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 10L),
@@ -214,6 +214,34 @@ public class DatabaseService {
         space.setActive(true);
         space.setName("Residência do Marido da Bella");
         return SpaceMapper.toDTO(space);
+    }
+
+    private void createActiveSpace(String name, User creator) {
+        Space space = new Space();
+        space.setActive(true);
+        space.setName(name);
+        SpaceRecordDTO createdSpace = spaceService.createSpace(SpaceMapper.toDTO(space), creator);
+        spaceService.toggleActiveSpace(creator, createdSpace.id());
+    }
+
+    private void createJonatasLaetSpaces(User adminJonatasLaet) {
+        Set.of(
+            "Casa do Jonatas",
+            "Apartamento Centro",
+            "Escritorio Taskify",
+            "Projeto Reforma",
+            "Chacara da Familia",
+            "Condominio Bela Vista",
+            "Loja Piloto",
+            "Time Operacional",
+            "Equipe Financeira",
+            "Manutencao Predial",
+            "Casa de Praia",
+            "Laboratorio de Testes",
+            "Coworking Fortaleza",
+            "Residencia dos Pais",
+            "Eventos da Familia"
+        ).forEach(spaceName -> createActiveSpace(spaceName, adminJonatasLaet));
     }
 
     public TaskRecordDTO getTaskRecordTrocarBotijaoDTO(SpaceRecordDTO spaceRecordDTO) {
@@ -254,12 +282,15 @@ public class DatabaseService {
 
         DefaultPlans defaultPlans = createDefaultPlans();
 
+        this.grantInternalSubscription(adminJonatasLaet, defaultPlans.premiumPlan());
         this.grantInternalSubscription(userJoiceLaet, defaultPlans.basicPlan());
         this.grantInternalSubscription(userBellaLaet, defaultPlans.basicPlan());
 
         if (spaceMembershipService.hasSpaceMembership(userJoiceLaet)) {
             return;
         }
+
+        createJonatasLaetSpaces(adminJonatasLaet);
 
         SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
         spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
