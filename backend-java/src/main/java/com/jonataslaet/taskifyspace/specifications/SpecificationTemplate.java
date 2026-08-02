@@ -24,6 +24,7 @@ public class SpecificationTemplate {
     public interface UserSpecification extends Specification<@NonNull User> {}
 
     @And({
+        @Spec(path = "space.id", params = "spaceId", spec = Equal.class),
         @Spec(path = "description", spec = LikeIgnoreCase.class),
         @Spec(path = "score", params = "score", spec = Equal.class),
         @Spec(path = "active", params = "active", spec = Equal.class),
