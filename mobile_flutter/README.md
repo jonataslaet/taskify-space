@@ -64,6 +64,15 @@ administrador. Como `GET /spaces` lista somente espaços ativos, a interface
 confirma a criação sem inserir o novo espaço na listagem atual; ele só poderá
 aparecer depois de ser ativado.
 
+Em espaços com participação aprovada, o botão **Ver tarefas** abre uma listagem
+que chama `GET /tasks` com `spaceId`, `page`, `size` e `sort=id,asc`. O filtro por
+espaço é aplicado no backend para que `totalElements` e `totalPages` representem
+somente as tarefas daquele espaço. A tela também permite combinar, por meio do
+Specification, descrição parcial, situação, categorias e pontuação exata,
+mínima ou máxima. Aplicar ou limpar filtros e trocar a quantidade de registros
+reinicia a consulta na página zero; a barra inferior permite navegar pelas
+páginas e escolher 5, 10, 20 ou 50 registros.
+
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. Nesta primeira entrega, a allowlist contém
 somente `10.0.2.2`, para o Android Emulator. O manifest principal contém a

@@ -8,6 +8,10 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
+import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 
 final class FakeSecureStorageGateway implements SecureStorageGateway {
   final values = <String, String>{};
@@ -150,6 +154,44 @@ final class FakeSpacesRepository implements SpacesRepository {
   }
 }
 
+typedef FetchTasksHandler =
+    Future<TaskPageResult> Function(
+      String accessToken,
+      TaskFilters filters,
+      int page,
+      int size,
+    );
+
+final class FakeTasksRepository implements TasksRepository {
+  FakeTasksRepository({FetchTasksHandler? handler}) : _handler = handler;
+
+  final FetchTasksHandler? _handler;
+  int fetchTasksCalls = 0;
+  final receivedAccessTokens = <String>[];
+  final receivedFilters = <TaskFilters>[];
+  final receivedPages = <int>[];
+  final receivedPageSizes = <int>[];
+
+  @override
+  Future<TaskPageResult> fetchTasks({
+    required String accessToken,
+    TaskFilters filters = const TaskFilters(),
+    int page = 0,
+    int size = 10,
+  }) {
+    fetchTasksCalls += 1;
+    receivedAccessTokens.add(accessToken);
+    receivedFilters.add(filters);
+    receivedPages.add(page);
+    receivedPageSizes.add(size);
+    final handler = _handler;
+    if (handler != null) {
+      return handler(accessToken, filters, page, size);
+    }
+    return Future<TaskPageResult>.value(makeTaskPage());
+  }
+}
+
 const testSession = AuthSession(
   id: 1,
   username: 'user@example.com',
@@ -171,6 +213,16 @@ const testSpace = SpaceSummary(
 
 SpacePageResult makeSpacePage({List<SpaceSummary> content = const []}) {
   return SpacePageResult(
+    content: content,
+    size: 10,
+    number: 0,
+    totalElements: content.length,
+    totalPages: content.isEmpty ? 0 : 1,
+  );
+}
+
+TaskPageResult makeTaskPage({List<TaskSummary> content = const []}) {
+  return TaskPageResult(
     content: content,
     size: 10,
     number: 0,

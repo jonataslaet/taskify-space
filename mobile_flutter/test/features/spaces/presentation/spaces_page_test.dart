@@ -8,6 +8,7 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
+import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
 import '../../../helpers/fakes.dart';
 
@@ -59,6 +60,7 @@ void main() {
             return SpacesPage(
               session: testSession,
               spacesRepository: activeRepository,
+              tasksRepository: FakeTasksRepository(),
             );
           },
         ),
@@ -153,19 +155,26 @@ void main() {
     expect(find.byKey(const ValueKey('space-card-1')), findsNothing);
     expect(find.byKey(const ValueKey('space-card-2')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('spaces-page-next')));
+    final nextPageButton = find.byKey(const ValueKey('spaces-page-next'));
+    await tester.ensureVisible(nextPageButton);
+    await tester.pumpAndSettle();
+    await tester.tap(nextPageButton);
     await tester.pumpAndSettle();
 
     expect(repository.receivedPages, [0, 1, 2]);
     expect(find.byKey(const ValueKey('space-card-2')), findsNothing);
     expect(find.byKey(const ValueKey('space-card-3')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('spaces-page-next')));
-    await tester.pump();
+    expect(tester.widget<IconButton>(nextPageButton).onPressed, isNull);
 
     expect(repository.receivedPages, [0, 1, 2]);
 
-    await tester.tap(find.byKey(const ValueKey('spaces-page-previous')));
+    final previousPageButton = find.byKey(
+      const ValueKey('spaces-page-previous'),
+    );
+    await tester.ensureVisible(previousPageButton);
+    await tester.pumpAndSettle();
+    await tester.tap(previousPageButton);
     await tester.pumpAndSettle();
 
     expect(repository.receivedPages, [0, 1, 2, 1]);
@@ -271,6 +280,78 @@ void main() {
     expect(find.text('Disponível'), findsOneWidget);
     expect(find.textContaining('Responsável:'), findsNothing);
   });
+
+  testWidgets(
+    'abre tarefas do espaço aprovado e faz uma única busca contextual',
+    (tester) async {
+      final spacesRepository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+      );
+      final tasksRepository = FakeTasksRepository();
+
+      await tester.pumpWidget(
+        _testApp(spacesRepository, tasksRepository: tasksRepository),
+      );
+      await tester.pumpAndSettle();
+
+      final tasksButton = find.byKey(const ValueKey('space-tasks-button-1'));
+      expect(tasksButton, findsOneWidget);
+      expect(tester.widget<OutlinedButton>(tasksButton).onPressed, isNotNull);
+      expect(tasksRepository.fetchTasksCalls, 0);
+
+      await tester.tap(tasksButton);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TasksPage), findsOneWidget);
+      expect(tasksRepository.fetchTasksCalls, 1);
+      expect(tasksRepository.receivedAccessTokens, [testSession.accessToken]);
+      expect(tasksRepository.receivedFilters.single.spaceId, testSpace.id);
+      expect(tasksRepository.receivedPages, [0]);
+      expect(tasksRepository.receivedPageSizes, [10]);
+    },
+  );
+
+  testWidgets(
+    'desabilita tarefas para espaços sem vínculo ou com participação pendente',
+    (tester) async {
+      const availableSpace = SpaceSummary(
+        id: 2,
+        name: 'Espaço sem vínculo',
+        spaceAdminName: 'Responsável',
+        active: true,
+        spaceUserRole: null,
+        spaceMembershipStatus: null,
+        activeParticipationsCount: 1,
+      );
+      const pendingSpace = SpaceSummary(
+        id: 3,
+        name: 'Espaço pendente',
+        spaceAdminName: 'Responsável',
+        active: true,
+        spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+        spaceMembershipStatus: 'PENDING',
+        activeParticipationsCount: 1,
+      );
+      final spacesRepository = FakeSpacesRepository(
+        (_) async =>
+            makeSpacePage(content: const [availableSpace, pendingSpace]),
+      );
+      final tasksRepository = FakeTasksRepository();
+
+      await tester.pumpWidget(
+        _testApp(spacesRepository, tasksRepository: tasksRepository),
+      );
+      await tester.pumpAndSettle();
+
+      for (final id in <int>[availableSpace.id, pendingSpace.id]) {
+        final tasksButton = find.byKey(ValueKey('space-tasks-button-$id'));
+        expect(tasksButton, findsOneWidget);
+        expect(tester.widget<OutlinedButton>(tasksButton).onPressed, isNull);
+      }
+      expect(tasksRepository.fetchTasksCalls, 0);
+      expect(find.byType(TasksPage), findsNothing);
+    },
+  );
 
   testWidgets('apresenta estado vazio', (tester) async {
     final repository = FakeSpacesRepository((_) async => makeSpacePage());
@@ -560,9 +641,16 @@ void main() {
   );
 }
 
-Widget _testApp(FakeSpacesRepository repository) {
+Widget _testApp(
+  FakeSpacesRepository repository, {
+  FakeTasksRepository? tasksRepository,
+}) {
   return MaterialApp(
-    home: SpacesPage(session: testSession, spacesRepository: repository),
+    home: SpacesPage(
+      session: testSession,
+      spacesRepository: repository,
+      tasksRepository: tasksRepository ?? FakeTasksRepository(),
+    ),
   );
 }
 

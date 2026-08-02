@@ -4,43 +4,48 @@ import 'package:flutter/material.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/core/presentation/paged_list_pagination_bar.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
-import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
-import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
-import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
-import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
-import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
-import 'package:mobile_flutter/features/spaces/presentation/create_space_dialog.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
-import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
-class SpacesPage extends StatefulWidget {
-  const SpacesPage({
+class TasksPage extends StatefulWidget {
+  const TasksPage({
     required this.session,
-    required this.spacesRepository,
+    required this.spaceId,
+    required this.spaceName,
     required this.tasksRepository,
     super.key,
-  });
+  }) : assert(spaceId > 0, 'spaceId deve ser positivo.');
 
   final AuthSession session;
-  final SpacesRepository spacesRepository;
+  final int spaceId;
+  final String spaceName;
   final TasksRepository tasksRepository;
 
   @override
-  State<SpacesPage> createState() => _SpacesPageState();
+  State<TasksPage> createState() => _TasksPageState();
 }
 
-class _SpacesPageState extends State<SpacesPage> {
+class _TasksPageState extends State<TasksPage> {
   static const _pageSizeOptions = <int>[5, 10, 20, 50];
 
-  final _nameFilterController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _scoreController = TextEditingController();
+  final _minScoreController = TextEditingController();
+  final _maxScoreController = TextEditingController();
   final _scrollController = ScrollController();
-  SpacePageResult? _result;
+
+  late TaskFilters _appliedFilters;
+  TaskPageResult? _result;
   ApiFailure? _failure;
-  SpaceUserRole? _selectedRole;
-  SpaceMembershipStatus? _selectedStatus;
-  SpaceFilters _appliedFilters = const SpaceFilters();
+  bool? _selectedActive;
+  final Set<TaskCategory> _selectedCategories = <TaskCategory>{};
   bool _isLoading = false;
   bool _areFiltersExpanded = false;
+  String? _filterValidationMessage;
   int _requestGeneration = 0;
   int _requestedPage = 0;
   int _pageSize = 10;
@@ -48,54 +53,57 @@ class _SpacesPageState extends State<SpacesPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSpaces());
+    _appliedFilters = TaskFilters(spaceId: widget.spaceId);
+    unawaited(_loadTasks());
   }
 
   @override
-  void didUpdateWidget(covariant SpacesPage oldWidget) {
+  void didUpdateWidget(covariant TasksPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     final sessionChanged =
         oldWidget.session.id != widget.session.id ||
         oldWidget.session.accessToken != widget.session.accessToken;
-    if (!sessionChanged &&
-        identical(oldWidget.spacesRepository, widget.spacesRepository) &&
-        identical(oldWidget.tasksRepository, widget.tasksRepository)) {
+    final sourceChanged =
+        sessionChanged ||
+        oldWidget.spaceId != widget.spaceId ||
+        !identical(oldWidget.tasksRepository, widget.tasksRepository);
+    if (!sourceChanged) {
       return;
     }
 
     _requestGeneration += 1;
     _result = null;
     _failure = null;
-    _selectedRole = null;
-    _selectedStatus = null;
-    _appliedFilters = const SpaceFilters();
+    _selectedActive = null;
+    _selectedCategories.clear();
+    _appliedFilters = TaskFilters(spaceId: widget.spaceId);
     _isLoading = false;
     _areFiltersExpanded = false;
+    _filterValidationMessage = null;
     _requestedPage = 0;
     _pageSize = 10;
-    _nameFilterController.clear();
+    _clearFilterControllers();
     unawaited(
-      _loadSpaces(filters: const SpaceFilters(), page: 0, size: _pageSize),
+      _loadTasks(filters: TaskFilters(spaceId: widget.spaceId), page: 0),
     );
   }
 
   @override
   void dispose() {
+    _descriptionController.dispose();
+    _scoreController.dispose();
+    _minScoreController.dispose();
+    _maxScoreController.dispose();
     _scrollController.dispose();
-    _nameFilterController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadSpaces({
-    SpaceFilters? filters,
-    int? page,
-    int? size,
-  }) async {
+  Future<void> _loadTasks({TaskFilters? filters, int? page, int? size}) async {
     if (_isLoading) {
       return;
     }
 
-    final requestedFilters = filters ?? _appliedFilters;
+    final requestedFilters = _scopedFilters(filters ?? _appliedFilters);
     final requestedPage = page ?? _result?.number ?? 0;
     final requestedSize = size ?? _pageSize;
     final requestGeneration = ++_requestGeneration;
@@ -112,30 +120,33 @@ class _SpacesPageState extends State<SpacesPage> {
     }
 
     try {
-      final result = await widget.spacesRepository.fetchSpaces(
+      final result = await widget.tasksRepository.fetchTasks(
         accessToken: widget.session.accessToken,
         filters: requestedFilters,
         page: requestedPage,
         size: requestedSize,
       );
-      if (result.number != requestedPage) {
+      if (result.number != requestedPage ||
+          result.content.any((task) => task.spaceId != widget.spaceId)) {
         throw const ApiFailure(ApiFailureKind.malformedResponse);
       }
       if (!mounted || requestGeneration != _requestGeneration) {
         return;
       }
+
       final lastAvailablePage = result.totalPages == 0
           ? 0
           : result.totalPages - 1;
       if (requestedPage > lastAvailablePage) {
         setState(() => _isLoading = false);
-        await _loadSpaces(
+        await _loadTasks(
           filters: requestedFilters,
           page: lastAvailablePage,
           size: requestedSize,
         );
         return;
       }
+
       setState(() {
         _result = result;
         _isLoading = false;
@@ -159,16 +170,54 @@ class _SpacesPageState extends State<SpacesPage> {
     }
   }
 
+  TaskFilters _scopedFilters(TaskFilters filters) {
+    return TaskFilters(
+      spaceId: widget.spaceId,
+      description: filters.description,
+      score: filters.score,
+      active: filters.active,
+      categories: Set<TaskCategory>.unmodifiable(filters.categories),
+      minScore: filters.minScore,
+      maxScore: filters.maxScore,
+    );
+  }
+
   void _applyFilters() {
     if (_isLoading) {
       return;
     }
+
+    final score = _parseOptionalScore(_scoreController.text);
+    final minScore = _parseOptionalScore(_minScoreController.text);
+    final maxScore = _parseOptionalScore(_maxScoreController.text);
+    if (!score.isValid || !minScore.isValid || !maxScore.isValid) {
+      setState(() {
+        _filterValidationMessage =
+            'Informe pontuações válidas usando números não negativos.';
+      });
+      return;
+    }
+    if (minScore.value != null &&
+        maxScore.value != null &&
+        minScore.value! > maxScore.value!) {
+      setState(() {
+        _filterValidationMessage =
+            'A pontuação mínima não pode ser maior que a máxima.';
+      });
+      return;
+    }
+
+    setState(() => _filterValidationMessage = null);
     unawaited(
-      _loadSpaces(
-        filters: SpaceFilters(
-          name: _nameFilterController.text,
-          role: _selectedRole,
-          status: _selectedStatus,
+      _loadTasks(
+        filters: TaskFilters(
+          spaceId: widget.spaceId,
+          description: _descriptionController.text,
+          score: score.value,
+          active: _selectedActive,
+          categories: Set<TaskCategory>.unmodifiable(_selectedCategories),
+          minScore: minScore.value,
+          maxScore: maxScore.value,
         ),
         page: 0,
       ),
@@ -179,17 +228,35 @@ class _SpacesPageState extends State<SpacesPage> {
     if (_isLoading) {
       return;
     }
-    _nameFilterController.clear();
+    _clearFilterControllers();
     setState(() {
-      _selectedRole = null;
-      _selectedStatus = null;
+      _selectedActive = null;
+      _selectedCategories.clear();
+      _filterValidationMessage = null;
     });
-    unawaited(_loadSpaces(filters: const SpaceFilters(), page: 0));
+    unawaited(
+      _loadTasks(filters: TaskFilters(spaceId: widget.spaceId), page: 0),
+    );
+  }
+
+  void _clearFilterControllers() {
+    _descriptionController.clear();
+    _scoreController.clear();
+    _minScoreController.clear();
+    _maxScoreController.clear();
   }
 
   void _toggleFilters() {
+    setState(() => _areFiltersExpanded = !_areFiltersExpanded);
+  }
+
+  void _toggleCategory(TaskCategory category, bool selected) {
     setState(() {
-      _areFiltersExpanded = !_areFiltersExpanded;
+      if (selected) {
+        _selectedCategories.add(category);
+      } else {
+        _selectedCategories.remove(category);
+      }
     });
   }
 
@@ -202,7 +269,7 @@ class _SpacesPageState extends State<SpacesPage> {
         page == result.number) {
       return;
     }
-    unawaited(_loadSpaces(page: page));
+    unawaited(_loadTasks(page: page));
   }
 
   void _changePageSize(int? size) {
@@ -212,89 +279,40 @@ class _SpacesPageState extends State<SpacesPage> {
         !_pageSizeOptions.contains(size)) {
       return;
     }
-    unawaited(_loadSpaces(page: 0, size: size));
-  }
-
-  void _openTasks(SpaceSummary space) {
-    unawaited(
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (context) => TasksPage(
-            session: widget.session,
-            spaceId: space.id,
-            spaceName: space.name,
-            tasksRepository: widget.tasksRepository,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openCreateSpaceDialog() async {
-    final createdSpace = await showDialog<CreatedSpace>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => CreateSpaceDialog(
-        accessToken: widget.session.accessToken,
-        spacesRepository: widget.spacesRepository,
-      ),
-    );
-    if (!mounted || createdSpace == null) {
-      return;
-    }
-
-    final message = createdSpace.active
-        ? 'Espaço "${createdSpace.name}" criado com sucesso.'
-        : 'Espaço "${createdSpace.name}" criado. Ele está inativo e ainda não '
-              'aparece nesta lista.';
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          key: const ValueKey('space-created-message'),
-          content: Text(message),
-        ),
-      );
-
-    if (createdSpace.active) {
-      unawaited(_loadSpaces());
-    }
+    unawaited(_loadTasks(page: 0, size: size));
   }
 
   bool get _hasActiveFilters {
-    return (_appliedFilters.name?.trim().isNotEmpty ?? false) ||
-        _appliedFilters.role != null ||
-        _appliedFilters.status != null;
+    return (_appliedFilters.description?.trim().isNotEmpty ?? false) ||
+        _appliedFilters.score != null ||
+        _appliedFilters.active != null ||
+        _appliedFilters.categories.isNotEmpty ||
+        _appliedFilters.minScore != null ||
+        _appliedFilters.maxScore != null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Taskify Space')),
+      appBar: AppBar(title: const Text('Tarefas')),
       body: SafeArea(child: _buildBody(context)),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const ValueKey('create-space-button'),
-        onPressed: _openCreateSpaceDialog,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Novo espaço'),
-      ),
     );
   }
 
   Widget _buildBody(BuildContext context) {
     if (_isLoading && _result == null) {
       return const Center(
-        child: CircularProgressIndicator(key: ValueKey('spaces-loading')),
+        child: CircularProgressIndicator(key: ValueKey('tasks-loading')),
       );
     }
 
     final failure = _failure;
     if (failure != null && _result == null) {
-      return _SpacesError(
+      return _TasksError(
         message: _failureMessage(failure.kind),
         isRetrying: _isLoading,
         onRetry: () =>
-            unawaited(_loadSpaces(page: _requestedPage, size: _pageSize)),
+            unawaited(_loadTasks(page: _requestedPage, size: _pageSize)),
       );
     }
 
@@ -304,25 +322,32 @@ class _SpacesPageState extends State<SpacesPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: () => _loadSpaces(page: result.number),
+      onRefresh: () => _loadTasks(page: result.number, size: _pageSize),
       child: ListView(
         controller: _scrollController,
-        key: const ValueKey('spaces-list'),
+        key: const ValueKey('tasks-list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          _SpacesHeader(session: widget.session, total: result.totalElements),
+          _TasksHeader(
+            spaceName: widget.spaceName,
+            total: result.totalElements,
+          ),
           const SizedBox(height: 16),
-          _SpacesFilterPanel(
-            nameController: _nameFilterController,
-            selectedRole: _selectedRole,
-            selectedStatus: _selectedStatus,
+          _TasksFilterPanel(
+            descriptionController: _descriptionController,
+            scoreController: _scoreController,
+            minScoreController: _minScoreController,
+            maxScoreController: _maxScoreController,
+            selectedActive: _selectedActive,
+            selectedCategories: _selectedCategories,
             isLoading: _isLoading,
             isExpanded: _areFiltersExpanded,
             hasActiveFilters: _hasActiveFilters,
-            onRoleChanged: (role) => setState(() => _selectedRole = role),
-            onStatusChanged: (status) =>
-                setState(() => _selectedStatus = status),
+            validationMessage: _filterValidationMessage,
+            onActiveChanged: (active) =>
+                setState(() => _selectedActive = active),
+            onCategoryChanged: _toggleCategory,
             onToggle: _toggleFilters,
             onApply: _applyFilters,
             onClear: _clearFilters,
@@ -333,33 +358,28 @@ class _SpacesPageState extends State<SpacesPage> {
               padding: EdgeInsets.symmetric(vertical: 36),
               child: Center(
                 child: CircularProgressIndicator(
-                  key: ValueKey('spaces-filter-progress'),
+                  key: ValueKey('tasks-filter-progress'),
                 ),
               ),
             )
           else if (failure != null)
-            _SpacesError(
+            _TasksError(
               message: _failureMessage(failure.kind),
               isRetrying: false,
               onRetry: () =>
-                  unawaited(_loadSpaces(page: _requestedPage, size: _pageSize)),
+                  unawaited(_loadTasks(page: _requestedPage, size: _pageSize)),
             )
           else ...[
             if (result.content.isEmpty)
-              _SpacesEmpty(isFiltered: _hasActiveFilters)
+              _TasksEmpty(isFiltered: _hasActiveFilters)
             else
-              for (final space in result.content) ...[
-                _SpaceCard(
-                  space: space,
-                  onViewTasks: space.spaceMembershipStatus == 'APPROVED'
-                      ? () => _openTasks(space)
-                      : null,
-                ),
+              for (final task in result.content) ...[
+                _TaskCard(task: task),
                 const SizedBox(height: 12),
               ],
             const SizedBox(height: 8),
             PagedListPaginationBar(
-              keyPrefix: 'spaces',
+              keyPrefix: 'tasks',
               currentPage: result.number,
               pageItemCount: result.content.length,
               totalElements: result.totalElements,
@@ -376,21 +396,21 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 }
 
-class _SpacesHeader extends StatelessWidget {
-  const _SpacesHeader({required this.session, required this.total});
+class _TasksHeader extends StatelessWidget {
+  const _TasksHeader({required this.spaceName, required this.total});
 
-  final AuthSession session;
+  final String spaceName;
   final int total;
 
   @override
   Widget build(BuildContext context) {
-    final displayName = session.name ?? session.username;
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Olá, $displayName!',
+          spaceName,
+          key: const ValueKey('tasks-space-name'),
           style: theme.textTheme.headlineSmall?.copyWith(
             color: const Color(0xFF173B38),
             fontWeight: FontWeight.w800,
@@ -398,7 +418,7 @@ class _SpacesHeader extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          total == 1 ? '1 espaço encontrado' : '$total espaços encontrados',
+          total == 1 ? '1 tarefa encontrada' : '$total tarefas encontradas',
           style: theme.textTheme.bodyLarge?.copyWith(
             color: const Color(0xFF5D716F),
           ),
@@ -408,29 +428,37 @@ class _SpacesHeader extends StatelessWidget {
   }
 }
 
-class _SpacesFilterPanel extends StatelessWidget {
-  const _SpacesFilterPanel({
-    required this.nameController,
-    required this.selectedRole,
-    required this.selectedStatus,
+class _TasksFilterPanel extends StatelessWidget {
+  const _TasksFilterPanel({
+    required this.descriptionController,
+    required this.scoreController,
+    required this.minScoreController,
+    required this.maxScoreController,
+    required this.selectedActive,
+    required this.selectedCategories,
     required this.isLoading,
     required this.isExpanded,
     required this.hasActiveFilters,
-    required this.onRoleChanged,
-    required this.onStatusChanged,
+    required this.validationMessage,
+    required this.onActiveChanged,
+    required this.onCategoryChanged,
     required this.onToggle,
     required this.onApply,
     required this.onClear,
   });
 
-  final TextEditingController nameController;
-  final SpaceUserRole? selectedRole;
-  final SpaceMembershipStatus? selectedStatus;
+  final TextEditingController descriptionController;
+  final TextEditingController scoreController;
+  final TextEditingController minScoreController;
+  final TextEditingController maxScoreController;
+  final bool? selectedActive;
+  final Set<TaskCategory> selectedCategories;
   final bool isLoading;
   final bool isExpanded;
   final bool hasActiveFilters;
-  final ValueChanged<SpaceUserRole?> onRoleChanged;
-  final ValueChanged<SpaceMembershipStatus?> onStatusChanged;
+  final String? validationMessage;
+  final ValueChanged<bool?> onActiveChanged;
+  final void Function(TaskCategory category, bool selected) onCategoryChanged;
   final VoidCallback onToggle;
   final VoidCallback onApply;
   final VoidCallback onClear;
@@ -467,7 +495,7 @@ class _SpacesFilterPanel extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Filtros ativos',
-                          key: const ValueKey('spaces-active-filters'),
+                          key: const ValueKey('tasks-active-filters'),
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: const Color(0xFF37615E),
                             fontWeight: FontWeight.w700,
@@ -477,9 +505,8 @@ class _SpacesFilterPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
                 TextButton.icon(
-                  key: const ValueKey('spaces-toggle-filters'),
+                  key: const ValueKey('tasks-toggle-filters'),
                   onPressed: onToggle,
                   icon: Icon(
                     isExpanded
@@ -492,77 +519,139 @@ class _SpacesFilterPanel extends StatelessWidget {
             ),
             if (isExpanded)
               Column(
-                key: const ValueKey('spaces-filter-panel'),
+                key: const ValueKey('tasks-filter-panel'),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 14),
                   TextField(
-                    key: const ValueKey('spaces-name-filter'),
-                    controller: nameController,
+                    key: const ValueKey('tasks-description-filter'),
+                    controller: descriptionController,
                     enabled: !isLoading,
                     textInputAction: TextInputAction.search,
                     decoration: const InputDecoration(
-                      labelText: 'Nome do espaço',
-                      hintText: 'Digite parte do nome',
+                      labelText: 'Descrição',
+                      hintText: 'Digite parte da descrição',
                       prefixIcon: Icon(Icons.search_rounded),
                     ),
                     onSubmitted: (_) => onApply(),
                   ),
                   const SizedBox(height: 12),
+                  InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Situação'),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<bool>(
+                        key: const ValueKey('tasks-active-filter'),
+                        value: selectedActive,
+                        isDense: true,
+                        isExpanded: true,
+                        hint: const Text('Todas'),
+                        items: const [
+                          DropdownMenuItem<bool>(
+                            value: null,
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem<bool>(
+                            value: true,
+                            child: Text('Ativas'),
+                          ),
+                          DropdownMenuItem<bool>(
+                            value: false,
+                            child: Text('Inativas'),
+                          ),
+                        ],
+                        onChanged: isLoading ? null : onActiveChanged,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Categorias',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF173B38),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final category in TaskCategory.values)
+                        FilterChip(
+                          key: ValueKey('tasks-category-${category.name}'),
+                          label: Text(_categoryLabel(category)),
+                          selected: selectedCategories.contains(category),
+                          onSelected: isLoading
+                              ? null
+                              : (selected) =>
+                                    onCategoryChanged(category, selected),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final roleFilter = _FilterDropdown<SpaceUserRole>(
-                        key: const ValueKey('spaces-role-filter'),
-                        label: 'Meu papel',
-                        allLabel: 'Todos os papéis',
-                        value: selectedRole,
-                        values: SpaceUserRole.values,
-                        valueLabel: _roleFilterLabel,
-                        enabled: !isLoading,
-                        onChanged: onRoleChanged,
-                      );
-                      final statusFilter =
-                          _FilterDropdown<SpaceMembershipStatus>(
-                            key: const ValueKey('spaces-status-filter'),
-                            label: 'Minha participação',
-                            allLabel: 'Todas as situações',
-                            value: selectedStatus,
-                            values: const [
-                              SpaceMembershipStatus.pending,
-                              SpaceMembershipStatus.approved,
-                            ],
-                            valueLabel: _statusFilterLabel,
-                            enabled: !isLoading,
-                            onChanged: onStatusChanged,
-                          );
-
-                      if (constraints.maxWidth >= 560) {
+                      final fields = <Widget>[
+                        _ScoreField(
+                          fieldKey: const ValueKey('tasks-score-filter'),
+                          controller: scoreController,
+                          label: 'Pontuação exata',
+                          enabled: !isLoading,
+                        ),
+                        _ScoreField(
+                          fieldKey: const ValueKey('tasks-min-score-filter'),
+                          controller: minScoreController,
+                          label: 'Pontuação mínima',
+                          enabled: !isLoading,
+                        ),
+                        _ScoreField(
+                          fieldKey: const ValueKey('tasks-max-score-filter'),
+                          controller: maxScoreController,
+                          label: 'Pontuação máxima',
+                          enabled: !isLoading,
+                        ),
+                      ];
+                      if (constraints.maxWidth >= 720) {
                         return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(child: roleFilter),
-                            const SizedBox(width: 12),
-                            Expanded(child: statusFilter),
+                            for (
+                              var index = 0;
+                              index < fields.length;
+                              index++
+                            ) ...[
+                              Expanded(child: fields[index]),
+                              if (index < fields.length - 1)
+                                const SizedBox(width: 10),
+                            ],
                           ],
                         );
                       }
                       return Column(
                         children: [
-                          roleFilter,
-                          const SizedBox(height: 12),
-                          statusFilter,
+                          for (
+                            var index = 0;
+                            index < fields.length;
+                            index++
+                          ) ...[
+                            fields[index],
+                            if (index < fields.length - 1)
+                              const SizedBox(height: 10),
+                          ],
                         ],
                       );
                     },
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Papel e participação consideram o seu vínculo com o '
-                    'espaço.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF5D716F),
+                  if (validationMessage != null) ...[
+                    const SizedBox(height: 10),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        validationMessage!,
+                        key: const ValueKey('tasks-filter-error'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 14),
                   Wrap(
                     alignment: WrapAlignment.end,
@@ -570,13 +659,13 @@ class _SpacesFilterPanel extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       TextButton.icon(
-                        key: const ValueKey('spaces-clear-filters'),
+                        key: const ValueKey('tasks-clear-filters'),
                         onPressed: isLoading ? null : onClear,
                         icon: const Icon(Icons.filter_alt_off_outlined),
                         label: const Text('Limpar filtros'),
                       ),
                       FilledButton.icon(
-                        key: const ValueKey('spaces-apply-filters'),
+                        key: const ValueKey('tasks-apply-filters'),
                         onPressed: isLoading ? null : onApply,
                         icon: const Icon(Icons.search_rounded),
                         label: const Text('Aplicar filtros'),
@@ -592,59 +681,41 @@ class _SpacesFilterPanel extends StatelessWidget {
   }
 }
 
-class _FilterDropdown<T> extends StatelessWidget {
-  const _FilterDropdown({
-    required super.key,
+class _ScoreField extends StatelessWidget {
+  const _ScoreField({
+    required this.fieldKey,
+    required this.controller,
     required this.label,
-    required this.allLabel,
-    required this.value,
-    required this.values,
-    required this.valueLabel,
     required this.enabled,
-    required this.onChanged,
   });
 
+  final Key fieldKey;
+  final TextEditingController controller;
   final String label;
-  final String allLabel;
-  final T? value;
-  final List<T> values;
-  final String Function(T value) valueLabel;
   final bool enabled;
-  final ValueChanged<T?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return InputDecorator(
-      decoration: InputDecoration(labelText: label),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          isDense: true,
-          isExpanded: true,
-          hint: Text(allLabel),
-          items: [
-            DropdownMenuItem<T>(value: null, child: Text(allLabel)),
-            for (final item in values)
-              DropdownMenuItem<T>(value: item, child: Text(valueLabel(item))),
-          ],
-          onChanged: enabled ? onChanged : null,
-        ),
-      ),
+    return TextField(
+      key: fieldKey,
+      controller: controller,
+      enabled: enabled,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(labelText: label, hintText: 'Ex.: 10,5'),
     );
   }
 }
 
-class _SpaceCard extends StatelessWidget {
-  const _SpaceCard({required this.space, required this.onViewTasks});
+class _TaskCard extends StatelessWidget {
+  const _TaskCard({required this.task});
 
-  final SpaceSummary space;
-  final VoidCallback? onViewTasks;
+  final TaskSummary task;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      key: ValueKey('space-card-${space.id}'),
+      key: ValueKey('task-card-${task.id}'),
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
@@ -666,9 +737,11 @@ class _SpaceCard extends StatelessWidget {
                     color: const Color(0xFFE3F2EF),
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: const Icon(
-                    Icons.home_work_outlined,
-                    color: Color(0xFF006C67),
+                  child: Icon(
+                    task.active
+                        ? Icons.task_alt_rounded
+                        : Icons.pause_circle_outline_rounded,
+                    color: const Color(0xFF006C67),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -677,16 +750,16 @@ class _SpaceCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        space.name,
+                        task.description,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: const Color(0xFF173B38),
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if (space.spaceAdminName != null) ...[
+                      if (task.creatorName != null) ...[
                         const SizedBox(height: 4),
                         Text(
-                          'Responsável: ${space.spaceAdminName}',
+                          'Criada por: ${task.creatorName}',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: const Color(0xFF5D716F),
                           ),
@@ -702,34 +775,28 @@ class _SpaceCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _InfoChip(
-                  icon: Icons.group_outlined,
-                  label: _participantsLabel(space.activeParticipationsCount),
+                _TaskInfoChip(
+                  icon: Icons.stars_outlined,
+                  label: '${_scoreLabel(task.score)} pontos',
                 ),
-                _InfoChip(
-                  icon: _membershipIcon(space.spaceMembershipStatus),
-                  label: _membershipLabel(space),
+                _TaskInfoChip(
+                  icon: task.category == TaskCategory.financial
+                      ? Icons.payments_outlined
+                      : Icons.build_outlined,
+                  label: _categoryLabel(task.category),
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Tooltip(
-                message: onViewTasks == null
-                    ? 'Participação aprovada necessária'
-                    : 'Ver tarefas deste espaço',
-                child: OutlinedButton.icon(
-                  key: ValueKey('space-tasks-button-${space.id}'),
-                  onPressed: onViewTasks,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                _TaskInfoChip(
+                  icon: task.active
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  label: task.active ? 'Ativa' : 'Inativa',
+                ),
+                if (task.schedule case final schedule?)
+                  _TaskInfoChip(
+                    icon: Icons.event_repeat_outlined,
+                    label: _scheduleLabel(schedule),
                   ),
-                  icon: const Icon(Icons.checklist_rounded, size: 20),
-                  label: const Text('Ver tarefas'),
-                ),
-              ),
+              ],
             ),
           ],
         ),
@@ -738,8 +805,8 @@ class _SpaceCard extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
+class _TaskInfoChip extends StatelessWidget {
+  const _TaskInfoChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -770,8 +837,8 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _SpacesEmpty extends StatelessWidget {
-  const _SpacesEmpty({required this.isFiltered});
+class _TasksEmpty extends StatelessWidget {
+  const _TasksEmpty({required this.isFiltered});
 
   final bool isFiltered;
 
@@ -781,19 +848,15 @@ class _SpacesEmpty extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
-          key: ValueKey(isFiltered ? 'spaces-filter-empty' : 'spaces-empty'),
+          key: ValueKey(isFiltered ? 'tasks-filter-empty' : 'tasks-empty'),
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.other_houses_outlined,
-              size: 64,
-              color: Color(0xFF6C8582),
-            ),
+            const Icon(Icons.task_outlined, size: 64, color: Color(0xFF6C8582)),
             const SizedBox(height: 18),
             Text(
               isFiltered
-                  ? 'Nenhum espaço corresponde aos filtros.'
-                  : 'Nenhum espaço está disponível no momento.',
+                  ? 'Nenhuma tarefa corresponde aos filtros.'
+                  : 'Nenhuma tarefa foi encontrada neste espaço.',
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
@@ -806,8 +869,8 @@ class _SpacesEmpty extends StatelessWidget {
   }
 }
 
-class _SpacesError extends StatelessWidget {
-  const _SpacesError({
+class _TasksError extends StatelessWidget {
+  const _TasksError({
     required this.message,
     required this.isRetrying,
     required this.onRetry,
@@ -825,7 +888,7 @@ class _SpacesError extends StatelessWidget {
         child: Semantics(
           liveRegion: true,
           child: Column(
-            key: const ValueKey('spaces-error'),
+            key: const ValueKey('tasks-error'),
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
@@ -835,7 +898,7 @@ class _SpacesError extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Text(
-                'Não foi possível carregar os espaços',
+                'Não foi possível carregar as tarefas',
                 textAlign: TextAlign.center,
                 style: Theme.of(
                   context,
@@ -845,7 +908,7 @@ class _SpacesError extends StatelessWidget {
               Text(message, textAlign: TextAlign.center),
               const SizedBox(height: 20),
               FilledButton.icon(
-                key: const ValueKey('spaces-retry-button'),
+                key: const ValueKey('tasks-retry-button'),
                 onPressed: isRetrying ? null : onRetry,
                 icon: isRetrying
                     ? const SizedBox.square(
@@ -866,55 +929,56 @@ class _SpacesError extends StatelessWidget {
   }
 }
 
-String _roleFilterLabel(SpaceUserRole role) {
-  return switch (role) {
-    SpaceUserRole.admin => 'Administrador',
-    SpaceUserRole.manager => 'Gerente',
-    SpaceUserRole.participant => 'Participante',
+({num? value, bool isValid}) _parseOptionalScore(String rawValue) {
+  final normalizedValue = rawValue.trim().replaceAll(',', '.');
+  if (normalizedValue.isEmpty) {
+    return (value: null, isValid: true);
+  }
+  final value = num.tryParse(normalizedValue);
+  return (value: value, isValid: value != null && value.isFinite && value >= 0);
+}
+
+String _categoryLabel(TaskCategory category) {
+  return switch (category) {
+    TaskCategory.operational => 'Operacional',
+    TaskCategory.financial => 'Financeira',
   };
 }
 
-String _statusFilterLabel(SpaceMembershipStatus status) {
-  return switch (status) {
-    SpaceMembershipStatus.pending => 'Pendente',
-    SpaceMembershipStatus.approved => 'Aprovada',
-    SpaceMembershipStatus.blocked => 'Bloqueada',
-    SpaceMembershipStatus.cancelled => 'Cancelada',
-    SpaceMembershipStatus.denied => 'Negada',
-    SpaceMembershipStatus.suspended => 'Suspensa',
-  };
+String _scoreLabel(num score) {
+  if (score == score.roundToDouble()) {
+    return score.toStringAsFixed(0);
+  }
+  return score.toString();
 }
 
-String _participantsLabel(int count) {
-  return count == 1 ? '1 participante ativo' : '$count participantes ativos';
-}
-
-IconData _membershipIcon(String? status) {
-  return switch (status) {
-    'APPROVED' => Icons.verified_outlined,
-    'PENDING' => Icons.hourglass_top_rounded,
-    _ => Icons.explore_outlined,
+String _scheduleLabel(TaskScheduleSummary schedule) {
+  final frequency = switch (schedule.frequency) {
+    TaskFrequency.once => 'Uma vez',
+    TaskFrequency.daily => 'Diária',
+    TaskFrequency.weekly => 'Semanal',
+    TaskFrequency.monthly => 'Mensal',
+    TaskFrequency.yearly => 'Anual',
   };
-}
-
-String _membershipLabel(SpaceSummary space) {
-  return switch (space.spaceMembershipStatus) {
-    'APPROVED' => switch (space.spaceUserRole) {
-      'ROLE_SPACE_ADMIN' => 'Administrador',
-      'ROLE_SPACE_MANAGER' => 'Gerente',
-      'ROLE_SPACE_PARTICIPANT' => 'Participante',
-      _ => 'Participação aprovada',
-    },
-    'PENDING' => 'Participação pendente',
-    _ => 'Disponível',
-  };
+  if (schedule.localDates.isEmpty) {
+    return frequency;
+  }
+  final firstDate = schedule.localDates.first;
+  final formattedDate =
+      '${firstDate.day.toString().padLeft(2, '0')}/'
+      '${firstDate.month.toString().padLeft(2, '0')}/'
+      '${firstDate.year}';
+  return '$frequency · $formattedDate';
 }
 
 String _failureMessage(ApiFailureKind kind) {
   return switch (kind) {
+    ApiFailureKind.validation =>
+      'Os filtros informados não puderam ser processados.',
     ApiFailureKind.unauthorized =>
       'Sua sessão não pôde ser autenticada. Tente entrar novamente.',
-    ApiFailureKind.forbidden => 'Seu acesso não permite consultar os espaços.',
+    ApiFailureKind.forbidden =>
+      'Seu acesso não permite consultar as tarefas deste espaço.',
     ApiFailureKind.rateLimited =>
       'Muitas solicitações foram feitas. Aguarde um pouco e tente novamente.',
     ApiFailureKind.timeout =>

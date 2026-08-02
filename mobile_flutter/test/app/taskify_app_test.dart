@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/app/taskify_app.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 
 import '../helpers/fakes.dart';
 
@@ -22,6 +25,7 @@ void main() {
       TaskifyApp(
         authenticationRepository: authenticationRepository,
         spacesRepository: spacesRepository,
+        tasksRepository: _FakeTasksRepository(),
       ),
     );
 
@@ -51,6 +55,7 @@ void main() {
       TaskifyApp(
         authenticationRepository: authenticationRepository,
         spacesRepository: spacesRepository,
+        tasksRepository: _FakeTasksRepository(),
       ),
     );
 
@@ -78,6 +83,7 @@ void main() {
       TaskifyApp(
         authenticationRepository: authenticationRepository,
         spacesRepository: spacesRepository,
+        tasksRepository: _FakeTasksRepository(),
       ),
     );
 
@@ -96,4 +102,22 @@ Future<void> _fillValidCredentials(WidgetTester tester) async {
     'user@example.com',
   );
   await tester.enterText(find.byKey(const Key('password-field')), 'Secret1!');
+}
+
+final class _FakeTasksRepository implements TasksRepository {
+  @override
+  Future<TaskPageResult> fetchTasks({
+    required String accessToken,
+    TaskFilters filters = const TaskFilters(),
+    int page = 0,
+    int size = 10,
+  }) async {
+    return TaskPageResult(
+      content: const [],
+      size: size,
+      number: page,
+      totalElements: 0,
+      totalPages: 0,
+    );
+  }
 }
