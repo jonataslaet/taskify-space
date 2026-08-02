@@ -7,11 +7,13 @@ class CreateSpaceDialog extends StatefulWidget {
   const CreateSpaceDialog({
     required this.accessToken,
     required this.spacesRepository,
+    this.onSessionExpired,
     super.key,
   });
 
   final String accessToken;
   final SpacesRepository spacesRepository;
+  final VoidCallback? onSessionExpired;
 
   @override
   State<CreateSpaceDialog> createState() => _CreateSpaceDialogState();
@@ -52,6 +54,11 @@ class _CreateSpaceDialogState extends State<CreateSpaceDialog> {
       Navigator.of(context).pop(createdSpace);
     } on ApiFailure catch (failure) {
       if (!mounted) {
+        return;
+      }
+      if (failure.kind == ApiFailureKind.unauthorized ||
+          failure.kind == ApiFailureKind.forbidden) {
+        widget.onSessionExpired?.call();
         return;
       }
       setState(() {

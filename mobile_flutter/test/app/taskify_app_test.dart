@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/app/taskify_app.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
+import 'package:mobile_flutter/core/storage/session_store.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
@@ -93,6 +94,34 @@ void main() {
 
     expect(spacesRepository.fetchSpacesCalls, 0);
     expect(find.byKey(const Key('login-error')), findsOneWidget);
+  });
+
+  testWidgets('limpa a sessão e retorna para o login em caso de falha de autenticação', (
+    tester,
+  ) async {
+    final authenticationRepository = FakeAuthenticationRepository(
+      (_, _) async => testSession,
+    );
+    final sessionStore = FakeSessionStore();
+    final spacesRepository = FakeSpacesRepository(
+      (_) async => throw const ApiFailure(ApiFailureKind.unauthorized),
+    );
+
+    await tester.pumpWidget(
+      TaskifyApp(
+        authenticationRepository: authenticationRepository,
+        spacesRepository: spacesRepository,
+        tasksRepository: _FakeTasksRepository(),
+        sessionStore: sessionStore,
+      ),
+    );
+
+    await _fillValidCredentials(tester);
+    await tester.tap(find.byKey(const Key('login-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('login-page')), findsOneWidget);
+    expect(sessionStore.savedSession, isNull);
   });
 }
 

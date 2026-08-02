@@ -18,12 +18,14 @@ class SpacesPage extends StatefulWidget {
     required this.session,
     required this.spacesRepository,
     required this.tasksRepository,
+    this.onSessionExpired,
     super.key,
   });
 
   final AuthSession session;
   final SpacesRepository spacesRepository;
   final TasksRepository tasksRepository;
+  final VoidCallback? onSessionExpired;
 
   @override
   State<SpacesPage> createState() => _SpacesPageState();
@@ -144,6 +146,11 @@ class _SpacesPageState extends State<SpacesPage> {
       if (!mounted || requestGeneration != _requestGeneration) {
         return;
       }
+      if (failure.kind == ApiFailureKind.unauthorized ||
+          failure.kind == ApiFailureKind.forbidden) {
+        widget.onSessionExpired?.call();
+        return;
+      }
       setState(() {
         _failure = failure;
         _isLoading = false;
@@ -224,6 +231,7 @@ class _SpacesPageState extends State<SpacesPage> {
             spaceId: space.id,
             spaceName: space.name,
             tasksRepository: widget.tasksRepository,
+            onSessionExpired: widget.onSessionExpired,
           ),
         ),
       ),
@@ -237,6 +245,7 @@ class _SpacesPageState extends State<SpacesPage> {
       builder: (context) => CreateSpaceDialog(
         accessToken: widget.session.accessToken,
         spacesRepository: widget.spacesRepository,
+        onSessionExpired: widget.onSessionExpired,
       ),
     );
     if (!mounted || createdSpace == null) {

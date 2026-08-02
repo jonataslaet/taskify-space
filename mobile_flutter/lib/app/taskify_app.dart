@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:mobile_flutter/core/storage/session_store.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
 import 'package:mobile_flutter/features/auth/presentation/login_page.dart';
@@ -11,12 +14,14 @@ class TaskifyApp extends StatefulWidget {
     required this.authenticationRepository,
     required this.spacesRepository,
     required this.tasksRepository,
+    this.sessionStore,
     super.key,
   });
 
   final AuthenticationRepository authenticationRepository;
   final SpacesRepository spacesRepository;
   final TasksRepository tasksRepository;
+  final SessionStore? sessionStore;
 
   @override
   State<TaskifyApp> createState() => _TaskifyAppState();
@@ -24,6 +29,14 @@ class TaskifyApp extends StatefulWidget {
 
 class _TaskifyAppState extends State<TaskifyApp> {
   AuthSession? _session;
+
+  void _handleSessionExpired() {
+    setState(() => _session = null);
+    final sessionStore = widget.sessionStore;
+    if (sessionStore != null) {
+      unawaited(sessionStore.clear());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +94,7 @@ class _TaskifyAppState extends State<TaskifyApp> {
                 session: _session!,
                 spacesRepository: widget.spacesRepository,
                 tasksRepository: widget.tasksRepository,
+                onSessionExpired: _handleSessionExpired,
               ),
       ),
     );

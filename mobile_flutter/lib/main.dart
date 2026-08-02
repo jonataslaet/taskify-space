@@ -17,11 +17,12 @@ void main() {
   final storageGateway = FlutterSecureStorageGateway(secureStorage);
   final client = http.Client();
   final config = AppConfig.fromEnvironment();
+  final sessionStore = SecureSessionStore(storageGateway);
   final authenticationRepository = HttpAuthenticationRepository(
     client: client,
     config: config,
     installationIdStore: SecureInstallationIdStore(storageGateway),
-    sessionStore: SecureSessionStore(storageGateway),
+    sessionStore: sessionStore,
   );
   final spacesRepository = HttpSpacesRepository(client: client, config: config);
   final tasksRepository = HttpTasksRepository(client: client, config: config);
@@ -31,6 +32,7 @@ void main() {
       authenticationRepository: authenticationRepository,
       spacesRepository: spacesRepository,
       tasksRepository: tasksRepository,
+      sessionStore: sessionStore,
     ),
   );
 }

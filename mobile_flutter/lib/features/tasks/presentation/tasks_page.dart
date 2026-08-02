@@ -17,6 +17,7 @@ class TasksPage extends StatefulWidget {
     required this.spaceId,
     required this.spaceName,
     required this.tasksRepository,
+    this.onSessionExpired,
     super.key,
   }) : assert(spaceId > 0, 'spaceId deve ser positivo.');
 
@@ -24,6 +25,7 @@ class TasksPage extends StatefulWidget {
   final int spaceId;
   final String spaceName;
   final TasksRepository tasksRepository;
+  final VoidCallback? onSessionExpired;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -153,6 +155,11 @@ class _TasksPageState extends State<TasksPage> {
       });
     } on ApiFailure catch (failure) {
       if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+      if (failure.kind == ApiFailureKind.unauthorized ||
+          failure.kind == ApiFailureKind.forbidden) {
+        widget.onSessionExpired?.call();
         return;
       }
       setState(() {
