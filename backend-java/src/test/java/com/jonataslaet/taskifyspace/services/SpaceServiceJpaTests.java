@@ -57,7 +57,7 @@ class SpaceServiceJpaTests {
     }
 
     @Test
-    void findAllReturnsOnlyActiveSpacesWhereUserHasNoMembershipOrAvailableMembership() {
+    void findAllReturnsOnlyActiveSpacesWhereUserHasNoMembershipOrPendingOrApprovedMembership() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
         User otherUser = userRepository.save(createUser("other@example.com"));
 
@@ -82,44 +82,52 @@ class SpaceServiceJpaTests {
         List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
         assertThat(spaceIds).containsExactlyInAnyOrder(
             noMembershipSpace.getId(),
-            deniedSpace.getId(),
-            cancelledSpace.getId(),
+            approvedSpace.getId(),
+            pendingSpace.getId(),
             otherUserSpace.getId());
     }
 
     @Test
-    void findAllFiltersRoleOnAuthenticatedUsersAvailableMembershipOnly() {
+    void findAllFiltersRoleOnAuthenticatedUsersPendingOrApprovedMembershipOnly() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
 
-        Space deniedParticipantSpace = spaceRepository.save(createSpace("Denied participant"));
-        Space deniedAdminSpace = spaceRepository.save(createSpace("Denied admin"));
+        Space pendingParticipantSpace = spaceRepository.save(createSpace("Pending participant"));
+        Space pendingAdminSpace = spaceRepository.save(createSpace("Pending admin"));
         Space approvedAdminSpace = spaceRepository.save(createSpace("Approved admin"));
+        Space deniedAdminSpace = spaceRepository.save(createSpace("Denied admin"));
 
         saveMembership(
-            deniedParticipantSpace,
+            pendingParticipantSpace,
             authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT,
-            SpaceMembershipStatusEnum.DENIED);
+            SpaceMembershipStatusEnum.PENDING);
         saveMembership(
-            deniedAdminSpace,
+            pendingAdminSpace,
             authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
-            SpaceMembershipStatusEnum.DENIED);
+            SpaceMembershipStatusEnum.PENDING);
         saveMembership(
             approvedAdminSpace,
             authenticatedUser,
             SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
             SpaceMembershipStatusEnum.APPROVED);
+        saveMembership(
+            deniedAdminSpace,
+            authenticatedUser,
+            SpaceUserRoleEnum.ROLE_SPACE_ADMIN,
+            SpaceMembershipStatusEnum.DENIED);
 
         Page<SpaceRecordDTO> spaces = spaceService.findAll(
             null, Pageable.unpaged(), authenticatedUser, SpaceUserRoleEnum.ROLE_SPACE_ADMIN, null);
 
         List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
-        assertThat(spaceIds).containsExactly(deniedAdminSpace.getId());
+        assertThat(spaceIds).containsExactlyInAnyOrder(
+            pendingAdminSpace.getId(),
+            approvedAdminSpace.getId());
     }
 
     @Test
-    void findAllFiltersStatusOnAuthenticatedUsersAvailableMembershipOnly() {
+    void findAllFiltersStatusOnAuthenticatedUsersPendingOrApprovedMembershipOnly() {
         User authenticatedUser = userRepository.save(createUser("user@example.com"));
         User otherUser = userRepository.save(createUser("other@example.com"));
 
@@ -144,10 +152,10 @@ class SpaceServiceJpaTests {
             SpaceMembershipStatusEnum.PENDING);
 
         Page<SpaceRecordDTO> spaces = spaceService.findAll(
-            null, Pageable.unpaged(), authenticatedUser, null, SpaceMembershipStatusEnum.DENIED);
+            null, Pageable.unpaged(), authenticatedUser, null, SpaceMembershipStatusEnum.PENDING);
 
         List<Long> spaceIds = spaces.getContent().stream().map(SpaceRecordDTO::id).toList();
-        assertThat(spaceIds).containsExactly(deniedSpace.getId());
+        assertThat(spaceIds).containsExactly(pendingSpace.getId());
     }
 
     private User createUser(String email) {
