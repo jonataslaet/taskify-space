@@ -52,7 +52,17 @@ opcionais.
 A listagem permite combinar a busca parcial por `name` com os filtros
 `spaceUserRole` e `spaceMembershipStatus`. A interface oferece somente os status
 `PENDING` e `APPROVED`, que são os estados admitidos pela regra-base dessa
-listagem.
+listagem. As consultas são ordenadas por `id`, e uma barra no fim da lista
+permite navegar pelas páginas e escolher 5, 10, 20 ou 50 registros por página.
+Ao alterar essa quantidade, aplicar ou limpar filtros, a consulta reinicia na
+página zero.
+
+O botão **Novo espaço** chama `POST /spaces` com o mesmo access token e envia
+somente o campo `name`, normalizado e validado com o limite de 255 caracteres.
+O backend cria esse espaço como inativo e registra o usuário autenticado como
+administrador. Como `GET /spaces` lista somente espaços ativos, a interface
+confirma a criação sem inserir o novo espaço na listagem atual; ele só poderá
+aparecer depois de ser ativado.
 
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. Nesta primeira entrega, a allowlist contém

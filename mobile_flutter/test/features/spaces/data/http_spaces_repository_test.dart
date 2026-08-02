@@ -10,10 +10,222 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 
 void main() {
   group('HttpSpacesRepository', () {
+    test('faz POST /spaces com o payload mínimo em JSON UTF-8', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.toString(), 'http://10.0.2.2:8080/api/spaces');
+        expect(request.headers['Accept'], 'application/json');
+        expect(
+          request.headers['Authorization'],
+          'Bearer access-token-test-only',
+        );
+        expect(
+          request.headers['Content-Type'],
+          'application/json; charset=utf-8',
+        );
+        expect(jsonDecode(utf8.decode(request.bodyBytes)), <String, dynamic>{
+          'name': 'Residência Açú',
+        });
+        return _jsonResponse(_validCreatedBody(), statusCode: 201);
+      });
+
+      final result = await _repository(client).createSpace(
+        accessToken: ' access-token-test-only ',
+        name: '  Residência Açú  ',
+      );
+
+      expect(result.id, 3);
+      expect(result.name, 'Residência Açú');
+      expect(result.spaceAdminName, 'Joice Laet');
+      expect(result.active, isFalse);
+    });
+
+    test('não envia campos controlados pelo backend na criação', () async {
+      final client = MockClient((request) async {
+        final body = jsonDecode(utf8.decode(request.bodyBytes));
+        expect(body, hasLength(1));
+        expect(body, isNot(contains('spaceAdminName')));
+        expect(body, isNot(contains('active')));
+        return _jsonResponse(_validCreatedBody(), statusCode: 201);
+      });
+
+      await _repository(
+        client,
+      ).createSpace(accessToken: 'access-token-test-only', name: 'Meu espaço');
+    });
+
+    test('não faz POST com nome vazio ou maior que 255 caracteres', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          return _jsonResponse(_validCreatedBody(), statusCode: 201);
+        }),
+      );
+
+      for (final invalidName in <String>['   ', 'a' * 256]) {
+        await expectLater(
+          repository.createSpace(
+            accessToken: 'access-token-test-only',
+            name: invalidName,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.validation,
+            ),
+          ),
+        );
+      }
+      expect(calls, 0);
+    });
+
+    test('não faz POST quando o token está vazio', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          return _jsonResponse(_validCreatedBody(), statusCode: 201);
+        }),
+      );
+
+      await expectLater(
+        repository.createSpace(accessToken: '   ', name: 'Meu espaço'),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.validation,
+          ),
+        ),
+      );
+      expect(calls, 0);
+    });
+
+    test('exige status 201 na criação', () async {
+      final repository = _repository(
+        MockClient((_) async => _jsonResponse(_validCreatedBody())),
+      );
+
+      await expectLater(
+        repository.createSpace(
+          accessToken: 'access-token-test-only',
+          name: 'Meu espaço',
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having((failure) => failure.kind, 'kind', ApiFailureKind.unknown)
+              .having((failure) => failure.statusCode, 'statusCode', 200),
+        ),
+      );
+    });
+
+    test('mapeia 400 do POST para validation', () async {
+      final repository = _repository(
+        MockClient((_) async => http.Response('{}', 400)),
+      );
+
+      await expectLater(
+        repository.createSpace(
+          accessToken: 'access-token-test-only',
+          name: 'Meu espaço',
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              )
+              .having((failure) => failure.statusCode, 'statusCode', 400),
+        ),
+      );
+    });
+
+    test('mapeia 403 do POST para forbidden', () async {
+      final repository = _repository(
+        MockClient((_) async => http.Response('{}', 403)),
+      );
+
+      await expectLater(
+        repository.createSpace(
+          accessToken: 'access-token-test-only',
+          name: 'Meu espaço',
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.forbidden,
+              )
+              .having((failure) => failure.statusCode, 'statusCode', 403),
+        ),
+      );
+    });
+
+    test('não repete automaticamente o POST após timeout', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          return _jsonResponse(_validCreatedBody(), statusCode: 201);
+        }),
+        timeout: const Duration(milliseconds: 1),
+      );
+
+      await expectLater(
+        repository.createSpace(
+          accessToken: 'access-token-test-only',
+          name: 'Meu espaço',
+        ),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.timeout,
+          ),
+        ),
+      );
+      expect(calls, 1);
+    });
+
+    test('mapeia resposta 201 incompatível para malformedResponse', () async {
+      final repository = _repository(
+        MockClient(
+          (_) async => _jsonResponse(<String, dynamic>{
+            'id': 3,
+            'name': 'Meu espaço',
+          }, statusCode: 201),
+        ),
+      );
+
+      await expectLater(
+        repository.createSpace(
+          accessToken: 'access-token-test-only',
+          name: 'Meu espaço',
+        ),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.malformedResponse,
+          ),
+        ),
+      );
+    });
+
     test('faz GET /spaces com Bearer e interpreta a resposta', () async {
       final client = MockClient((request) async {
         expect(request.method, 'GET');
-        expect(request.url.toString(), 'http://10.0.2.2:8080/api/spaces');
+        expect(request.url.path, '/api/spaces');
+        expect(request.url.queryParameters, <String, String>{
+          'page': '0',
+          'size': '10',
+          'sort': 'id,asc',
+        });
         expect(request.headers['Accept'], 'application/json');
         expect(
           request.headers['Authorization'],
@@ -37,11 +249,18 @@ void main() {
       final client = MockClient((request) async {
         expect(request.url.path, '/api/spaces');
         expect(request.url.queryParameters, <String, String>{
+          'page': '2',
+          'size': '25',
+          'sort': 'id,asc',
           'name': 'Residência do Casal',
           'spaceUserRole': 'ROLE_SPACE_MANAGER',
           'spaceMembershipStatus': 'APPROVED',
         });
-        return _jsonResponse(_validBody());
+        final body = _validBody();
+        final page = body['page']! as Map<String, dynamic>;
+        page['number'] = 2;
+        page['totalPages'] = 3;
+        return _jsonResponse(body);
       });
 
       await _repository(client).fetchSpaces(
@@ -51,20 +270,56 @@ void main() {
           role: SpaceUserRole.manager,
           status: SpaceMembershipStatus.approved,
         ),
+        page: 2,
+        size: 25,
       );
     });
 
-    test('omite filtros ausentes e nome em branco da query', () async {
-      final client = MockClient((request) async {
-        expect(request.url.toString(), 'http://10.0.2.2:8080/api/spaces');
-        expect(request.url.hasQuery, isFalse);
-        return _jsonResponse(_validBody());
-      });
+    test(
+      'omite filtros ausentes e nome em branco, preservando paginação',
+      () async {
+        final client = MockClient((request) async {
+          expect(request.url.queryParameters, <String, String>{
+            'page': '0',
+            'size': '10',
+            'sort': 'id,asc',
+          });
+          return _jsonResponse(_validBody());
+        });
 
-      await _repository(client).fetchSpaces(
-        accessToken: 'access-token-test-only',
-        filters: const SpaceFilters(name: '   '),
+        await _repository(client).fetchSpaces(
+          accessToken: 'access-token-test-only',
+          filters: const SpaceFilters(name: '   '),
+        );
+      },
+    );
+
+    test('não faz GET com paginação inválida', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          return _jsonResponse(_validBody());
+        }),
       );
+
+      for (final pagination in <(int, int)>[(-1, 10), (0, 0), (0, -1)]) {
+        await expectLater(
+          repository.fetchSpaces(
+            accessToken: 'access-token-test-only',
+            page: pagination.$1,
+            size: pagination.$2,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.validation,
+            ),
+          ),
+        );
+      }
+      expect(calls, 0);
     });
 
     test('não faz requisição quando o token está vazio', () async {
@@ -168,6 +423,26 @@ void main() {
       );
     });
 
+    test('rejeita número de página diferente do solicitado', () async {
+      final body = _validBody();
+      final page = body['page']! as Map<String, dynamic>;
+      page['number'] = 1;
+      final repository = _repository(
+        MockClient((_) async => _jsonResponse(body)),
+      );
+
+      await expectLater(
+        repository.fetchSpaces(accessToken: 'access-token-test-only', page: 0),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.malformedResponse,
+          ),
+        ),
+      );
+    });
+
     test('mapeia falha do cliente para network', () async {
       final repository = _repository(
         MockClient((request) async {
@@ -224,12 +499,21 @@ HttpSpacesRepository _repository(
   );
 }
 
-http.Response _jsonResponse(Map<String, dynamic> body) {
+http.Response _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
   return http.Response.bytes(
     utf8.encode(jsonEncode(body)),
-    200,
+    statusCode,
     headers: const {'content-type': 'application/json; charset=utf-8'},
   );
+}
+
+Map<String, dynamic> _validCreatedBody() {
+  return <String, dynamic>{
+    'id': 3,
+    'name': 'Residência Açú',
+    'spaceAdminName': 'Joice Laet',
+    'active': false,
+  };
 }
 
 Map<String, dynamic> _validBody() {

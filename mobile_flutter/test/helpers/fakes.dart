@@ -3,6 +3,7 @@ import 'package:mobile_flutter/core/storage/secure_storage_gateway.dart';
 import 'package:mobile_flutter/core/storage/session_store.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
+import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
@@ -88,23 +89,63 @@ final class FakeAuthenticationRepository implements AuthenticationRepository {
 
 typedef FetchSpacesHandler =
     Future<SpacePageResult> Function(String accessToken);
+typedef FetchSpacesPageHandler =
+    Future<SpacePageResult> Function(String accessToken, int page, int size);
+typedef CreateSpaceHandler =
+    Future<CreatedSpace> Function(String accessToken, String name);
 
 final class FakeSpacesRepository implements SpacesRepository {
-  FakeSpacesRepository(this._handler);
+  FakeSpacesRepository(
+    this._handler, {
+    this.fetchPageHandler,
+    this.createHandler,
+  });
 
   final FetchSpacesHandler _handler;
+  final FetchSpacesPageHandler? fetchPageHandler;
+  final CreateSpaceHandler? createHandler;
   int fetchSpacesCalls = 0;
+  int createSpaceCalls = 0;
   final receivedAccessTokens = <String>[];
+  final receivedPages = <int>[];
+  final receivedPageSizes = <int>[];
+  final receivedCreateAccessTokens = <String>[];
+  final receivedSpaceNames = <String>[];
   final receivedFilters = <SpaceFilters>[];
+
+  @override
+  Future<CreatedSpace> createSpace({
+    required String accessToken,
+    required String name,
+  }) {
+    createSpaceCalls += 1;
+    receivedCreateAccessTokens.add(accessToken);
+    receivedSpaceNames.add(name);
+    final handler = createHandler;
+    if (handler == null) {
+      return Future<CreatedSpace>.error(
+        StateError('Handler de criação não configurado.'),
+      );
+    }
+    return handler(accessToken, name);
+  }
 
   @override
   Future<SpacePageResult> fetchSpaces({
     required String accessToken,
     SpaceFilters filters = const SpaceFilters(),
+    int page = 0,
+    int size = 10,
   }) {
     fetchSpacesCalls += 1;
     receivedAccessTokens.add(accessToken);
     receivedFilters.add(filters);
+    receivedPages.add(page);
+    receivedPageSizes.add(size);
+    final pageHandler = fetchPageHandler;
+    if (pageHandler != null) {
+      return pageHandler(accessToken, page, size);
+    }
     return _handler(accessToken);
   }
 }

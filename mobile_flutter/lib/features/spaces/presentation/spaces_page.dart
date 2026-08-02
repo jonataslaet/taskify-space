@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/spaces/presentation/create_space_dialog.dart';
 
 class SpacesPage extends StatefulWidget {
   const SpacesPage({
@@ -23,13 +25,20 @@ class SpacesPage extends StatefulWidget {
 }
 
 class _SpacesPageState extends State<SpacesPage> {
+  static const _pageSizeOptions = <int>[5, 10, 20, 50];
+
   final _nameFilterController = TextEditingController();
+  final _scrollController = ScrollController();
   SpacePageResult? _result;
   ApiFailure? _failure;
   SpaceUserRole? _selectedRole;
   SpaceMembershipStatus? _selectedStatus;
   SpaceFilters _appliedFilters = const SpaceFilters();
   bool _isLoading = false;
+  bool _areFiltersExpanded = false;
+  int _requestGeneration = 0;
+  int _requestedPage = 0;
+  int _pageSize = 10;
 
   @override
   void initState() {
@@ -38,29 +47,87 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   @override
+  void didUpdateWidget(covariant SpacesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final sessionChanged =
+        oldWidget.session.id != widget.session.id ||
+        oldWidget.session.accessToken != widget.session.accessToken;
+    if (!sessionChanged &&
+        identical(oldWidget.spacesRepository, widget.spacesRepository)) {
+      return;
+    }
+
+    _requestGeneration += 1;
+    _result = null;
+    _failure = null;
+    _selectedRole = null;
+    _selectedStatus = null;
+    _appliedFilters = const SpaceFilters();
+    _isLoading = false;
+    _areFiltersExpanded = false;
+    _requestedPage = 0;
+    _pageSize = 10;
+    _nameFilterController.clear();
+    unawaited(
+      _loadSpaces(filters: const SpaceFilters(), page: 0, size: _pageSize),
+    );
+  }
+
+  @override
   void dispose() {
+    _scrollController.dispose();
     _nameFilterController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadSpaces({SpaceFilters? filters}) async {
+  Future<void> _loadSpaces({
+    SpaceFilters? filters,
+    int? page,
+    int? size,
+  }) async {
     if (_isLoading) {
       return;
     }
 
     final requestedFilters = filters ?? _appliedFilters;
+    final requestedPage = page ?? _result?.number ?? 0;
+    final requestedSize = size ?? _pageSize;
+    final requestGeneration = ++_requestGeneration;
     setState(() {
       _appliedFilters = requestedFilters;
+      _requestedPage = requestedPage;
+      _pageSize = requestedSize;
       _isLoading = true;
       _failure = null;
     });
+    if ((filters != null || page != null || size != null) &&
+        _scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
 
     try {
       final result = await widget.spacesRepository.fetchSpaces(
         accessToken: widget.session.accessToken,
         filters: requestedFilters,
+        page: requestedPage,
+        size: requestedSize,
       );
-      if (!mounted) {
+      if (result.number != requestedPage) {
+        throw const ApiFailure(ApiFailureKind.malformedResponse);
+      }
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+      final lastAvailablePage = result.totalPages == 0
+          ? 0
+          : result.totalPages - 1;
+      if (requestedPage > lastAvailablePage) {
+        setState(() => _isLoading = false);
+        await _loadSpaces(
+          filters: requestedFilters,
+          page: lastAvailablePage,
+          size: requestedSize,
+        );
         return;
       }
       setState(() {
@@ -68,7 +135,7 @@ class _SpacesPageState extends State<SpacesPage> {
         _isLoading = false;
       });
     } on ApiFailure catch (failure) {
-      if (!mounted) {
+      if (!mounted || requestGeneration != _requestGeneration) {
         return;
       }
       setState(() {
@@ -76,7 +143,7 @@ class _SpacesPageState extends State<SpacesPage> {
         _isLoading = false;
       });
     } on Object {
-      if (!mounted) {
+      if (!mounted || requestGeneration != _requestGeneration) {
         return;
       }
       setState(() {
@@ -97,6 +164,7 @@ class _SpacesPageState extends State<SpacesPage> {
           role: _selectedRole,
           status: _selectedStatus,
         ),
+        page: 0,
       ),
     );
   }
@@ -110,7 +178,66 @@ class _SpacesPageState extends State<SpacesPage> {
       _selectedRole = null;
       _selectedStatus = null;
     });
-    unawaited(_loadSpaces(filters: const SpaceFilters()));
+    unawaited(_loadSpaces(filters: const SpaceFilters(), page: 0));
+  }
+
+  void _toggleFilters() {
+    setState(() {
+      _areFiltersExpanded = !_areFiltersExpanded;
+    });
+  }
+
+  void _goToPage(int page) {
+    final result = _result;
+    if (_isLoading ||
+        result == null ||
+        page < 0 ||
+        page >= result.totalPages ||
+        page == result.number) {
+      return;
+    }
+    unawaited(_loadSpaces(page: page));
+  }
+
+  void _changePageSize(int? size) {
+    if (_isLoading ||
+        size == null ||
+        size == _pageSize ||
+        !_pageSizeOptions.contains(size)) {
+      return;
+    }
+    unawaited(_loadSpaces(page: 0, size: size));
+  }
+
+  Future<void> _openCreateSpaceDialog() async {
+    final createdSpace = await showDialog<CreatedSpace>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CreateSpaceDialog(
+        accessToken: widget.session.accessToken,
+        spacesRepository: widget.spacesRepository,
+      ),
+    );
+    if (!mounted || createdSpace == null) {
+      return;
+    }
+
+    final message = createdSpace.active
+        ? 'Espaço "${createdSpace.name}" criado com sucesso.'
+        : 'Espaço "${createdSpace.name}" criado. Ele está inativo e ainda não '
+              'aparece nesta lista.';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('space-created-message'),
+          content: Text(message),
+        ),
+      );
+
+    if (createdSpace.active) {
+      unawaited(_loadSpaces());
+    }
   }
 
   bool get _hasActiveFilters {
@@ -124,6 +251,12 @@ class _SpacesPageState extends State<SpacesPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Taskify Space')),
       body: SafeArea(child: _buildBody(context)),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('create-space-button'),
+        onPressed: _openCreateSpaceDialog,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Novo espaço'),
+      ),
     );
   }
 
@@ -139,7 +272,8 @@ class _SpacesPageState extends State<SpacesPage> {
       return _SpacesError(
         message: _failureMessage(failure.kind),
         isRetrying: _isLoading,
-        onRetry: () => unawaited(_loadSpaces()),
+        onRetry: () =>
+            unawaited(_loadSpaces(page: _requestedPage, size: _pageSize)),
       );
     }
 
@@ -149,11 +283,12 @@ class _SpacesPageState extends State<SpacesPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: () => _loadSpaces(),
+      onRefresh: () => _loadSpaces(page: result.number),
       child: ListView(
+        controller: _scrollController,
         key: const ValueKey('spaces-list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
         children: [
           _SpacesHeader(session: widget.session, total: result.totalElements),
           const SizedBox(height: 16),
@@ -162,9 +297,12 @@ class _SpacesPageState extends State<SpacesPage> {
             selectedRole: _selectedRole,
             selectedStatus: _selectedStatus,
             isLoading: _isLoading,
+            isExpanded: _areFiltersExpanded,
+            hasActiveFilters: _hasActiveFilters,
             onRoleChanged: (role) => setState(() => _selectedRole = role),
             onStatusChanged: (status) =>
                 setState(() => _selectedStatus = status),
+            onToggle: _toggleFilters,
             onApply: _applyFilters,
             onClear: _clearFilters,
           ),
@@ -182,15 +320,29 @@ class _SpacesPageState extends State<SpacesPage> {
             _SpacesError(
               message: _failureMessage(failure.kind),
               isRetrying: false,
-              onRetry: () => unawaited(_loadSpaces()),
+              onRetry: () =>
+                  unawaited(_loadSpaces(page: _requestedPage, size: _pageSize)),
             )
-          else if (result.content.isEmpty)
-            _SpacesEmpty(isFiltered: _hasActiveFilters)
-          else
-            for (final space in result.content) ...[
-              _SpaceCard(space: space),
-              const SizedBox(height: 12),
-            ],
+          else ...[
+            if (result.content.isEmpty)
+              _SpacesEmpty(isFiltered: _hasActiveFilters)
+            else
+              for (final space in result.content) ...[
+                _SpaceCard(space: space),
+                const SizedBox(height: 12),
+              ],
+            const SizedBox(height: 8),
+            _SpacesPaginationBar(
+              currentPage: result.number,
+              pageItemCount: result.content.length,
+              totalElements: result.totalElements,
+              totalPages: result.totalPages,
+              pageSize: _pageSize,
+              pageSizeOptions: _pageSizeOptions,
+              onPageSelected: _goToPage,
+              onPageSizeChanged: _changePageSize,
+            ),
+          ],
         ],
       ),
     );
@@ -229,14 +381,229 @@ class _SpacesHeader extends StatelessWidget {
   }
 }
 
+class _SpacesPaginationBar extends StatelessWidget {
+  const _SpacesPaginationBar({
+    required this.currentPage,
+    required this.pageItemCount,
+    required this.totalElements,
+    required this.totalPages,
+    required this.pageSize,
+    required this.pageSizeOptions,
+    required this.onPageSelected,
+    required this.onPageSizeChanged,
+  });
+
+  final int currentPage;
+  final int pageItemCount;
+  final int totalElements;
+  final int totalPages;
+  final int pageSize;
+  final List<int> pageSizeOptions;
+  final ValueChanged<int> onPageSelected;
+  final ValueChanged<int?> onPageSizeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final firstItem = totalElements == 0 ? 0 : currentPage * pageSize + 1;
+    final lastItem = totalElements == 0 ? 0 : firstItem + pageItemCount - 1;
+    final pageTokens = _visiblePageTokens(currentPage, totalPages);
+
+    return Card(
+      key: const ValueKey('spaces-pagination-bar'),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFDDE8E5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                totalPages == 0
+                    ? 'Nenhuma página disponível'
+                    : 'Página ${currentPage + 1} de $totalPages · '
+                          '$firstItem–$lastItem de $totalElements',
+                key: const ValueKey('spaces-page-summary'),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF5D716F),
+                ),
+              ),
+            ),
+            if (totalPages > 0) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  IconButton(
+                    key: const ValueKey('spaces-page-previous'),
+                    tooltip: 'Página anterior',
+                    onPressed: currentPage > 0
+                        ? () => onPageSelected(currentPage - 1)
+                        : null,
+                    icon: const Icon(Icons.chevron_left_rounded),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (
+                            var index = 0;
+                            index < pageTokens.length;
+                            index++
+                          )
+                            if (pageTokens[index] case final page?)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                child: _PageNumberButton(
+                                  page: page,
+                                  isCurrent: page == currentPage,
+                                  onPressed: () => onPageSelected(page),
+                                ),
+                              )
+                            else
+                              SizedBox(
+                                key: ValueKey('spaces-page-ellipsis-$index'),
+                                width: 30,
+                                child: const ExcludeSemantics(
+                                  child: Center(child: Text('…')),
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const ValueKey('spaces-page-next'),
+                    tooltip: 'Próxima página',
+                    onPressed: currentPage + 1 < totalPages
+                        ? () => onPageSelected(currentPage + 1)
+                        : null,
+                    icon: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              children: [
+                const Text('Registros por página'),
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    key: const ValueKey('spaces-page-size'),
+                    value: pageSize,
+                    items: [
+                      for (final option in pageSizeOptions)
+                        DropdownMenuItem<int>(
+                          value: option,
+                          child: Text('$option'),
+                        ),
+                    ],
+                    onChanged: onPageSizeChanged,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PageNumberButton extends StatelessWidget {
+  const _PageNumberButton({
+    required this.page,
+    required this.isCurrent,
+    required this.onPressed,
+  });
+
+  final int page;
+  final bool isCurrent;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = '${page + 1}';
+    final button = isCurrent
+        ? FilledButton(
+            key: ValueKey('spaces-page-$page'),
+            onPressed: null,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.square(48),
+              padding: EdgeInsets.zero,
+              disabledBackgroundColor: Theme.of(context).colorScheme.primary,
+              disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
+            child: Text(label),
+          )
+        : OutlinedButton(
+            key: ValueKey('spaces-page-$page'),
+            onPressed: onPressed,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.square(48),
+              padding: EdgeInsets.zero,
+            ),
+            child: Text(label),
+          );
+
+    return Semantics(
+      button: true,
+      selected: isCurrent,
+      label: isCurrent ? 'Página $label, atual' : 'Ir para página $label',
+      child: ExcludeSemantics(child: button),
+    );
+  }
+}
+
+List<int?> _visiblePageTokens(int currentPage, int totalPages) {
+  if (totalPages <= 0) {
+    return const [];
+  }
+  if (totalPages <= 7) {
+    return List<int>.generate(totalPages, (index) => index);
+  }
+
+  final lastPage = totalPages - 1;
+  if (currentPage <= 3) {
+    return <int?>[0, 1, 2, 3, null, lastPage];
+  }
+  if (currentPage >= lastPage - 3) {
+    return <int?>[0, null, lastPage - 3, lastPage - 2, lastPage - 1, lastPage];
+  }
+  return <int?>[
+    0,
+    null,
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    null,
+    lastPage,
+  ];
+}
+
 class _SpacesFilterPanel extends StatelessWidget {
   const _SpacesFilterPanel({
     required this.nameController,
     required this.selectedRole,
     required this.selectedStatus,
     required this.isLoading,
+    required this.isExpanded,
+    required this.hasActiveFilters,
     required this.onRoleChanged,
     required this.onStatusChanged,
+    required this.onToggle,
     required this.onApply,
     required this.onClear,
   });
@@ -245,8 +612,11 @@ class _SpacesFilterPanel extends StatelessWidget {
   final SpaceUserRole? selectedRole;
   final SpaceMembershipStatus? selectedStatus;
   final bool isLoading;
+  final bool isExpanded;
+  final bool hasActiveFilters;
   final ValueChanged<SpaceUserRole?> onRoleChanged;
   final ValueChanged<SpaceMembershipStatus?> onStatusChanged;
+  final VoidCallback onToggle;
   final VoidCallback onApply;
   final VoidCallback onClear;
 
@@ -265,99 +635,141 @@ class _SpacesFilterPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Buscar e filtrar',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: const Color(0xFF173B38),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              key: const ValueKey('spaces-name-filter'),
-              controller: nameController,
-              enabled: !isLoading,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                labelText: 'Nome do espaço',
-                hintText: 'Digite parte do nome',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-              onSubmitted: (_) => onApply(),
-            ),
-            const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final roleFilter = _FilterDropdown<SpaceUserRole>(
-                  key: const ValueKey('spaces-role-filter'),
-                  label: 'Meu papel',
-                  allLabel: 'Todos os papéis',
-                  value: selectedRole,
-                  values: SpaceUserRole.values,
-                  valueLabel: _roleFilterLabel,
-                  enabled: !isLoading,
-                  onChanged: onRoleChanged,
-                );
-                final statusFilter = _FilterDropdown<SpaceMembershipStatus>(
-                  key: const ValueKey('spaces-status-filter'),
-                  label: 'Minha participação',
-                  allLabel: 'Todas as situações',
-                  value: selectedStatus,
-                  values: const [
-                    SpaceMembershipStatus.pending,
-                    SpaceMembershipStatus.approved,
-                  ],
-                  valueLabel: _statusFilterLabel,
-                  enabled: !isLoading,
-                  onChanged: onStatusChanged,
-                );
-
-                if (constraints.maxWidth >= 560) {
-                  return Row(
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: roleFilter),
-                      const SizedBox(width: 12),
-                      Expanded(child: statusFilter),
+                      Text(
+                        'Buscar e filtrar',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: const Color(0xFF173B38),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (hasActiveFilters) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Filtros ativos',
+                          key: const ValueKey('spaces-active-filters'),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: const Color(0xFF37615E),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ],
-                  );
-                }
-                return Column(
-                  children: [
-                    roleFilter,
-                    const SizedBox(height: 12),
-                    statusFilter,
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Papel e participação consideram o seu vínculo com o espaço.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF5D716F),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                TextButton.icon(
-                  key: const ValueKey('spaces-clear-filters'),
-                  onPressed: isLoading ? null : onClear,
-                  icon: const Icon(Icons.filter_alt_off_outlined),
-                  label: const Text('Limpar filtros'),
+                  ),
                 ),
-                FilledButton.icon(
-                  key: const ValueKey('spaces-apply-filters'),
-                  onPressed: isLoading ? null : onApply,
-                  icon: const Icon(Icons.search_rounded),
-                  label: const Text('Aplicar filtros'),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  key: const ValueKey('spaces-toggle-filters'),
+                  onPressed: onToggle,
+                  icon: Icon(
+                    isExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                  ),
+                  label: Text(isExpanded ? 'Contrair' : 'Expandir'),
                 ),
               ],
             ),
+            if (isExpanded)
+              Column(
+                key: const ValueKey('spaces-filter-panel'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 14),
+                  TextField(
+                    key: const ValueKey('spaces-name-filter'),
+                    controller: nameController,
+                    enabled: !isLoading,
+                    textInputAction: TextInputAction.search,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome do espaço',
+                      hintText: 'Digite parte do nome',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onSubmitted: (_) => onApply(),
+                  ),
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final roleFilter = _FilterDropdown<SpaceUserRole>(
+                        key: const ValueKey('spaces-role-filter'),
+                        label: 'Meu papel',
+                        allLabel: 'Todos os papéis',
+                        value: selectedRole,
+                        values: SpaceUserRole.values,
+                        valueLabel: _roleFilterLabel,
+                        enabled: !isLoading,
+                        onChanged: onRoleChanged,
+                      );
+                      final statusFilter =
+                          _FilterDropdown<SpaceMembershipStatus>(
+                            key: const ValueKey('spaces-status-filter'),
+                            label: 'Minha participação',
+                            allLabel: 'Todas as situações',
+                            value: selectedStatus,
+                            values: const [
+                              SpaceMembershipStatus.pending,
+                              SpaceMembershipStatus.approved,
+                            ],
+                            valueLabel: _statusFilterLabel,
+                            enabled: !isLoading,
+                            onChanged: onStatusChanged,
+                          );
+
+                      if (constraints.maxWidth >= 560) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: roleFilter),
+                            const SizedBox(width: 12),
+                            Expanded(child: statusFilter),
+                          ],
+                        );
+                      }
+                      return Column(
+                        children: [
+                          roleFilter,
+                          const SizedBox(height: 12),
+                          statusFilter,
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Papel e participação consideram o seu vínculo com o '
+                    'espaço.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFF5D716F),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      TextButton.icon(
+                        key: const ValueKey('spaces-clear-filters'),
+                        onPressed: isLoading ? null : onClear,
+                        icon: const Icon(Icons.filter_alt_off_outlined),
+                        label: const Text('Limpar filtros'),
+                      ),
+                      FilledButton.icon(
+                        key: const ValueKey('spaces-apply-filters'),
+                        onPressed: isLoading ? null : onApply,
+                        icon: const Icon(Icons.search_rounded),
+                        label: const Text('Aplicar filtros'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
           ],
         ),
       ),

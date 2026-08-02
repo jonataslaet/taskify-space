@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
+import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
@@ -24,19 +25,71 @@ final class HttpSpacesRepository implements SpacesRepository {
   final Duration _timeout;
 
   @override
+  Future<CreatedSpace> createSpace({
+    required String accessToken,
+    required String name,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    final normalizedName = name.trim();
+    if (normalizedToken.isEmpty ||
+        normalizedName.isEmpty ||
+        normalizedName.length > 255) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .post(
+            _config.endpoint('/spaces'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode(<String, String>{'name': normalizedName}),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 201) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de criação de espaço não é um objeto JSON.',
+        );
+      }
+      return CreatedSpace.fromJson(decodedBody);
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<SpacePageResult> fetchSpaces({
     required String accessToken,
     SpaceFilters filters = const SpaceFilters(),
+    int page = 0,
+    int size = 10,
   }) async {
     final normalizedToken = accessToken.trim();
-    if (normalizedToken.isEmpty) {
+    if (normalizedToken.isEmpty || page < 0 || size <= 0) {
       throw const ApiFailure(ApiFailureKind.validation);
     }
 
     try {
       final response = await _client
           .get(
-            _spacesEndpoint(filters),
+            _spacesEndpoint(filters, page: page, size: size),
             headers: <String, String>{
               'Accept': 'application/json',
               'Authorization': 'Bearer $normalizedToken',
@@ -54,7 +107,14 @@ final class HttpSpacesRepository implements SpacesRepository {
           'Resposta de espaços não é um objeto JSON.',
         );
       }
-      return SpacePageResult.fromJson(decodedBody);
+      final result = SpacePageResult.fromJson(decodedBody);
+      if (result.number != page) {
+        throw FormatException(
+          'A API retornou a página ${result.number}, mas a página $page foi '
+          'solicitada.',
+        );
+      }
+      return result;
     } on ApiFailure {
       rethrow;
     } on TimeoutException {
@@ -68,9 +128,16 @@ final class HttpSpacesRepository implements SpacesRepository {
     }
   }
 
-  Uri _spacesEndpoint(SpaceFilters filters) {
+  Uri _spacesEndpoint(
+    SpaceFilters filters, {
+    required int page,
+    required int size,
+  }) {
     final normalizedName = filters.name?.trim();
     final queryParameters = <String, String>{
+      'page': page.toString(),
+      'size': size.toString(),
+      'sort': 'id,asc',
       if (normalizedName != null && normalizedName.isNotEmpty)
         'name': normalizedName,
       if (filters.role case final role?) 'spaceUserRole': role.apiValue,
@@ -79,9 +146,6 @@ final class HttpSpacesRepository implements SpacesRepository {
     };
 
     final endpoint = _config.endpoint('/spaces');
-    if (queryParameters.isEmpty) {
-      return endpoint;
-    }
     return endpoint.replace(queryParameters: queryParameters);
   }
 
