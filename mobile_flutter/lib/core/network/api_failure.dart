@@ -20,7 +20,10 @@ final class ApiFailure implements Exception {
 
   String userMessage({int? retrySeconds}) {
     return switch (kind) {
-      ApiFailureKind.validation => 'Confira o e-mail e a senha informados.',
+      ApiFailureKind.validation =>
+        statusCode == 409
+            ? 'Já existe uma conta com este e-mail.'
+            : 'Confira os dados informados.',
       ApiFailureKind.unauthorized =>
         'E-mail ou senha inválidos, ou cadastro ainda não liberado.',
       ApiFailureKind.forbidden =>

@@ -35,6 +35,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   bool _isRegistering = false;
   bool _isPasswordVisible = false;
   ApiFailure? _failure;
+  String? _successMessage;
   int _retrySeconds = 0;
   DateTime? _retryEndsAt;
   Timer? _retryTimer;
@@ -50,12 +51,12 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
 
   String get _loginButtonSemanticLabel {
     if (_isSubmitting) {
-      return 'Entrando';
+      return _isRegistering ? 'Criando conta' : 'Entrando';
     }
     if (_retrySeconds > 0) {
       return 'Tente novamente em $_retrySeconds segundos';
     }
-    return 'Entrar';
+    return _isRegistering ? 'Criar conta' : 'Entrar';
   }
 
   @override
@@ -161,20 +162,41 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     setState(() {
       _isSubmitting = true;
       _failure = null;
+      _successMessage = null;
     });
 
     try {
-      final session = _isRegistering
-          ? await widget.authenticationRepository.register(
-              name: _nameController.text,
-              email: _emailController.text,
-              password: _passwordController.text,
-              passwordConfirmation: _passwordConfirmationController.text,
-            )
-          : await widget.authenticationRepository.login(
-              email: _emailController.text,
-              password: _passwordController.text,
-            );
+      if (_isRegistering) {
+        final registeredEmail = _emailController.text.trim().toLowerCase();
+        await widget.authenticationRepository.register(
+          name: _nameController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          passwordConfirmation: _passwordConfirmationController.text,
+        );
+        if (!mounted) {
+          return;
+        }
+        FocusManager.instance.primaryFocus?.unfocus();
+        TextInput.finishAutofillContext();
+        setState(() {
+          _isSubmitting = false;
+          _isRegistering = false;
+          _isPasswordVisible = false;
+          _nameController.clear();
+          _passwordController.clear();
+          _passwordConfirmationController.clear();
+          _successMessage =
+              'Cadastro realizado! Verifique $registeredEmail para confirmar '
+              'o cadastro antes de entrar.';
+        });
+        return;
+      }
+
+      final session = await widget.authenticationRepository.login(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
       if (!mounted) {
         return;
       }
@@ -296,6 +318,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     setState(() {
       _isRegistering = !_isRegistering;
       _failure = null;
+      _successMessage = null;
       _retryTimer?.cancel();
       _retryEndsAt = null;
       _retrySeconds = 0;
@@ -308,6 +331,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   Widget _buildLoginCard({required bool showBrandMark}) {
     final theme = Theme.of(context);
     final failure = _failure;
+    final successMessage = _successMessage;
     return Card(
       elevation: 0,
       color: Colors.white.withValues(alpha: 0.96),
@@ -451,35 +475,51 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                 ],
                 AnimatedSize(
                   duration: const Duration(milliseconds: 180),
-                  child: failure == null
+                  child: failure == null && successMessage == null
                       ? const SizedBox(height: 24)
                       : Padding(
                           padding: const EdgeInsets.only(top: 18, bottom: 6),
                           child: Semantics(
                             liveRegion: true,
                             child: Container(
-                              key: const Key('login-error'),
+                              key: Key(
+                                failure == null
+                                    ? 'registration-success'
+                                    : 'login-error',
+                              ),
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.errorContainer,
+                                color: failure == null
+                                    ? theme.colorScheme.primaryContainer
+                                    : theme.colorScheme.errorContainer,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(
-                                    Icons.error_outline_rounded,
-                                    color: theme.colorScheme.onErrorContainer,
+                                    failure == null
+                                        ? Icons.check_circle_outline_rounded
+                                        : Icons.error_outline_rounded,
+                                    color: failure == null
+                                        ? theme.colorScheme.onPrimaryContainer
+                                        : theme.colorScheme.onErrorContainer,
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      failure.userMessage(
-                                        retrySeconds: _retrySeconds,
-                                      ),
+                                      failure?.userMessage(
+                                            retrySeconds: _retrySeconds,
+                                          ) ??
+                                          successMessage!,
                                       style: TextStyle(
-                                        color:
-                                            theme.colorScheme.onErrorContainer,
+                                        color: failure == null
+                                            ? theme
+                                                  .colorScheme
+                                                  .onPrimaryContainer
+                                            : theme
+                                                  .colorScheme
+                                                  .onErrorContainer,
                                         height: 1.35,
                                       ),
                                     ),

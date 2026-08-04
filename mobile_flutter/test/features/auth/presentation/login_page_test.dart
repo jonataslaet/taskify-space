@@ -118,10 +118,18 @@ void main() {
     expect(find.byKey(const Key('login-error')), findsNothing);
   });
 
-  testWidgets('permite criar conta usando o endpoint de usuários', (
+  testWidgets('confirma o cadastro sem autenticar antes da confirmação', (
     tester,
   ) async {
-    final repository = FakeAuthenticationRepository((_, _) async => testSession);
+    final repository = FakeAuthenticationRepository(
+      (_, _) async => testSession,
+      registerHandler: (name, email, password, passwordConfirmation) async {
+        expect(name, 'Jonatas Blendo');
+        expect(email, 'jonataslaetprogramador@gmail.com');
+        expect(password, 'Secret1!');
+        expect(passwordConfirmation, 'Secret1!');
+      },
+    );
     AuthSession? authenticatedSession;
     await tester.binding.setSurfaceSize(const Size(800, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -135,7 +143,10 @@ void main() {
     await tester.tap(find.byKey(const Key('toggle-auth-mode-button')));
     await tester.pump();
 
-    await tester.enterText(find.byKey(const Key('name-field')), 'Jonatas Blendo');
+    await tester.enterText(
+      find.byKey(const Key('name-field')),
+      'Jonatas Blendo',
+    );
     await tester.enterText(
       find.byKey(const Key('email-field')),
       'jonataslaetprogramador@gmail.com',
@@ -149,7 +160,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.registerCalls, 1);
-    expect(authenticatedSession, same(testSession));
+    expect(authenticatedSession, isNull);
+    expect(find.byKey(const Key('registration-success')), findsOneWidget);
+    expect(
+      find.text(
+        'Cadastro realizado! Verifique jonataslaetprogramador@gmail.com para '
+        'confirmar o cadastro antes de entrar.',
+      ),
+      findsOneWidget,
+    );
+    expect(repository.loginCalls, 0);
+    expect(find.byKey(const Key('login-error')), findsNothing);
+    expect(find.byKey(const Key('name-field')), findsNothing);
+    expect(find.byKey(const Key('password-confirmation-field')), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const Key('email-field')))
+          .controller
+          ?.text,
+      'jonataslaetprogramador@gmail.com',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const Key('password-field')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(find.text('Entrar'), findsWidgets);
   });
 }
 

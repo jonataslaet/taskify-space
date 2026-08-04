@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/device/installation_id_store.dart';
@@ -77,7 +76,7 @@ final class HttpAuthenticationRepository implements AuthenticationRepository {
       if (decodedBody is! Map<String, dynamic>) {
         throw const FormatException('Resposta de login não é um objeto JSON.');
       }
-      return _persistAndReturnSession(decodedBody);
+      return await _persistAndReturnSession(decodedBody);
     } on ApiFailure {
       rethrow;
     } on TimeoutException {
@@ -92,7 +91,7 @@ final class HttpAuthenticationRepository implements AuthenticationRepository {
   }
 
   @override
-  Future<AuthSession> register({
+  Future<void> register({
     required String name,
     required String email,
     required String password,
@@ -106,52 +105,40 @@ final class HttpAuthenticationRepository implements AuthenticationRepository {
     }
 
     try {
-      final endpoint = _config.endpoint('/users');
-      final requestBody = jsonEncode(<String, String>{
-        'email': email.trim().toLowerCase(),
-        'name': name.trim(),
-        'password': password,
-        'passwordConfirmation': passwordConfirmation,
-      });
-      debugPrint('Registro: POST $endpoint');
-      debugPrint('Registro body: $requestBody');
       final response = await _client
           .post(
-            endpoint,
+            _config.endpoint('/users'),
             headers: <String, String>{
               'Accept': 'application/json',
               'Content-Type': 'application/json; charset=utf-8',
               'X-Device-Id': installationId,
             },
-            body: requestBody,
+            body: jsonEncode(<String, String>{
+              'email': email.trim().toLowerCase(),
+              'name': name.trim(),
+              'password': password,
+              'passwordConfirmation': passwordConfirmation,
+            }),
           )
           .timeout(_timeout);
-      debugPrint('Registro status: ${response.statusCode}');
-      debugPrint('Registro response: ${response.body}');
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
+      if (response.statusCode != 201) {
         throw _mapFailure(response);
       }
-
-      final decodedBody = _decodeJsonBody(response.bodyBytes);
-      if (decodedBody is! Map<String, dynamic>) {
-        throw const FormatException('Resposta de cadastro não é um objeto JSON.');
-      }
-      return _persistAndReturnSession(decodedBody);
     } on ApiFailure {
       rethrow;
     } on TimeoutException {
       throw const ApiFailure(ApiFailureKind.timeout);
     } on http.ClientException {
       throw const ApiFailure(ApiFailureKind.network);
-    } on FormatException {
-      throw const ApiFailure(ApiFailureKind.malformedResponse);
     } on Object {
       throw const ApiFailure(ApiFailureKind.unknown);
     }
   }
 
-  Future<AuthSession> _persistAndReturnSession(Map<String, dynamic> decodedBody) async {
+  Future<AuthSession> _persistAndReturnSession(
+    Map<String, dynamic> decodedBody,
+  ) async {
     final session = AuthSession.fromJson(decodedBody);
     try {
       await _sessionStore.save(session);
@@ -161,21 +148,11 @@ final class HttpAuthenticationRepository implements AuthenticationRepository {
     return session;
   }
 
-  Object _decodeJsonBody(List<int> bodyBytes) {
-    final decodedBody = jsonDecode(utf8.decode(bodyBytes));
-    if (decodedBody is Map<String, dynamic>) {
-      return decodedBody;
-    }
-    if (decodedBody is Map) {
-      return Map<String, dynamic>.from(decodedBody);
-    }
-    return decodedBody;
-  }
-
   ApiFailure _mapFailure(http.Response response) {
     final statusCode = response.statusCode;
     return switch (statusCode) {
       400 => ApiFailure(ApiFailureKind.validation, statusCode: statusCode),
+      409 => ApiFailure(ApiFailureKind.validation, statusCode: statusCode),
       401 => ApiFailure(ApiFailureKind.unauthorized, statusCode: statusCode),
       403 => ApiFailure(ApiFailureKind.forbidden, statusCode: statusCode),
       429 => ApiFailure(

@@ -78,7 +78,7 @@ final class FakeInstallationIdStore implements InstallationIdStore {
 typedef LoginHandler =
     Future<AuthSession> Function(String email, String password);
 typedef RegisterHandler =
-    Future<AuthSession> Function(
+    Future<void> Function(
       String name,
       String email,
       String password,
@@ -86,8 +86,10 @@ typedef RegisterHandler =
     );
 
 final class FakeAuthenticationRepository implements AuthenticationRepository {
-  FakeAuthenticationRepository(this._handler, {RegisterHandler? registerHandler})
-    : _registerHandler = registerHandler;
+  FakeAuthenticationRepository(
+    this._handler, {
+    RegisterHandler? registerHandler,
+  }) : _registerHandler = registerHandler;
 
   final LoginHandler _handler;
   final RegisterHandler? _registerHandler;
@@ -101,7 +103,7 @@ final class FakeAuthenticationRepository implements AuthenticationRepository {
   }
 
   @override
-  Future<AuthSession> register({
+  Future<void> register({
     required String name,
     required String email,
     required String password,
@@ -110,7 +112,9 @@ final class FakeAuthenticationRepository implements AuthenticationRepository {
     registerCalls += 1;
     final handler = _registerHandler;
     if (handler == null) {
-      return _handler(email, password);
+      return Future<void>.error(
+        StateError('Handler de cadastro não configurado.'),
+      );
     }
     return handler(name, email, password, passwordConfirmation);
   }

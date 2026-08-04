@@ -10,14 +10,23 @@ class AppConfig {
        );
 
   factory AppConfig.fromEnvironment() {
-    const apiBaseUrl = String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://localhost:8080',
-    );
+    const configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
+    final apiBaseUrl = configuredBaseUrl.trim().isNotEmpty
+        ? configuredBaseUrl
+        : _defaultApiBaseUrl;
+
     return AppConfig(apiBaseUrl: apiBaseUrl);
   }
 
   final Uri apiBaseUri;
+
+  static String get _defaultApiBaseUrl {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Alias do loopback do computador host no Android Emulator.
+      return 'http://10.0.2.2:8080';
+    }
+    return 'http://localhost:8080';
+  }
 
   Uri endpoint(String path) {
     final endpointPath = path.replaceFirst(RegExp(r'^/+'), '');
