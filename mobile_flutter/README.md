@@ -54,6 +54,12 @@ token no cabeçalho `Authorization: Bearer <token>` e apresenta a primeira pági
 de espaços. Campos de participação ausentes na resposta são tratados como
 opcionais.
 
+Nas telas autenticadas, o botão **Sair** chama `POST /auth/logout` enviando
+somente o `refreshToken`. Depois da tentativa de revogação, o aplicativo remove
+access token e refresh token do armazenamento local e da memória, fecha as
+telas protegidas e retorna ao login. A limpeza local também acontece se a API
+estiver temporariamente indisponível.
+
 A listagem permite combinar a busca parcial por `name` com os filtros
 `spaceUserRole` e `spaceMembershipStatus`. A interface oferece somente os status
 `PENDING` e `APPROVED`, que são os estados admitidos pela regra-base dessa

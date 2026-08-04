@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/core/presentation/paged_list_pagination_bar.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/auth/presentation/logout_button.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
@@ -19,6 +20,7 @@ class SpacesPage extends StatefulWidget {
     required this.spacesRepository,
     required this.tasksRepository,
     this.onSessionExpired,
+    this.onLogout,
     super.key,
   });
 
@@ -26,6 +28,7 @@ class SpacesPage extends StatefulWidget {
   final SpacesRepository spacesRepository;
   final TasksRepository tasksRepository;
   final VoidCallback? onSessionExpired;
+  final Future<void> Function()? onLogout;
 
   @override
   State<SpacesPage> createState() => _SpacesPageState();
@@ -232,6 +235,7 @@ class _SpacesPageState extends State<SpacesPage> {
             spaceName: space.name,
             tasksRepository: widget.tasksRepository,
             onSessionExpired: widget.onSessionExpired,
+            onLogout: widget.onLogout,
           ),
         ),
       ),
@@ -279,7 +283,12 @@ class _SpacesPageState extends State<SpacesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Taskify Space')),
+      appBar: AppBar(
+        title: const Text('Taskify Space'),
+        actions: widget.onLogout == null
+            ? null
+            : [LogoutButton(onLogout: widget.onLogout!)],
+      ),
       body: SafeArea(child: _buildBody(context)),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('create-space-button'),

@@ -91,6 +91,34 @@ final class HttpAuthenticationRepository implements AuthenticationRepository {
   }
 
   @override
+  Future<void> logout({required String refreshToken}) async {
+    try {
+      final response = await _client
+          .post(
+            _config.endpoint('/auth/logout'),
+            headers: const <String, String>{
+              'Accept': 'application/json',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode(<String, String>{'refreshToken': refreshToken}),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 204) {
+        throw _mapFailure(response);
+      }
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<void> register({
     required String name,
     required String email,

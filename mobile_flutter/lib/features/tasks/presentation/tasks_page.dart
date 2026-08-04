@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/core/presentation/paged_list_pagination_bar.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/auth/presentation/logout_button.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
@@ -18,6 +19,7 @@ class TasksPage extends StatefulWidget {
     required this.spaceName,
     required this.tasksRepository,
     this.onSessionExpired,
+    this.onLogout,
     super.key,
   }) : assert(spaceId > 0, 'spaceId deve ser positivo.');
 
@@ -26,6 +28,7 @@ class TasksPage extends StatefulWidget {
   final String spaceName;
   final TasksRepository tasksRepository;
   final VoidCallback? onSessionExpired;
+  final Future<void> Function()? onLogout;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -301,7 +304,12 @@ class _TasksPageState extends State<TasksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tarefas')),
+      appBar: AppBar(
+        title: const Text('Tarefas'),
+        actions: widget.onLogout == null
+            ? null
+            : [LogoutButton(onLogout: widget.onLogout!)],
+      ),
       body: SafeArea(child: _buildBody(context)),
     );
   }

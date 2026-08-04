@@ -40,9 +40,15 @@ final class FakeSecureStorageGateway implements SecureStorageGateway {
 final class FakeSessionStore implements SessionStore {
   AuthSession? savedSession;
   bool failOnSave = false;
+  bool failOnClear = false;
+  int clearCalls = 0;
 
   @override
   Future<void> clear() async {
+    clearCalls += 1;
+    if (failOnClear) {
+      throw StateError('Falha simulada ao limpar o armazenamento.');
+    }
     savedSession = null;
   }
 
@@ -84,22 +90,40 @@ typedef RegisterHandler =
       String password,
       String passwordConfirmation,
     );
+typedef LogoutHandler = Future<void> Function(String refreshToken);
 
 final class FakeAuthenticationRepository implements AuthenticationRepository {
   FakeAuthenticationRepository(
     this._handler, {
-    RegisterHandler? registerHandler,
-  }) : _registerHandler = registerHandler;
+    this.registerHandler,
+    this.logoutHandler,
+  });
 
   final LoginHandler _handler;
-  final RegisterHandler? _registerHandler;
+  final RegisterHandler? registerHandler;
+  final LogoutHandler? logoutHandler;
   int loginCalls = 0;
   int registerCalls = 0;
+  int logoutCalls = 0;
+  final receivedRefreshTokens = <String>[];
 
   @override
   Future<AuthSession> login({required String email, required String password}) {
     loginCalls += 1;
     return _handler(email, password);
+  }
+
+  @override
+  Future<void> logout({required String refreshToken}) {
+    logoutCalls += 1;
+    receivedRefreshTokens.add(refreshToken);
+    final handler = logoutHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de logout não configurado.'),
+      );
+    }
+    return handler(refreshToken);
   }
 
   @override
@@ -110,7 +134,7 @@ final class FakeAuthenticationRepository implements AuthenticationRepository {
     required String passwordConfirmation,
   }) {
     registerCalls += 1;
-    final handler = _registerHandler;
+    final handler = registerHandler;
     if (handler == null) {
       return Future<void>.error(
         StateError('Handler de cadastro não configurado.'),
@@ -192,9 +216,9 @@ typedef FetchTasksHandler =
     );
 
 final class FakeTasksRepository implements TasksRepository {
-  FakeTasksRepository({FetchTasksHandler? handler}) : _handler = handler;
+  FakeTasksRepository({this.handler});
 
-  final FetchTasksHandler? _handler;
+  final FetchTasksHandler? handler;
   int fetchTasksCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedFilters = <TaskFilters>[];
@@ -213,9 +237,9 @@ final class FakeTasksRepository implements TasksRepository {
     receivedFilters.add(filters);
     receivedPages.add(page);
     receivedPageSizes.add(size);
-    final handler = _handler;
-    if (handler != null) {
-      return handler(accessToken, filters, page, size);
+    final fetchHandler = handler;
+    if (fetchHandler != null) {
+      return fetchHandler(accessToken, filters, page, size);
     }
     return Future<TaskPageResult>.value(makeTaskPage());
   }

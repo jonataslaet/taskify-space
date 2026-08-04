@@ -94,6 +94,30 @@ void main() {
       },
     );
 
+    test('envia somente o refresh token ao encerrar a sessão', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.toString(), 'http://localhost:8080/auth/logout');
+        expect(request.headers['Content-Type'], contains('application/json'));
+        expect(
+          request.headers.keys.map((header) => header.toLowerCase()),
+          isNot(contains('authorization')),
+        );
+        expect(
+          request.headers.keys.map((header) => header.toLowerCase()),
+          isNot(contains('x-device-id')),
+        );
+        expect(jsonDecode(request.body), <String, dynamic>{
+          'refreshToken': 'refresh-token-test-only',
+        });
+        expect(request.body, isNot(contains('access-token-test-only')));
+        return http.Response('', 204);
+      });
+      final repository = _repository(client);
+
+      await repository.logout(refreshToken: 'refresh-token-test-only');
+    });
+
     test(
       'mapeia e-mail já cadastrado sem expor a resposta do backend',
       () async {

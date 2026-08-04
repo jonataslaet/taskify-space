@@ -95,15 +95,96 @@ void main() {
     expect(find.byKey(const Key('login-error')), findsOneWidget);
   });
 
-  testWidgets('limpa a sessão e retorna para o login em caso de falha de autenticação', (
+  testWidgets(
+    'limpa a sessão e retorna para o login em caso de falha de autenticação',
+    (tester) async {
+      final authenticationRepository = FakeAuthenticationRepository(
+        (_, _) async => testSession,
+      );
+      final sessionStore = FakeSessionStore();
+      final spacesRepository = FakeSpacesRepository(
+        (_) async => throw const ApiFailure(ApiFailureKind.unauthorized),
+      );
+
+      await tester.pumpWidget(
+        TaskifyApp(
+          authenticationRepository: authenticationRepository,
+          spacesRepository: spacesRepository,
+          tasksRepository: _FakeTasksRepository(),
+          sessionStore: sessionStore,
+        ),
+      );
+
+      await _fillValidCredentials(tester);
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('login-page')), findsOneWidget);
+      expect(sessionStore.savedSession, isNull);
+    },
+  );
+
+  testWidgets(
+    'revoga o refresh token, limpa a sessão e volta ao login a partir das tarefas',
+    (tester) async {
+      final logoutCompleter = Completer<void>();
+      final authenticationRepository = FakeAuthenticationRepository(
+        (_, _) async => testSession,
+        logoutHandler: (_) => logoutCompleter.future,
+      );
+      final sessionStore = FakeSessionStore()..savedSession = testSession;
+      final spacesRepository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+      );
+
+      await tester.pumpWidget(
+        TaskifyApp(
+          authenticationRepository: authenticationRepository,
+          spacesRepository: spacesRepository,
+          tasksRepository: _FakeTasksRepository(),
+          sessionStore: sessionStore,
+        ),
+      );
+      await _fillValidCredentials(tester);
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('space-tasks-button-1')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tarefas'), findsOneWidget);
+      expect(find.byKey(const Key('logout-button')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('logout-button')));
+      await tester.pump();
+
+      expect(authenticationRepository.logoutCalls, 1);
+      expect(authenticationRepository.receivedRefreshTokens, [
+        testSession.refreshToken,
+      ]);
+      expect(find.byKey(const Key('logout-progress')), findsOneWidget);
+      expect(sessionStore.savedSession, same(testSession));
+
+      logoutCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('login-page')), findsOneWidget);
+      expect(find.text('Tarefas'), findsNothing);
+      expect(sessionStore.savedSession, isNull);
+      expect(sessionStore.clearCalls, 1);
+    },
+  );
+
+  testWidgets('encerra a sessão local mesmo quando a API de logout falha', (
     tester,
   ) async {
     final authenticationRepository = FakeAuthenticationRepository(
       (_, _) async => testSession,
+      logoutHandler: (_) async =>
+          throw const ApiFailure(ApiFailureKind.network),
     );
-    final sessionStore = FakeSessionStore();
+    final sessionStore = FakeSessionStore()..savedSession = testSession;
     final spacesRepository = FakeSpacesRepository(
-      (_) async => throw const ApiFailure(ApiFailureKind.unauthorized),
+      (_) async => makeSpacePage(content: const [testSpace]),
     );
 
     await tester.pumpWidget(
@@ -114,13 +195,17 @@ void main() {
         sessionStore: sessionStore,
       ),
     );
-
     await _fillValidCredentials(tester);
     await tester.tap(find.byKey(const Key('login-button')));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const Key('logout-button')));
+    await tester.pumpAndSettle();
+
+    expect(authenticationRepository.logoutCalls, 1);
     expect(find.byKey(const Key('login-page')), findsOneWidget);
     expect(sessionStore.savedSession, isNull);
+    expect(sessionStore.clearCalls, 1);
   });
 }
 

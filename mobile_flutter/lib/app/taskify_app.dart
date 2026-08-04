@@ -28,19 +28,58 @@ class TaskifyApp extends StatefulWidget {
 }
 
 class _TaskifyAppState extends State<TaskifyApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
   AuthSession? _session;
+  bool _isLoggingOut = false;
 
   void _handleSessionExpired() {
-    setState(() => _session = null);
+    _returnToLogin();
     final sessionStore = widget.sessionStore;
     if (sessionStore != null) {
       unawaited(sessionStore.clear());
     }
   }
 
+  Future<void> _handleLogout() async {
+    final session = _session;
+    if (session == null || _isLoggingOut) {
+      return;
+    }
+
+    _isLoggingOut = true;
+    try {
+      try {
+        await widget.authenticationRepository.logout(
+          refreshToken: session.refreshToken,
+        );
+      } on Object {
+        // A sessão local precisa terminar mesmo sem conexão com a API.
+      }
+
+      try {
+        await widget.sessionStore?.clear();
+      } on Object {
+        // O estado em memória ainda precisa ser descartado e a tela protegida fechada.
+      }
+    } finally {
+      if (mounted) {
+        _returnToLogin();
+        _isLoggingOut = false;
+      }
+    }
+  }
+
+  void _returnToLogin() {
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    if (mounted) {
+      setState(() => _session = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Taskify Space',
       theme: ThemeData(
@@ -95,6 +134,7 @@ class _TaskifyAppState extends State<TaskifyApp> {
                 spacesRepository: widget.spacesRepository,
                 tasksRepository: widget.tasksRepository,
                 onSessionExpired: _handleSessionExpired,
+                onLogout: _handleLogout,
               ),
       ),
     );
