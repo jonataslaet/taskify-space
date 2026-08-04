@@ -7,6 +7,7 @@ import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.TaskSchedule;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -16,6 +17,7 @@ import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
+import com.jonataslaet.taskifyspace.validations.TaskSchedulerValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -65,7 +67,8 @@ class TaskServiceJpaTests {
             mock(SpaceService.class),
             mock(SpaceMembershipService.class),
             taskExecutionRepository,
-            mock(FeatureAccessService.class));
+            mock(FeatureAccessService.class),
+            mock(TaskSchedulerValidator.class));
     }
 
     @Test
@@ -113,18 +116,20 @@ class TaskServiceJpaTests {
     void saveTaskCascadesSchedule() {
         Space space = spaceRepository.save(createSpace("Scheduled Space"));
         Task task = createTask(space, "Scheduled task");
+        LocalDate firstDate = LocalDate.of(2026, 8, 3);
+        LocalDate secondDate = LocalDate.of(2026, 8, 7);
         TaskSchedule schedule = new TaskSchedule();
-        schedule.setDaysOfWeek(Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY));
-        schedule.setDayOfMonth(15);
+        schedule.setLocalDates(Set.of(firstDate, secondDate));
+        schedule.setFrequenceEnum(FrequenceEnum.WEEKLY);
         task.setSchedule(schedule);
 
         Task savedTask = taskRepository.saveAndFlush(task);
 
         assertThat(savedTask.getSchedule().getId()).isNotNull();
         assertThat(savedTask.getSchedule().getTask()).isSameAs(savedTask);
-        assertThat(savedTask.getSchedule().getDaysOfWeek())
-            .containsExactlyInAnyOrder(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
-        assertThat(savedTask.getSchedule().getDayOfMonth()).isEqualTo(15);
+        assertThat(savedTask.getSchedule().getLocalDates())
+            .containsExactlyInAnyOrder(firstDate, secondDate);
+        assertThat(savedTask.getSchedule().getFrequenceEnum()).isEqualTo(FrequenceEnum.WEEKLY);
     }
 
     private User createUser(String email) {

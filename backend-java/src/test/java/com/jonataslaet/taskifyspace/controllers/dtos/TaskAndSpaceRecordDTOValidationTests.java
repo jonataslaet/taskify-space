@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -70,7 +71,7 @@ class TaskAndSpaceRecordDTOValidationTests {
     }
 
     @Test
-    void taskScheduleRejectsEmptyScheduleAndInvalidDayOfMonth() {
+    void taskScheduleRejectsEmptyScheduleAndMissingFrequency() {
         TaskRecordDTO emptyScheduleTask = new TaskRecordDTO(
             null,
             1L,
@@ -80,23 +81,23 @@ class TaskAndSpaceRecordDTOValidationTests {
             new TaskScheduleRecordDTO(Set.of(), null),
             null,
             null);
-        TaskRecordDTO invalidDayOfMonthTask = new TaskRecordDTO(
+        TaskRecordDTO missingFrequencyTask = new TaskRecordDTO(
             null,
             1L,
             "Task",
             BigDecimal.ONE,
             TaskCategoryEnum.OPERATIONAL,
-            new TaskScheduleRecordDTO(null, 32),
+            new TaskScheduleRecordDTO(Set.of(LocalDate.of(2026, 8, 4)), null),
             null,
             null);
 
         Set<String> emptyScheduleFields = violatedFields(
             validator.validate(emptyScheduleTask, TaskRecordDTO.TaskView.CreateTask.class));
-        Set<String> invalidDayOfMonthFields = violatedFields(
-            validator.validate(invalidDayOfMonthTask, TaskRecordDTO.TaskView.CreateTask.class));
+        Set<String> missingFrequencyFields = violatedFields(
+            validator.validate(missingFrequencyTask, TaskRecordDTO.TaskView.CreateTask.class));
 
-        assertThat(emptyScheduleFields).contains("schedule.validSchedule");
-        assertThat(invalidDayOfMonthFields).contains("schedule.dayOfMonth");
+        assertThat(emptyScheduleFields).contains("schedule.localDates", "schedule.frequence");
+        assertThat(missingFrequencyFields).contains("schedule.frequence");
     }
 
     @Test

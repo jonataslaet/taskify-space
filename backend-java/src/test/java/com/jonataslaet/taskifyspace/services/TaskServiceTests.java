@@ -7,6 +7,7 @@ import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.TaskExecution;
 import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
@@ -14,6 +15,7 @@ import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
+import com.jonataslaet.taskifyspace.validations.TaskSchedulerValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -58,6 +60,9 @@ class TaskServiceTests {
     @Mock
     private FeatureAccessService featureAccessService;
 
+    @Mock
+    private TaskSchedulerValidator taskSchedulerValidator;
+
     private TaskService taskService;
 
     @BeforeEach
@@ -67,7 +72,8 @@ class TaskServiceTests {
             spaceService,
             spaceMembershipService,
             taskExecutionRepository,
-            featureAccessService);
+            featureAccessService,
+            taskSchedulerValidator);
     }
 
     @Test
@@ -209,13 +215,14 @@ class TaskServiceTests {
     void createTaskPersistsScheduleFromPayload() {
         User authenticatedUser = createUser(1L);
         Space space = createSpace(10L);
+        LocalDate scheduledDate = LocalDate.of(2026, 8, 4);
         TaskRecordDTO taskRecordDTO = new TaskRecordDTO(
             null,
             space.getId(),
             "Scheduled task",
             BigDecimal.TEN,
             TaskCategoryEnum.OPERATIONAL,
-            new TaskScheduleRecordDTO(Set.of(DayOfWeek.MONDAY), null),
+            new TaskScheduleRecordDTO(Set.of(scheduledDate), FrequenceEnum.WEEKLY),
             null,
             null);
 
@@ -230,8 +237,10 @@ class TaskServiceTests {
 
         assertThat(savedTask.getSchedule()).isNotNull();
         assertThat(savedTask.getSchedule().getTask()).isSameAs(savedTask);
-        assertThat(savedTask.getSchedule().getDaysOfWeek()).containsExactly(DayOfWeek.MONDAY);
-        assertThat(createdTask.schedule().daysOfWeek()).containsExactly(DayOfWeek.MONDAY);
+        assertThat(savedTask.getSchedule().getLocalDates()).containsExactly(scheduledDate);
+        assertThat(savedTask.getSchedule().getFrequenceEnum()).isEqualTo(FrequenceEnum.WEEKLY);
+        assertThat(createdTask.schedule().localDates()).containsExactly(scheduledDate);
+        assertThat(createdTask.schedule().frequence()).isEqualTo(FrequenceEnum.WEEKLY);
     }
 
     @Test

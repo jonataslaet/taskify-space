@@ -2,7 +2,6 @@ package com.jonataslaet.taskifyspace.controllers;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.CreateUserResponseDTO;
-import com.jonataslaet.taskifyspace.controllers.dtos.ConfirmUserRegistrationRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserPasswordRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserRequestDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.UpdateUserStatusRequestDTO;
@@ -43,8 +42,8 @@ public class UserController {
 
     @PostMapping("/confirm-registration")
     public ResponseEntity<@NonNull Void> confirmRegistration(
-        @RequestBody @Valid ConfirmUserRegistrationRequestDTO request) {
-        userRegistrationConfirmationService.confirmRegistration(request.token());
+        @RequestParam("token") String token) {
+        userRegistrationConfirmationService.confirmRegistration(token);
         return ResponseEntity.noContent().build();
     }
 
