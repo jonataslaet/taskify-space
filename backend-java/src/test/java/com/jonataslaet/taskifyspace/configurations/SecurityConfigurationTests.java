@@ -19,6 +19,12 @@ class SecurityConfigurationTests {
     }
 
     @Test
+    void logoutEndpointIsPublicPostRoute() {
+        assertThat(SecurityConfiguration.POST_PUBLIC)
+            .contains("/auth/logout");
+    }
+
+    @Test
     void registrationConfirmationEndpointIsPublicPostRoute() {
         assertThat(SecurityConfiguration.POST_PUBLIC)
             .contains("/users/confirm-registration");

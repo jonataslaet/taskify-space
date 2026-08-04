@@ -22,6 +22,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -93,6 +94,18 @@ class RefreshTokenServiceTests {
             .isInstanceOf(InvalidAuthenticationException.class);
 
         verify(refreshTokenRepository).rotateActiveToken(eq(oldHash), anyString(), eq(NOW));
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
+    }
+
+    @Test
+    void revokeUsesAtomicUpdateAndDoesNotExposeUnknownOrInactiveTokens() {
+        String rawRefreshToken = "refresh-token";
+        String tokenHash = TokenUtils.sha256(rawRefreshToken);
+
+        assertThatNoException().isThrownBy(() -> refreshTokenService.revoke(rawRefreshToken));
+
+        verify(refreshTokenRepository).revokeActiveToken(tokenHash, NOW);
+        verify(refreshTokenRepository, never()).findByTokenHash(anyString());
         verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
     }
 

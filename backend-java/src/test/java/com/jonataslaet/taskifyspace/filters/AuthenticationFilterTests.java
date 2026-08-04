@@ -66,4 +66,21 @@ class AuthenticationFilterTests {
         verify(filterChain).doFilter(request, response);
         verifyNoInteractions(tokenConfiguration, authenticationEntryPoint);
     }
+
+    @Test
+    void skipsAuthenticationForPublicLogoutRouteEvenWhenBearerHeaderIsInvalid() throws Exception {
+        authenticationFilter = new AuthenticationFilter(
+            tokenConfiguration,
+            authenticationEntryPoint,
+            new String[0],
+            new String[] {"/auth/logout"});
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/logout");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer invalid");
+
+        authenticationFilter.doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verifyNoInteractions(tokenConfiguration, authenticationEntryPoint);
+    }
 }

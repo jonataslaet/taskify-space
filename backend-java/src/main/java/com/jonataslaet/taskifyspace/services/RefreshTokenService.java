@@ -29,7 +29,7 @@ public class RefreshTokenService {
         this.clock = clock;
     }
 
-    /** Gera um novo refresh token (string) e persiste seu hash associado ao usuário. */
+    /** Gera um novo refresh token e persiste seu hash associado ao usuario. */
     @Transactional
     public String issue(User user, String deviceId, String userAgent, String ipAddress) {
         String raw = generateRandomToken();
@@ -49,18 +49,18 @@ public class RefreshTokenService {
         return raw;
     }
 
-    /** Valida o refresh token, verifica expiração/revogação e retorna a entidade. */
+    /** Valida o refresh token, verifica expiracao/revogacao e retorna a entidade. */
     @Transactional(readOnly = true)
     public RefreshToken validate(String rawRefreshToken) {
         String hash = TokenUtils.sha256(rawRefreshToken);
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
-            .orElseThrow(() -> new InvalidAuthenticationException("Refresh token inválido"));
+            .orElseThrow(() -> new InvalidAuthenticationException("Refresh token invalido"));
 
         Instant now = Instant.now(clock);
         if (token.getRevokedAt() != null) throw new InvalidAuthenticationException("Refresh token revogado");
         if (now.isAfter(token.getExpiresAt())) throw new InvalidAuthenticationException("Refresh token expirado");
         if (token.getReplacedByHash() != null) {
-            throw new InvalidAuthenticationException("Refresh token já foi rotacionado");
+            throw new InvalidAuthenticationException("Refresh token ja foi rotacionado");
         }
         return token;
     }
@@ -68,17 +68,15 @@ public class RefreshTokenService {
     /** Rotaciona: revoga o atual e emite um novo, encadeando replacedByHash. */
     @Transactional
     public String rotate(String rawOldRefreshToken, String deviceId, String userAgent, String ipAddress) {
-        RefreshToken old = validate(rawOldRefreshToken); // valida atual
+        RefreshToken old = validate(rawOldRefreshToken);
 
         String rawNew = generateRandomToken();
         String newHash = TokenUtils.sha256(rawNew);
         Instant now = Instant.now(clock);
 
-        // marca encadeamento e revogação lógica do antigo
         int rotatedTokens = refreshTokenRepository.rotateActiveToken(old.getTokenHash(), newHash, now);
         if (rotatedTokens != 1) throw new InvalidAuthenticationException("Refresh token ja foi rotacionado");
 
-        // cria o novo
         RefreshToken newer = new RefreshToken();
         newer.setTokenHash(newHash);
         newer.setUser(old.getUser());
@@ -92,14 +90,11 @@ public class RefreshTokenService {
         return rawNew;
     }
 
-    /** Revoga toda a “cadeia” do token atual (logout). */
+    /** Revoga o refresh token ativo da sessao atual. */
     @Transactional
     public void revoke(String rawRefreshToken) {
         String hash = TokenUtils.sha256(rawRefreshToken);
-        RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
-            .orElseThrow(() -> new InvalidAuthenticationException("Refresh token inválido"));
-        token.setRevokedAt(Instant.now(clock));
-        refreshTokenRepository.save(token);
+        refreshTokenRepository.revokeActiveToken(hash, Instant.now(clock));
     }
 
     @Transactional

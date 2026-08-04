@@ -37,7 +37,7 @@ public class SecurityConfiguration {
         "/public/**", "/privacy-policy"
     };
     public static final String[] POST_PUBLIC = {
-        "/auth/login", "/auth/refresh", "/auth/recovery-token", "/auth/new-password/*", "/users",
+        "/auth/login", "/auth/refresh", "/auth/logout", "/auth/recovery-token", "/auth/new-password/*", "/users",
         "/users/confirm-registration"
     };
 
@@ -63,7 +63,7 @@ public class SecurityConfiguration {
                 .authenticationEntryPoint(customAuthenticationEntryPoint())
             )
             .addFilterBefore(
-                new AuthenticationFilter(tokenConfiguration, customAuthenticationEntryPoint()),
+                new AuthenticationFilter(tokenConfiguration, customAuthenticationEntryPoint(), GET_PUBLIC, POST_PUBLIC),
                 BasicAuthenticationFilter.class);
 
         return http.build();
