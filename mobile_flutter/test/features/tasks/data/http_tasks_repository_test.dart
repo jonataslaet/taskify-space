@@ -257,7 +257,7 @@ HttpTasksRepository _repository(
 }) {
   return HttpTasksRepository(
     client: client,
-    config: AppConfig(apiBaseUrl: 'http://10.0.2.2:8080/api/'),
+    config: AppConfig(apiBaseUrl: 'http://localhost:8080/api/'),
     timeout: timeout,
   );
 }

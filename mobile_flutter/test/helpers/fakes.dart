@@ -77,17 +77,42 @@ final class FakeInstallationIdStore implements InstallationIdStore {
 
 typedef LoginHandler =
     Future<AuthSession> Function(String email, String password);
+typedef RegisterHandler =
+    Future<AuthSession> Function(
+      String name,
+      String email,
+      String password,
+      String passwordConfirmation,
+    );
 
 final class FakeAuthenticationRepository implements AuthenticationRepository {
-  FakeAuthenticationRepository(this._handler);
+  FakeAuthenticationRepository(this._handler, {RegisterHandler? registerHandler})
+    : _registerHandler = registerHandler;
 
   final LoginHandler _handler;
+  final RegisterHandler? _registerHandler;
   int loginCalls = 0;
+  int registerCalls = 0;
 
   @override
   Future<AuthSession> login({required String email, required String password}) {
     loginCalls += 1;
     return _handler(email, password);
+  }
+
+  @override
+  Future<AuthSession> register({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) {
+    registerCalls += 1;
+    final handler = _registerHandler;
+    if (handler == null) {
+      return _handler(email, password);
+    }
+    return handler(name, email, password, passwordConfirmation);
   }
 }
 

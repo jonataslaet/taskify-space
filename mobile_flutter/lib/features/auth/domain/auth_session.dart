@@ -19,15 +19,29 @@ final class AuthSession {
       throw const FormatException('Campo name inválido.');
     }
 
+    final username = _requiredString(
+      json,
+      ['username', 'email', 'userName', 'user_name'],
+    );
+    final accessToken = _requiredString(
+      json,
+      ['accessToken', 'token', 'access_token'],
+    );
+    final refreshToken = _requiredString(
+      json,
+      ['refreshToken', 'refresh_token', 'refreshTokenValue'],
+    );
+    final role = _requiredString(json, ['role', 'roles']);
+
     return AuthSession(
       id: id,
-      username: _requiredString(json, 'username'),
+      username: username,
       name: rawName is String && rawName.trim().isNotEmpty
           ? rawName.trim()
           : null,
-      accessToken: _requiredString(json, 'accessToken'),
-      refreshToken: _requiredString(json, 'refreshToken'),
-      role: _requiredString(json, 'role'),
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      role: role,
     );
   }
 
@@ -47,11 +61,16 @@ final class AuthSession {
     'role': role,
   };
 
-  static String _requiredString(Map<String, dynamic> json, String key) {
-    final value = json[key];
-    if (value is! String || value.trim().isEmpty) {
-      throw FormatException('Campo $key ausente ou inválido.');
+  static String _requiredString(
+    Map<String, dynamic> json,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
     }
-    return value.trim();
+    throw FormatException('Campos ${keys.join(', ')} ausentes ou inválidos.');
   }
 }

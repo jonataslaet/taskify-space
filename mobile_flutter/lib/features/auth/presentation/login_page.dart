@@ -22,12 +22,17 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _nameFocusNode = FocusNode();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordConfirmationController = TextEditingController();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _passwordConfirmationFocusNode = FocusNode();
 
   bool _isSubmitting = false;
+  bool _isRegistering = false;
   bool _isPasswordVisible = false;
   ApiFailure? _failure;
   int _retrySeconds = 0;
@@ -35,6 +40,13 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   Timer? _retryTimer;
 
   bool get _isBlocked => _isSubmitting || _retrySeconds > 0;
+
+  String get _loginButtonLabel {
+    if (_retrySeconds > 0) {
+      return 'Tente novamente em ${_retrySeconds}s';
+    }
+    return _isRegistering ? 'Criar conta' : 'Entrar';
+  }
 
   String get _loginButtonSemanticLabel {
     if (_isSubmitting) {
@@ -56,10 +68,14 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _retryTimer?.cancel();
+    _nameController.dispose();
+    _nameFocusNode.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordConfirmationController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _passwordConfirmationFocusNode.dispose();
     super.dispose();
   }
 
@@ -68,6 +84,28 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed && _retryEndsAt != null) {
       _synchronizeRetryCountdown();
     }
+  }
+
+  String? _validateName(String? value) {
+    final name = value?.trim() ?? '';
+    if (_isRegistering && name.isEmpty) {
+      return 'Informe seu nome.';
+    }
+    return null;
+  }
+
+  String? _validatePasswordConfirmation(String? value) {
+    if (!_isRegistering) {
+      return null;
+    }
+    final confirmation = value?.trim() ?? '';
+    if (confirmation.isEmpty) {
+      return 'Confirme sua senha.';
+    }
+    if (confirmation != _passwordController.text) {
+      return 'As senhas não coincidem.';
+    }
+    return null;
   }
 
   String? _validateEmail(String? value) {
@@ -93,11 +131,27 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       return;
     }
 
+    final nameError = _validateName(_nameController.text);
     final emailError = _validateEmail(_emailController.text);
     final passwordError = _validatePassword(_passwordController.text);
+    final confirmationError = _validatePasswordConfirmation(
+      _passwordConfirmationController.text,
+    );
     if (!_formKey.currentState!.validate()) {
-      if (emailError != null) {
+      if (_isRegistering && nameError != null) {
+        _nameController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _nameController.text.length),
+        );
+        _nameFocusNode.requestFocus();
+      } else if (emailError != null) {
         _emailFocusNode.requestFocus();
+      } else if ((_isRegistering && confirmationError != null) ||
+          (!_isRegistering && passwordError != null)) {
+        if (_isRegistering) {
+          _passwordConfirmationFocusNode.requestFocus();
+        } else {
+          _passwordFocusNode.requestFocus();
+        }
       } else if (passwordError != null) {
         _passwordFocusNode.requestFocus();
       }
@@ -110,10 +164,17 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     });
 
     try {
-      final session = await widget.authenticationRepository.login(
-        email: _emailController.text,
-        password: _passwordController.text,
-      );
+      final session = _isRegistering
+          ? await widget.authenticationRepository.register(
+              name: _nameController.text,
+              email: _emailController.text,
+              password: _passwordController.text,
+              passwordConfirmation: _passwordConfirmationController.text,
+            )
+          : await widget.authenticationRepository.login(
+              email: _emailController.text,
+              password: _passwordController.text,
+            );
       if (!mounted) {
         return;
       }
@@ -231,6 +292,19 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     );
   }
 
+  void _toggleAuthMode() {
+    setState(() {
+      _isRegistering = !_isRegistering;
+      _failure = null;
+      _retryTimer?.cancel();
+      _retryEndsAt = null;
+      _retrySeconds = 0;
+      if (!_isRegistering) {
+        _passwordConfirmationController.clear();
+      }
+    });
+  }
+
   Widget _buildLoginCard({required bool showBrandMark}) {
     final theme = Theme.of(context);
     final failure = _failure;
@@ -270,6 +344,27 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(height: 28),
+                if (_isRegistering) ...[
+                  TextFormField(
+                    key: const Key('name-field'),
+                    controller: _nameController,
+                    focusNode: _nameFocusNode,
+                    enabled: !_isSubmitting,
+                    keyboardType: TextInputType.name,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.name],
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome',
+                      hintText: 'Seu nome completo',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    ),
+                    validator: _validateName,
+                    onFieldSubmitted: (_) => _emailFocusNode.requestFocus(),
+                  ),
+                  const SizedBox(height: 18),
+                ],
                 TextFormField(
                   key: const Key('email-field'),
                   controller: _emailController,
@@ -325,8 +420,35 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                     ),
                   ),
                   validator: _validatePassword,
-                  onFieldSubmitted: (_) => _submit(),
+                  onFieldSubmitted: (_) {
+                    if (_isRegistering) {
+                      _passwordConfirmationFocusNode.requestFocus();
+                    } else {
+                      _submit();
+                    }
+                  },
                 ),
+                if (_isRegistering) ...[
+                  const SizedBox(height: 18),
+                  TextFormField(
+                    key: const Key('password-confirmation-field'),
+                    controller: _passwordConfirmationController,
+                    focusNode: _passwordConfirmationFocusNode,
+                    enabled: !_isSubmitting,
+                    obscureText: !_isPasswordVisible,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.password],
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirmar senha',
+                      prefixIcon: Icon(Icons.lock_outline_rounded),
+                    ),
+                    validator: _validatePasswordConfirmation,
+                    onFieldSubmitted: (_) => _submit(),
+                  ),
+                ],
                 AnimatedSize(
                   duration: const Duration(milliseconds: 180),
                   child: failure == null
@@ -369,6 +491,15 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                         ),
                 ),
                 const SizedBox(height: 4),
+                TextButton(
+                  key: const Key('toggle-auth-mode-button'),
+                  onPressed: _isBlocked ? null : _toggleAuthMode,
+                  child: Text(
+                    _isRegistering
+                        ? 'Já tem conta? Entrar'
+                        : 'Não tem conta? Criar conta',
+                  ),
+                ),
                 Semantics(
                   button: true,
                   enabled: !_isBlocked,
@@ -388,9 +519,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                               ),
                             )
                           : Text(
-                              _retrySeconds > 0
-                                  ? 'Tente novamente em ${_retrySeconds}s'
-                                  : 'Entrar',
+                              _loginButtonLabel,
                               key: ValueKey('login-label-$_retrySeconds'),
                             ),
                     ),

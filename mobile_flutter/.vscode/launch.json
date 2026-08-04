@@ -8,7 +8,7 @@
       "program": "lib/main.dart",
       "deviceId": "emulator-5554",
       "toolArgs": [
-        "--dart-define=API_BASE_URL=http://10.0.2.2:8080"
+        "--dart-define=API_BASE_URL=http://localhost:8080"
       ],
       "cwd": "${workspaceFolder}"
     }

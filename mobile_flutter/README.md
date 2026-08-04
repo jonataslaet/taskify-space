@@ -19,17 +19,17 @@ flutter pub get
 Inicie o backend e, a partir desta pasta, execute:
 
 ```powershell
-flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8080
+flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
 A configuração `Flutter (Pixel 7)` em `.vscode/launch.json` já usa essa URL.
-`10.0.2.2` é o endereço pelo qual o Android Emulator alcança o host.
+`localhost` é o endereço pelo qual o Android Emulator alcança o host.
 
 Para outros alvos, informe uma única `API_BASE_URL`:
 
 | Alvo | URL local típica |
 | --- | --- |
-| Android Emulator | `http://10.0.2.2:8080` |
+| Android Emulator | `http://localhost:8080` |
 | Android físico | `http://<IP-LAN-DO-HOST>:8080` (exige liberar esse host em um flavor de desenvolvimento) |
 | Web, desktop e iOS Simulator | `http://localhost:8080` |
 
@@ -75,7 +75,7 @@ páginas e escolher 5, 10, 20 ou 50 registros.
 
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. Nesta primeira entrega, a allowlist contém
-somente `10.0.2.2`, para o Android Emulator. O manifest principal contém a
+somente `localhost`, para o Android Emulator. O manifest principal contém a
 permissão de Internet para que builds de release possam acessar uma API HTTPS.
 O backup automático do Android fica desativado para impedir a restauração de
 dados cifrados sem a chave correspondente do dispositivo.

@@ -17,7 +17,7 @@ void main() {
         final sessionStore = FakeSessionStore();
         final client = MockClient((request) async {
           expect(request.method, 'POST');
-          expect(request.url.toString(), 'http://10.0.2.2:8080/auth/login');
+          expect(request.url.toString(), 'http://localhost:8080/auth/login');
           expect(
             request.headers['X-Device-Id'],
             '123e4567-e89b-42d3-a456-426614174000',
@@ -51,6 +51,47 @@ void main() {
         expect(sessionStore.savedSession, same(session));
       },
     );
+
+    test('envia o cadastro para /users e aceita 200 como sucesso', () async {
+      final sessionStore = FakeSessionStore();
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.toString(), 'http://localhost:8080/users');
+        expect(
+          request.headers['X-Device-Id'],
+          '123e4567-e89b-42d3-a456-426614174000',
+        );
+        expect(jsonDecode(request.body), <String, dynamic>{
+          'email': 'user@example.com',
+          'name': 'User',
+          'password': 'Secret1!',
+          'passwordConfirmation': 'Secret1!',
+        });
+        return http.Response(
+          jsonEncode(<String, dynamic>{
+            'id': 2,
+            'username': 'user@example.com',
+            'name': 'User',
+            'accessToken': 'access-token-register-test-only',
+            'refreshToken': 'refresh-token-register-test-only',
+            'role': 'ROLE_USER',
+          }),
+          200,
+          headers: const {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final repository = _repository(client, sessionStore: sessionStore);
+
+      final session = await repository.register(
+        name: ' User ',
+        email: 'USER@EXAMPLE.COM',
+        password: 'Secret1!',
+        passwordConfirmation: 'Secret1!',
+      );
+
+      expect(session.role, 'ROLE_USER');
+      expect(sessionStore.savedSession, same(session));
+    });
 
     test('mapeia 401 sem interpretar a mensagem do backend', () async {
       final repository = _repository(
@@ -134,7 +175,7 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 30));
           return http.Response('{}', 200);
         }),
-        config: AppConfig(apiBaseUrl: 'http://10.0.2.2:8080'),
+        config: AppConfig(apiBaseUrl: 'http://localhost:8080'),
         sessionStore: FakeSessionStore(),
         installationIdStore: FakeInstallationIdStore(),
         timeout: const Duration(milliseconds: 1),
@@ -161,7 +202,7 @@ HttpAuthenticationRepository _repository(
 }) {
   return HttpAuthenticationRepository(
     client: client,
-    config: AppConfig(apiBaseUrl: 'http://10.0.2.2:8080'),
+    config: AppConfig(apiBaseUrl: 'http://localhost:8080'),
     sessionStore: sessionStore ?? FakeSessionStore(),
     installationIdStore: FakeInstallationIdStore(),
   );

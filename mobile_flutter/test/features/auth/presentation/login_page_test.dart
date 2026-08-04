@@ -117,6 +117,40 @@ void main() {
     expect(find.text('Entrar'), findsOneWidget);
     expect(find.byKey(const Key('login-error')), findsNothing);
   });
+
+  testWidgets('permite criar conta usando o endpoint de usuários', (
+    tester,
+  ) async {
+    final repository = FakeAuthenticationRepository((_, _) async => testSession);
+    AuthSession? authenticatedSession;
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      _testApp(
+        repository,
+        onAuthenticated: (session) => authenticatedSession = session,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('toggle-auth-mode-button')));
+    await tester.pump();
+
+    await tester.enterText(find.byKey(const Key('name-field')), 'Jonatas Blendo');
+    await tester.enterText(
+      find.byKey(const Key('email-field')),
+      'jonataslaetprogramador@gmail.com',
+    );
+    await tester.enterText(find.byKey(const Key('password-field')), 'Secret1!');
+    await tester.enterText(
+      find.byKey(const Key('password-confirmation-field')),
+      'Secret1!',
+    );
+    await tester.tap(find.byKey(const Key('login-button')));
+    await tester.pumpAndSettle();
+
+    expect(repository.registerCalls, 1);
+    expect(authenticatedSession, same(testSession));
+  });
 }
 
 Widget _testApp(

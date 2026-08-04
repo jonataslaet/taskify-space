@@ -13,7 +13,7 @@ void main() {
     test('faz POST /spaces com o payload mínimo em JSON UTF-8', () async {
       final client = MockClient((request) async {
         expect(request.method, 'POST');
-        expect(request.url.toString(), 'http://10.0.2.2:8080/api/spaces');
+        expect(request.url.toString(), 'http://localhost:8080/api/spaces');
         expect(request.headers['Accept'], 'application/json');
         expect(
           request.headers['Authorization'],
@@ -494,7 +494,7 @@ HttpSpacesRepository _repository(
 }) {
   return HttpSpacesRepository(
     client: client,
-    config: AppConfig(apiBaseUrl: 'http://10.0.2.2:8080/api/'),
+    config: AppConfig(apiBaseUrl: 'http://localhost:8080/api/'),
     timeout: timeout,
   );
 }
