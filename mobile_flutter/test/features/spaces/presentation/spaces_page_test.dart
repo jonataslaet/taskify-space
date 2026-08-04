@@ -8,6 +8,9 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
 import '../../../helpers/fakes.dart';
@@ -310,6 +313,60 @@ void main() {
       expect(tasksRepository.receivedPageSizes, [10]);
     },
   );
+
+  for (final roleCase in <({String label, String? role, bool canEditTasks})>[
+    (label: 'administrador', role: 'ROLE_SPACE_ADMIN', canEditTasks: true),
+    (label: 'gerente', role: 'ROLE_SPACE_MANAGER', canEditTasks: true),
+    (
+      label: 'participante',
+      role: 'ROLE_SPACE_PARTICIPANT',
+      canEditTasks: false,
+    ),
+    (label: 'ausente', role: null, canEditTasks: false),
+  ]) {
+    testWidgets(
+      'propaga papel ${roleCase.label} e controla a visibilidade da edição',
+      (tester) async {
+        final space = SpaceSummary(
+          id: _roleTestTask.spaceId,
+          name: 'Espaço por papel',
+          spaceAdminName: 'Responsável',
+          active: true,
+          spaceUserRole: roleCase.role,
+          spaceMembershipStatus: 'APPROVED',
+          activeParticipationsCount: 1,
+        );
+        final spacesRepository = FakeSpacesRepository(
+          (_) async => makeSpacePage(content: [space]),
+        );
+        final tasksRepository = FakeTasksRepository(
+          handler: (_, filters, page, size) async => TaskPageResult(
+            content: const [_roleTestTask],
+            size: size,
+            number: page,
+            totalElements: 1,
+            totalPages: 1,
+          ),
+        );
+
+        await tester.pumpWidget(
+          _testApp(spacesRepository, tasksRepository: tasksRepository),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(ValueKey('space-tasks-button-${space.id}')),
+        );
+        await tester.pumpAndSettle();
+
+        final tasksPage = tester.widget<TasksPage>(find.byType(TasksPage));
+        expect(tasksPage.canEditTasks, roleCase.canEditTasks);
+        expect(
+          find.byKey(ValueKey('task-edit-button-${_roleTestTask.id}')),
+          roleCase.canEditTasks ? findsOneWidget : findsNothing,
+        );
+      },
+    );
+  }
 
   testWidgets(
     'desabilita tarefas para espaços sem vínculo ou com participação pendente',
@@ -670,6 +727,17 @@ SpaceSummary _makeSpace(int id) {
     activeParticipationsCount: 1,
   );
 }
+
+const _roleTestTask = TaskSummary(
+  id: 91,
+  spaceId: 71,
+  description: 'Tarefa por papel',
+  score: 10,
+  category: TaskCategory.operational,
+  schedule: null,
+  active: true,
+  creatorName: 'Responsável',
+);
 
 SpacePageResult _makePagedSpacePage({
   required List<SpaceSummary> content,

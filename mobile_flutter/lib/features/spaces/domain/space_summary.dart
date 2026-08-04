@@ -1,3 +1,5 @@
+import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
+
 final class SpaceSummary {
   const SpaceSummary({
     required this.id,
@@ -31,6 +33,12 @@ final class SpaceSummary {
   final String? spaceUserRole;
   final String? spaceMembershipStatus;
   final int activeParticipationsCount;
+
+  bool get canEditTasks {
+    return spaceMembershipStatus == SpaceMembershipStatus.approved.apiValue &&
+        (spaceUserRole == SpaceUserRole.admin.apiValue ||
+            spaceUserRole == SpaceUserRole.manager.apiValue);
+  }
 
   static int _requiredPositiveInt(Map<String, dynamic> json, String key) {
     final value = json[key];

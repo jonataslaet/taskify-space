@@ -233,6 +233,7 @@ class _SpacesPageState extends State<SpacesPage> {
             session: widget.session,
             spaceId: space.id,
             spaceName: space.name,
+            canEditTasks: space.canEditTasks,
             tasksRepository: widget.tasksRepository,
             onSessionExpired: widget.onSessionExpired,
             onLogout: widget.onLogout,

@@ -9,7 +9,9 @@ import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
+import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
 void main() {
@@ -124,9 +126,10 @@ void main() {
       });
       expect(filters.minScore, 5.25);
       expect(filters.maxScore, 20.75);
+      await _scrollTo(tester, find.byKey(const ValueKey('tasks-filter-empty')));
       expect(find.byKey(const ValueKey('tasks-filter-empty')), findsOneWidget);
 
-      await _tapVisible(
+      await _scrollToAndTap(
         tester,
         find.byKey(const ValueKey('tasks-clear-filters')),
       );
@@ -141,6 +144,7 @@ void main() {
       expect(cleared.categories, isEmpty);
       expect(cleared.minScore, isNull);
       expect(cleared.maxScore, isNull);
+      await _scrollTo(tester, find.byKey(const ValueKey('tasks-empty')));
       expect(find.byKey(const ValueKey('tasks-empty')), findsOneWidget);
       expect(
         tester
@@ -216,7 +220,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('task-card-10')), findsOneWidget);
-    await _tapVisible(tester, find.byKey(const ValueKey('tasks-page-1')));
+    await _scrollToAndTap(tester, find.byKey(const ValueKey('tasks-page-1')));
 
     expect(repository.pages, [0, 1]);
     expect(repository.sizes, [10, 10]);
@@ -267,7 +271,7 @@ void main() {
       tester,
       find.byKey(const ValueKey('tasks-apply-filters')),
     );
-    await _tapVisible(tester, find.byKey(const ValueKey('tasks-page-1')));
+    await _scrollToAndTap(tester, find.byKey(const ValueKey('tasks-page-1')));
 
     final refreshIndicator = tester.widget<RefreshIndicator>(
       find.byType(RefreshIndicator),
@@ -316,6 +320,7 @@ void main() {
       find.byKey(const ValueKey('tasks-apply-filters')),
     );
 
+    await _scrollTo(tester, find.byKey(const ValueKey('tasks-filter-empty')));
     expect(find.byKey(const ValueKey('tasks-filter-empty')), findsOneWidget);
   });
 
@@ -410,6 +415,120 @@ void main() {
     expect(find.byKey(const ValueKey('tasks-error')), findsOneWidget);
     expect(find.textContaining('resposta inesperada'), findsOneWidget);
   });
+
+  for (final editCase in <({bool canEdit, Matcher matcher, String label})>[
+    (canEdit: true, matcher: findsOneWidget, label: 'permitida'),
+    (canEdit: false, matcher: findsNothing, label: 'não permitida'),
+  ]) {
+    testWidgets(
+      'renderiza a ação de editar quando a permissão é ${editCase.label}',
+      (tester) async {
+        final repository = _FakeTasksRepository(
+          (_, _, page, size) async => _page(
+            content: [_task(id: 1)],
+            number: page,
+            size: size,
+            totalElements: 1,
+            totalPages: 1,
+          ),
+        );
+
+        await tester.pumpWidget(
+          _testApp(repository, canEditTasks: editCase.canEdit),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('task-edit-button-1')),
+          editCase.matcher,
+        );
+      },
+    );
+  }
+
+  testWidgets(
+    'recarrega filtros, página e tamanho atuais após editar e preserva a agenda',
+    (tester) async {
+      final schedule = TaskScheduleSummary(
+        localDates: [DateTime.utc(2026, 8, 4), DateTime.utc(2026, 8, 11)],
+        frequency: TaskFrequency.weekly,
+      );
+      final originalTask = _task(
+        id: 1,
+        description: 'Tarefa antiga',
+        schedule: schedule,
+      );
+      final updatedTask = _task(
+        id: 1,
+        description: 'Tarefa revisada',
+        schedule: schedule,
+      );
+      var fetchSequence = 0;
+      final repository = _FakeTasksRepository((_, _, page, size) async {
+        fetchSequence += 1;
+        return _page(
+          content: [fetchSequence >= 4 ? updatedTask : originalTask],
+          number: page,
+          size: size,
+          totalElements: 20,
+          totalPages: 2,
+        );
+      }, updateHandler: (_, _, _) async => updatedTask);
+
+      await tester.pumpWidget(_testApp(repository, canEditTasks: true));
+      await tester.pumpAndSettle();
+
+      await _openFilters(tester);
+      tester
+          .widget<FilterChip>(
+            find.byKey(const ValueKey('tasks-category-operational')),
+          )
+          .onSelected!(true);
+      await tester.pump();
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('tasks-apply-filters')),
+      );
+      await _scrollToAndTap(tester, find.byKey(const ValueKey('tasks-page-1')));
+
+      await _scrollToAndTap(
+        tester,
+        find.byKey(const ValueKey('task-edit-button-1')),
+      );
+      expect(find.byType(EditTaskDialog), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('edit-task-description-field')),
+        '  Tarefa revisada  ',
+      );
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('edit-task-submit-button')),
+      );
+
+      expect(
+        find.byKey(const ValueKey('task-updated-message')),
+        findsOneWidget,
+      );
+      expect(repository.updateCalls, 1);
+      expect(repository.updateAccessTokens, [_session.accessToken]);
+      expect(repository.taskIds, [originalTask.id]);
+      final update = repository.updates.single;
+      expect(update.description, 'Tarefa revisada');
+      expect(update.score, originalTask.score);
+      expect(update.category, originalTask.category);
+      expect(update.schedule?.frequency, schedule.frequency);
+      expect(update.schedule?.localDates, schedule.localDates);
+
+      expect(repository.fetchCalls, 4);
+      expect(repository.pages, [0, 0, 1, 1]);
+      expect(repository.sizes, [10, 10, 10, 10]);
+      expect(repository.filters.last.spaceId, 7);
+      expect(repository.filters.last.categories, {TaskCategory.operational});
+      await _scrollTo(tester, find.byKey(const ValueKey('task-card-1')));
+      expect(find.text('Tarefa antiga'), findsNothing);
+      expect(find.text('Tarefa revisada'), findsOneWidget);
+    },
+  );
 }
 
 typedef _FetchHandler =
@@ -419,16 +538,27 @@ typedef _FetchHandler =
       int page,
       int size,
     );
+typedef _UpdateHandler =
+    Future<TaskSummary> Function(
+      String accessToken,
+      int taskId,
+      TaskUpdate update,
+    );
 
 final class _FakeTasksRepository implements TasksRepository {
-  _FakeTasksRepository(this._handler);
+  _FakeTasksRepository(this._handler, {this.updateHandler});
 
   final _FetchHandler _handler;
+  final _UpdateHandler? updateHandler;
   int fetchCalls = 0;
+  int updateCalls = 0;
   final accessTokens = <String>[];
   final filters = <TaskFilters>[];
   final pages = <int>[];
   final sizes = <int>[];
+  final updateAccessTokens = <String>[];
+  final taskIds = <int>[];
+  final updates = <TaskUpdate>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -444,6 +574,25 @@ final class _FakeTasksRepository implements TasksRepository {
     sizes.add(size);
     return _handler(accessToken, filters, page, size);
   }
+
+  @override
+  Future<TaskSummary> updateTask({
+    required String accessToken,
+    required int taskId,
+    required TaskUpdate update,
+  }) {
+    updateCalls += 1;
+    updateAccessTokens.add(accessToken);
+    taskIds.add(taskId);
+    updates.add(update);
+    final handler = updateHandler;
+    if (handler == null) {
+      return Future<TaskSummary>.error(
+        StateError('Handler de atualização de tarefa não configurado.'),
+      );
+    }
+    return handler(accessToken, taskId, update);
+  }
 }
 
 const _session = AuthSession(
@@ -455,13 +604,14 @@ const _session = AuthSession(
   role: 'ROLE_USER',
 );
 
-Widget _testApp(_FakeTasksRepository repository) {
+Widget _testApp(_FakeTasksRepository repository, {bool canEditTasks = false}) {
   return MaterialApp(
     home: TasksPage(
       session: _session,
       spaceId: 7,
       spaceName: 'Residência do Casal',
       tasksRepository: repository,
+      canEditTasks: canEditTasks,
     ),
   );
 }
@@ -469,6 +619,7 @@ Widget _testApp(_FakeTasksRepository repository) {
 TaskSummary _task({
   required int id,
   int spaceId = 7,
+  String? description,
   num score = 10,
   TaskCategory category = TaskCategory.operational,
   TaskScheduleSummary? schedule,
@@ -478,7 +629,7 @@ TaskSummary _task({
   return TaskSummary(
     id: id,
     spaceId: spaceId,
-    description: 'Tarefa $id',
+    description: description ?? 'Tarefa $id',
     score: score,
     category: category,
     schedule: schedule,
@@ -513,4 +664,25 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
+}
+
+Future<void> _scrollToAndTap(WidgetTester tester, Finder finder) async {
+  await _scrollTo(tester, finder);
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 400, scrollable: _tasksScrollable());
+  await tester.pumpAndSettle();
+}
+
+Finder _tasksScrollable() {
+  return find.descendant(
+    of: find.byKey(const ValueKey('tasks-list')),
+    matching: find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    ),
+  );
 }

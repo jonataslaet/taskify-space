@@ -39,6 +39,11 @@ final class TaskScheduleSummary {
         'Campo schedule.localDates ausente ou inválido.',
       );
     }
+    if (rawLocalDates.isEmpty) {
+      throw const FormatException(
+        'Campo schedule.localDates deve conter ao menos uma data.',
+      );
+    }
 
     return TaskScheduleSummary(
       localDates: <DateTime>[

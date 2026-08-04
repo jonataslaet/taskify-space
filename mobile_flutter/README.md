@@ -84,6 +84,12 @@ mínima ou máxima. Aplicar ou limpar filtros e trocar a quantidade de registros
 reinicia a consulta na página zero; a barra inferior permite navegar pelas
 páginas e escolher 5, 10, 20 ou 50 registros.
 
+Administradores e gerentes do espaço podem editar cada tarefa pelo botão de
+lápis. O formulário atualiza descrição, pontuação, categoria e agenda por meio
+de `PUT /tasks/{taskId}`. A agenda atual é sempre reenviada para preservá-la;
+ela só é removida quando a opção de agenda é desligada explicitamente.
+Situação e criador são somente leitura nesse endpoint.
+
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. A allowlist contém `localhost` e `10.0.2.2`,
 o alias usado pelo Android Emulator. O manifest principal contém a

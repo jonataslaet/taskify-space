@@ -69,6 +69,13 @@ void main() {
       );
       expect(() => TaskSummary.fromJson(invalidDate), throwsFormatException);
     });
+
+    test('rejeita agenda sem datas como o TaskScheduleRecordDTO', () {
+      final json = _validTaskJson();
+      (json['schedule'] as Map<String, dynamic>)['localDates'] = <String>[];
+
+      expect(() => TaskSummary.fromJson(json), throwsFormatException);
+    });
   });
 }
 

@@ -11,6 +11,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
+import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({
@@ -18,6 +19,7 @@ class TasksPage extends StatefulWidget {
     required this.spaceId,
     required this.spaceName,
     required this.tasksRepository,
+    this.canEditTasks = false,
     this.onSessionExpired,
     this.onLogout,
     super.key,
@@ -27,6 +29,7 @@ class TasksPage extends StatefulWidget {
   final int spaceId;
   final String spaceName;
   final TasksRepository tasksRepository;
+  final bool canEditTasks;
   final VoidCallback? onSessionExpired;
   final Future<void> Function()? onLogout;
 
@@ -292,6 +295,34 @@ class _TasksPageState extends State<TasksPage> {
     unawaited(_loadTasks(page: 0, size: size));
   }
 
+  Future<void> _openEditTask(TaskSummary task) async {
+    final updatedTask = await showDialog<TaskSummary>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => EditTaskDialog(
+        task: task,
+        accessToken: widget.session.accessToken,
+        tasksRepository: widget.tasksRepository,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || updatedTask == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('task-updated-message'),
+          content: Text('Tarefa "${updatedTask.description}" atualizada.'),
+        ),
+      );
+
+    final result = _result;
+    await _loadTasks(page: result?.number ?? _requestedPage, size: _pageSize);
+  }
+
   bool get _hasActiveFilters {
     return (_appliedFilters.description?.trim().isNotEmpty ?? false) ||
         _appliedFilters.score != null ||
@@ -389,7 +420,12 @@ class _TasksPageState extends State<TasksPage> {
               _TasksEmpty(isFiltered: _hasActiveFilters)
             else
               for (final task in result.content) ...[
-                _TaskCard(task: task),
+                _TaskCard(
+                  task: task,
+                  onEdit: widget.canEditTasks
+                      ? () => _openEditTask(task)
+                      : null,
+                ),
                 const SizedBox(height: 12),
               ],
             const SizedBox(height: 8),
@@ -722,9 +758,10 @@ class _ScoreField extends StatelessWidget {
 }
 
 class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task});
+  const _TaskCard({required this.task, required this.onEdit});
 
   final TaskSummary task;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -783,6 +820,15 @@ class _TaskCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onEdit != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    key: ValueKey('task-edit-button-${task.id}'),
+                    tooltip: 'Editar tarefa',
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),

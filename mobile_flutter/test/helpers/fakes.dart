@@ -11,6 +11,7 @@ import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 
 final class FakeSecureStorageGateway implements SecureStorageGateway {
@@ -214,16 +215,27 @@ typedef FetchTasksHandler =
       int page,
       int size,
     );
+typedef UpdateTaskHandler =
+    Future<TaskSummary> Function(
+      String accessToken,
+      int taskId,
+      TaskUpdate update,
+    );
 
 final class FakeTasksRepository implements TasksRepository {
-  FakeTasksRepository({this.handler});
+  FakeTasksRepository({this.handler, this.updateHandler});
 
   final FetchTasksHandler? handler;
+  final UpdateTaskHandler? updateHandler;
   int fetchTasksCalls = 0;
+  int updateTaskCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedFilters = <TaskFilters>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
+  final receivedUpdateAccessTokens = <String>[];
+  final receivedTaskIds = <int>[];
+  final receivedTaskUpdates = <TaskUpdate>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -242,6 +254,25 @@ final class FakeTasksRepository implements TasksRepository {
       return fetchHandler(accessToken, filters, page, size);
     }
     return Future<TaskPageResult>.value(makeTaskPage());
+  }
+
+  @override
+  Future<TaskSummary> updateTask({
+    required String accessToken,
+    required int taskId,
+    required TaskUpdate update,
+  }) {
+    updateTaskCalls += 1;
+    receivedUpdateAccessTokens.add(accessToken);
+    receivedTaskIds.add(taskId);
+    receivedTaskUpdates.add(update);
+    final handler = updateHandler;
+    if (handler == null) {
+      return Future<TaskSummary>.error(
+        StateError('Handler de atualização de tarefa não configurado.'),
+      );
+    }
+    return handler(accessToken, taskId, update);
   }
 }
 

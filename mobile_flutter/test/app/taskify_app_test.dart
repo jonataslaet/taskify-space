@@ -7,6 +7,8 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 
 import '../helpers/fakes.dart';
@@ -231,6 +233,17 @@ final class _FakeTasksRepository implements TasksRepository {
       number: page,
       totalElements: 0,
       totalPages: 0,
+    );
+  }
+
+  @override
+  Future<TaskSummary> updateTask({
+    required String accessToken,
+    required int taskId,
+    required TaskUpdate update,
+  }) {
+    return Future<TaskSummary>.error(
+      StateError('Atualização de tarefa não esperada neste teste.'),
     );
   }
 }

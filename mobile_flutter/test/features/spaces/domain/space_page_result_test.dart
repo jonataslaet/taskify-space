@@ -35,6 +35,7 @@ void main() {
       expect(result.content.first.name, 'Residência do Casal Laet');
       expect(result.content.first.spaceUserRole, 'ROLE_SPACE_PARTICIPANT');
       expect(result.content.first.spaceMembershipStatus, 'APPROVED');
+      expect(result.content.first.canEditTasks, isFalse);
       expect(result.content.last.spaceUserRole, isNull);
       expect(result.content.last.spaceMembershipStatus, isNull);
       expect(result.content.last.spaceAdminName, isNull);
@@ -44,6 +45,29 @@ void main() {
       expect(result.totalPages, 1);
       expect(result.isEmpty, isFalse);
       expect(result.hasNextPage, isFalse);
+    });
+
+    test('libera edição somente para admin ou gerente aprovados', () {
+      SpaceSummary space({required String? role, String? status = 'APPROVED'}) {
+        return SpaceSummary(
+          id: 1,
+          name: 'Casa',
+          spaceAdminName: null,
+          active: true,
+          spaceUserRole: role,
+          spaceMembershipStatus: status,
+          activeParticipationsCount: 1,
+        );
+      }
+
+      expect(space(role: 'ROLE_SPACE_ADMIN').canEditTasks, isTrue);
+      expect(space(role: 'ROLE_SPACE_MANAGER').canEditTasks, isTrue);
+      expect(space(role: 'ROLE_SPACE_PARTICIPANT').canEditTasks, isFalse);
+      expect(space(role: null).canEditTasks, isFalse);
+      expect(
+        space(role: 'ROLE_SPACE_ADMIN', status: 'PENDING').canEditTasks,
+        isFalse,
+      );
     });
 
     test('mantém a lista de resultados imutável', () {

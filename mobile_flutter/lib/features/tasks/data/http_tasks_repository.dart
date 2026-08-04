@@ -7,6 +7,8 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 
 final class HttpTasksRepository implements TasksRepository {
@@ -23,6 +25,60 @@ final class HttpTasksRepository implements TasksRepository {
   final http.Client _client;
   final AppConfig _config;
   final Duration _timeout;
+
+  @override
+  Future<TaskSummary> updateTask({
+    required String accessToken,
+    required int taskId,
+    required TaskUpdate update,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || taskId <= 0 || !_isValidUpdate(update)) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .put(
+            _config.endpoint('/tasks/$taskId'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode(update.toJson()),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de atualização de tarefa não é um objeto JSON.',
+        );
+      }
+      final updatedTask = TaskSummary.fromJson(decodedBody);
+      if (updatedTask.id != taskId) {
+        throw const FormatException(
+          'A API retornou uma tarefa diferente da atualizada.',
+        );
+      }
+      return updatedTask;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -112,10 +168,46 @@ final class HttpTasksRepository implements TasksRepository {
     ].any((score) => score != null && !score.isFinite);
   }
 
+  bool _isValidUpdate(TaskUpdate update) {
+    final description = update.description.trim();
+    if (description.isEmpty || description.length > 255) {
+      return false;
+    }
+
+    final score = update.score;
+    if (!score.isFinite || score <= 0 || !_hasAtMostTwoDecimalPlaces(score)) {
+      return false;
+    }
+
+    if (score is int) {
+      if (score.toString().length > 36) {
+        return false;
+      }
+    } else if (score >= 1e36) {
+      return false;
+    }
+
+    final schedule = update.schedule;
+    return schedule == null ||
+        (schedule.localDates.isNotEmpty &&
+            schedule.localDates.every(
+              (date) => date.year >= 1 && date.year <= 9999,
+            ));
+  }
+
+  bool _hasAtMostTwoDecimalPlaces(num value) {
+    if (value is int) {
+      return true;
+    }
+    final asDouble = value.toDouble();
+    return double.parse(asDouble.toStringAsFixed(2)) == asDouble;
+  }
+
   ApiFailure _mapFailure(http.Response response) {
     final statusCode = response.statusCode;
     return switch (statusCode) {
       400 => ApiFailure(ApiFailureKind.validation, statusCode: statusCode),
+      409 => ApiFailure(ApiFailureKind.validation, statusCode: statusCode),
       401 => ApiFailure(ApiFailureKind.unauthorized, statusCode: statusCode),
       403 => ApiFailure(ApiFailureKind.forbidden, statusCode: statusCode),
       429 => ApiFailure(
