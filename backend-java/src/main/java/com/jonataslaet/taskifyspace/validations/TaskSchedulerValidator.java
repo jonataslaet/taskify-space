@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.validations;
 
+import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.entities.TaskSchedule;
 import org.springframework.stereotype.Component;
 
@@ -19,16 +20,22 @@ public class TaskSchedulerValidator {
             );
         }
 
-        if (Objects.isNull(schedule.getLocalDates()) || schedule.getLocalDates().isEmpty()) {
+        if (requiresSchedulingDates(schedule)
+            && (Objects.isNull(schedule.getLocalDates()) || schedule.getLocalDates().isEmpty())) {
             throw new IllegalArgumentException(
                 "At least one scheduling date must be configured"
             );
         }
 
-        if (schedule.getLocalDates().stream().anyMatch(Objects::isNull)) {
+        if (Objects.nonNull(schedule.getLocalDates())
+            && schedule.getLocalDates().stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(
                 "Scheduling dates cannot contain null values"
             );
         }
+    }
+
+    private boolean requiresSchedulingDates(TaskSchedule schedule) {
+        return !FrequenceEnum.DAILY.equals(schedule.getFrequenceEnum());
     }
 }

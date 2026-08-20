@@ -207,7 +207,7 @@ public class TaskService {
 
                 var scheduleJoin = root.join("schedule", JoinType.INNER);
 
-                var localDatesJoin = scheduleJoin.join("localDates", JoinType.INNER);
+                var localDatesJoin = scheduleJoin.join("localDates", JoinType.LEFT);
 
                 var oncePredicate = criteriaBuilder.and(
                     criteriaBuilder.equal(scheduleJoin.get("frequenceEnum"), FrequenceEnum.ONCE),

@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.mock;
     "spring.flyway.enabled=false",
     "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-class TaskServiceJpaTests {
+public class TaskServiceJpaTests {
 
     @Autowired
     private TaskRepository taskRepository;
@@ -130,6 +131,39 @@ class TaskServiceJpaTests {
         assertThat(savedTask.getSchedule().getLocalDates())
             .containsExactlyInAnyOrder(firstDate, secondDate);
         assertThat(savedTask.getSchedule().getFrequenceEnum()).isEqualTo(FrequenceEnum.WEEKLY);
+    }
+
+    @Test
+    @Sql(statements = "CREATE ALIAS IF NOT EXISTS DATE_PART FOR \"com.jonataslaet.taskifyspace.services.TaskServiceJpaTests.datePart\"")
+    void findAllScheduledTasksIncludesDailyScheduleWithoutLocalDates() {
+        User authenticatedUser = userRepository.save(createUser("daily-user@example.com"));
+        Space space = spaceRepository.save(createSpace("Daily Space"));
+        saveMembership(space, authenticatedUser, SpaceMembershipStatusEnum.APPROVED);
+        Task dailyTask = createTask(space, "Daily task");
+        TaskSchedule schedule = new TaskSchedule();
+        schedule.setFrequenceEnum(FrequenceEnum.DAILY);
+        dailyTask.setSchedule(schedule);
+        dailyTask = taskRepository.saveAndFlush(dailyTask);
+
+        Page<TaskRecordDTO> tasks = taskService.findAllScheduledTasks(
+            space.getId(), null, Pageable.unpaged(), authenticatedUser);
+
+        List<Long> taskIds = tasks.getContent().stream().map(TaskRecordDTO::id).toList();
+        assertThat(taskIds).containsExactly(dailyTask.getId());
+    }
+
+    public static Double datePart(String field, java.sql.Date date) {
+        if (date == null) {
+            return null;
+        }
+
+        LocalDate localDate = date.toLocalDate();
+        return switch (field.toLowerCase()) {
+            case "day" -> (double) localDate.getDayOfMonth();
+            case "isodow" -> (double) localDate.getDayOfWeek().getValue();
+            case "month" -> (double) localDate.getMonthValue();
+            default -> throw new IllegalArgumentException("Unsupported date part: " + field);
+        };
     }
 
     private User createUser(String email) {

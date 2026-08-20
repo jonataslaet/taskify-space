@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.controllers.dtos;
 
+import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -96,8 +97,46 @@ class TaskAndSpaceRecordDTOValidationTests {
         Set<String> missingFrequencyFields = violatedFields(
             validator.validate(missingFrequencyTask, TaskRecordDTO.TaskView.CreateTask.class));
 
-        assertThat(emptyScheduleFields).contains("schedule.localDates", "schedule.frequence");
+        assertThat(emptyScheduleFields).contains("schedule.frequence");
+        assertThat(emptyScheduleFields).doesNotContain("schedule.localDates");
         assertThat(missingFrequencyFields).contains("schedule.frequence");
+    }
+
+    @Test
+    void taskScheduleAllowsDailyFrequencyWithoutLocalDatesOnCreateAndUpdate() {
+        TaskRecordDTO dailyTask = new TaskRecordDTO(
+            null,
+            1L,
+            "Task",
+            BigDecimal.ONE,
+            TaskCategoryEnum.OPERATIONAL,
+            new TaskScheduleRecordDTO(null, FrequenceEnum.DAILY),
+            null,
+            null);
+
+        assertThat(validator.validate(dailyTask, TaskRecordDTO.TaskView.CreateTask.class)).isEmpty();
+        assertThat(validator.validate(dailyTask, TaskRecordDTO.TaskView.UpdateTask.class)).isEmpty();
+    }
+
+    @Test
+    void taskScheduleRequiresLocalDatesForNonDailyFrequencyOnCreateAndUpdate() {
+        TaskRecordDTO weeklyTask = new TaskRecordDTO(
+            null,
+            1L,
+            "Task",
+            BigDecimal.ONE,
+            TaskCategoryEnum.OPERATIONAL,
+            new TaskScheduleRecordDTO(Set.of(), FrequenceEnum.WEEKLY),
+            null,
+            null);
+
+        Set<String> createFields = violatedFields(
+            validator.validate(weeklyTask, TaskRecordDTO.TaskView.CreateTask.class));
+        Set<String> updateFields = violatedFields(
+            validator.validate(weeklyTask, TaskRecordDTO.TaskView.UpdateTask.class));
+
+        assertThat(createFields).contains("schedule.localDates");
+        assertThat(updateFields).contains("schedule.localDates");
     }
 
     @Test
