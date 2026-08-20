@@ -418,6 +418,300 @@ void main() {
     expect(find.textContaining('resposta inesperada'), findsOneWidget);
   });
 
+  testWidgets('mantém o status visível, mas sem ação para participante', (
+    tester,
+  ) async {
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: [_task(id: 1)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
+    expect(statusChip, findsOneWidget);
+    expect(
+      tester
+          .widget<InkWell>(
+            find.descendant(of: statusChip, matching: find.byType(InkWell)),
+          )
+          .onTap,
+      isNull,
+    );
+    expect(repository.toggleTaskActiveCalls, 0);
+  });
+
+  for (final toggleCase
+      in <({bool initialActive, IconData initialIcon, IconData nextIcon})>[
+        (
+          initialActive: true,
+          initialIcon: Icons.visibility_outlined,
+          nextIcon: Icons.visibility_off_outlined,
+        ),
+        (
+          initialActive: false,
+          initialIcon: Icons.visibility_off_outlined,
+          nextIcon: Icons.visibility_outlined,
+        ),
+      ]) {
+    testWidgets(
+      'alterna tarefa ${toggleCase.initialActive ? 'ativa' : 'inativa'} e recarrega a lista',
+      (tester) async {
+        var active = toggleCase.initialActive;
+        final repository = _FakeTasksRepository(
+          (_, _, page, size) async => _page(
+            content: [_task(id: 1, active: active)],
+            number: page,
+            size: size,
+            totalElements: 1,
+            totalPages: 1,
+          ),
+          toggleTaskActiveHandler: (_, taskId) async {
+            expect(taskId, 1);
+            active = !active;
+          },
+        );
+
+        await tester.pumpWidget(_testApp(repository, canEditTasks: true));
+        await tester.pumpAndSettle();
+
+        final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
+        expect(tester.getSize(statusChip).height, greaterThanOrEqualTo(48));
+        expect(
+          find.descendant(
+            of: statusChip,
+            matching: find.byIcon(toggleCase.initialIcon),
+          ),
+          findsOneWidget,
+        );
+
+        await _tapVisible(tester, statusChip);
+
+        expect(repository.toggleTaskActiveCalls, 1);
+        expect(repository.toggleTaskActiveAccessTokens, [_session.accessToken]);
+        expect(repository.toggledTaskIds, [1]);
+        expect(repository.fetchCalls, 2);
+        expect(repository.pages, [0, 0]);
+        expect(repository.sizes, [10, 10]);
+        expect(
+          find.descendant(
+            of: statusChip,
+            matching: find.byIcon(toggleCase.nextIcon),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('task-status-updated-message')),
+          findsOneWidget,
+        );
+      },
+    );
+  }
+
+  testWidgets('bloqueia clique duplicado enquanto altera o status', (
+    tester,
+  ) async {
+    final response = Completer<void>();
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: [_task(id: 1)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      toggleTaskActiveHandler: (_, _) => response.future,
+    );
+
+    await tester.pumpWidget(_testApp(repository, canEditTasks: true));
+    await tester.pumpAndSettle();
+
+    final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
+    await tester.tap(statusChip);
+    await tester.pump();
+
+    expect(repository.toggleTaskActiveCalls, 1);
+    expect(find.byKey(const ValueKey('task-status-progress')), findsOneWidget);
+    expect(
+      tester
+          .widget<InkWell>(
+            find.descendant(of: statusChip, matching: find.byType(InkWell)),
+          )
+          .onTap,
+      isNull,
+    );
+
+    await tester.tap(statusChip);
+    await tester.pump();
+    expect(repository.toggleTaskActiveCalls, 1);
+
+    response.complete();
+    await tester.pumpAndSettle();
+    expect(repository.fetchCalls, 2);
+  });
+
+  testWidgets('toggle preserva filtros, página e tamanho atuais', (
+    tester,
+  ) async {
+    var active = true;
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: [_task(id: 1, active: active)],
+        number: page,
+        size: size,
+        totalElements: 60,
+        totalPages: 3,
+      ),
+      toggleTaskActiveHandler: (_, _) async => active = false,
+    );
+
+    await tester.pumpWidget(_testApp(repository, canEditTasks: true));
+    await tester.pumpAndSettle();
+
+    tester
+        .widget<DropdownButton<int>>(
+          find.byKey(const ValueKey('tasks-page-size')),
+        )
+        .onChanged!(20);
+    await tester.pumpAndSettle();
+    await _openFilters(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('tasks-description-filter')),
+      'mensal',
+    );
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('tasks-apply-filters')),
+    );
+    await _scrollToAndTap(tester, find.byKey(const ValueKey('tasks-page-1')));
+    await _scrollToAndTap(
+      tester,
+      find.byKey(const ValueKey('task-active-toggle-1')),
+    );
+
+    expect(repository.toggleTaskActiveCalls, 1);
+    expect(repository.pages, [0, 0, 0, 1, 1]);
+    expect(repository.sizes, [10, 20, 20, 20, 20]);
+    expect(repository.filters.last.spaceId, 7);
+    expect(repository.filters.last.description, 'mensal');
+  });
+
+  testWidgets('401 ao alterar status expira a sessão sem recarregar', (
+    tester,
+  ) async {
+    var sessionExpiredCalls = 0;
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: [_task(id: 1)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      toggleTaskActiveHandler: (_, _) async =>
+          throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        repository,
+        canEditTasks: true,
+        onSessionExpired: () => sessionExpiredCalls += 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('task-active-toggle-1')),
+    );
+
+    expect(repository.toggleTaskActiveCalls, 1);
+    expect(repository.fetchCalls, 1);
+    expect(sessionExpiredCalls, 1);
+    expect(find.byKey(const ValueKey('task-status-error')), findsNothing);
+  });
+
+  testWidgets('403 ao alterar status mantém a sessão e informa o erro', (
+    tester,
+  ) async {
+    var sessionExpiredCalls = 0;
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: [_task(id: 1)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      toggleTaskActiveHandler: (_, _) async =>
+          throw const ApiFailure(ApiFailureKind.forbidden, statusCode: 403),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        repository,
+        canEditTasks: true,
+        onSessionExpired: () => sessionExpiredCalls += 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('task-active-toggle-1')),
+    );
+
+    expect(repository.toggleTaskActiveCalls, 1);
+    expect(repository.fetchCalls, 1);
+    expect(sessionExpiredCalls, 0);
+    expect(find.byKey(const ValueKey('task-status-error')), findsOneWidget);
+    expect(find.textContaining('não tem permissão'), findsOneWidget);
+  });
+
+  testWidgets('recarrega a lista quando o resultado do PATCH é incerto', (
+    tester,
+  ) async {
+    var active = true;
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: [_task(id: 1, active: active)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      toggleTaskActiveHandler: (_, _) async {
+        active = false;
+        throw const ApiFailure(ApiFailureKind.network);
+      },
+    );
+
+    await tester.pumpWidget(_testApp(repository, canEditTasks: true));
+    await tester.pumpAndSettle();
+
+    final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
+    await _tapVisible(tester, statusChip);
+
+    expect(repository.toggleTaskActiveCalls, 1);
+    expect(repository.fetchCalls, 2);
+    expect(
+      find.descendant(
+        of: statusChip,
+        matching: find.byIcon(Icons.visibility_off_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('task-status-error')), findsOneWidget);
+    expect(find.textContaining('lista será atualizada'), findsOneWidget);
+  });
+
   for (final createCase in <({bool canEdit, Matcher matcher, String label})>[
     (canEdit: true, matcher: findsOneWidget, label: 'permitida'),
     (canEdit: false, matcher: findsNothing, label: 'não permitida'),
@@ -648,16 +942,25 @@ typedef _UpdateHandler =
     );
 typedef _CreateHandler =
     Future<TaskSummary> Function(String accessToken, TaskCreation creation);
+typedef _ToggleTaskActiveHandler =
+    Future<void> Function(String accessToken, int taskId);
 
 final class _FakeTasksRepository implements TasksRepository {
-  _FakeTasksRepository(this._handler, {this.createHandler, this.updateHandler});
+  _FakeTasksRepository(
+    this._handler, {
+    this.createHandler,
+    this.updateHandler,
+    this.toggleTaskActiveHandler,
+  });
 
   final _FetchHandler _handler;
   final _CreateHandler? createHandler;
   final _UpdateHandler? updateHandler;
+  final _ToggleTaskActiveHandler? toggleTaskActiveHandler;
   int fetchCalls = 0;
   int createCalls = 0;
   int updateCalls = 0;
+  int toggleTaskActiveCalls = 0;
   final accessTokens = <String>[];
   final filters = <TaskFilters>[];
   final pages = <int>[];
@@ -667,6 +970,8 @@ final class _FakeTasksRepository implements TasksRepository {
   final updateAccessTokens = <String>[];
   final taskIds = <int>[];
   final updates = <TaskUpdate>[];
+  final toggleTaskActiveAccessTokens = <String>[];
+  final toggledTaskIds = <int>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -718,6 +1023,23 @@ final class _FakeTasksRepository implements TasksRepository {
     }
     return handler(accessToken, taskId, update);
   }
+
+  @override
+  Future<void> toggleTaskActive({
+    required String accessToken,
+    required int taskId,
+  }) {
+    toggleTaskActiveCalls += 1;
+    toggleTaskActiveAccessTokens.add(accessToken);
+    toggledTaskIds.add(taskId);
+    final handler = toggleTaskActiveHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de status de tarefa não configurado.'),
+      );
+    }
+    return handler(accessToken, taskId);
+  }
 }
 
 const _session = AuthSession(
@@ -729,7 +1051,11 @@ const _session = AuthSession(
   role: 'ROLE_USER',
 );
 
-Widget _testApp(_FakeTasksRepository repository, {bool canEditTasks = false}) {
+Widget _testApp(
+  _FakeTasksRepository repository, {
+  bool canEditTasks = false,
+  VoidCallback? onSessionExpired,
+}) {
   return MaterialApp(
     home: TasksPage(
       session: _session,
@@ -737,6 +1063,7 @@ Widget _testApp(_FakeTasksRepository repository, {bool canEditTasks = false}) {
       spaceName: 'Residência do Casal',
       tasksRepository: repository,
       canEditTasks: canEditTasks,
+      onSessionExpired: onSessionExpired,
     ),
   );
 }

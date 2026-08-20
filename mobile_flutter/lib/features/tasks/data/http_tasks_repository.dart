@@ -136,6 +136,41 @@ final class HttpTasksRepository implements TasksRepository {
   }
 
   @override
+  Future<void> toggleTaskActive({
+    required String accessToken,
+    required int taskId,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || taskId <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .patch(
+            _config.endpoint('/tasks/$taskId'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 204) {
+        throw _mapFailure(response);
+      }
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<TaskPageResult> fetchTasks({
     required String accessToken,
     TaskFilters filters = const TaskFilters(),

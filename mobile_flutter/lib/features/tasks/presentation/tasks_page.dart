@@ -53,11 +53,14 @@ class _TasksPageState extends State<TasksPage> {
   bool? _selectedActive;
   final Set<TaskCategory> _selectedCategories = <TaskCategory>{};
   bool _isLoading = false;
+  int? _togglingTaskId;
   bool _areFiltersExpanded = false;
   String? _filterValidationMessage;
   int _requestGeneration = 0;
   int _requestedPage = 0;
   int _pageSize = 10;
+
+  bool get _isBusy => _isLoading || _togglingTaskId != null;
 
   @override
   void initState() {
@@ -87,6 +90,7 @@ class _TasksPageState extends State<TasksPage> {
     _selectedCategories.clear();
     _appliedFilters = TaskFilters(spaceId: widget.spaceId);
     _isLoading = false;
+    _togglingTaskId = null;
     _areFiltersExpanded = false;
     _filterValidationMessage = null;
     _requestedPage = 0;
@@ -108,7 +112,7 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   Future<void> _loadTasks({TaskFilters? filters, int? page, int? size}) async {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
 
@@ -197,7 +201,7 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   void _applyFilters() {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
 
@@ -239,7 +243,7 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   void _clearFilters() {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
     _clearFilterControllers();
@@ -276,7 +280,7 @@ class _TasksPageState extends State<TasksPage> {
 
   void _goToPage(int page) {
     final result = _result;
-    if (_isLoading ||
+    if (_isBusy ||
         result == null ||
         page < 0 ||
         page >= result.totalPages ||
@@ -287,7 +291,7 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   void _changePageSize(int? size) {
-    if (_isLoading ||
+    if (_isBusy ||
         size == null ||
         size == _pageSize ||
         !_pageSizeOptions.contains(size)) {
@@ -297,6 +301,9 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   Future<void> _openEditTask(TaskSummary task) async {
+    if (_isBusy) {
+      return;
+    }
     final updatedTask = await showDialog<TaskSummary>(
       context: context,
       barrierDismissible: false,
@@ -325,6 +332,9 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   Future<void> _openCreateTask() async {
+    if (_isBusy) {
+      return;
+    }
     final creatorName = widget.session.name ?? widget.session.username;
     final createdTask = await showDialog<TaskSummary>(
       context: context,
@@ -354,6 +364,75 @@ class _TasksPageState extends State<TasksPage> {
     await _loadTasks(page: result?.number ?? _requestedPage, size: _pageSize);
   }
 
+  Future<void> _toggleTaskActive(TaskSummary task) async {
+    if (!widget.canEditTasks || _isBusy) {
+      return;
+    }
+
+    final requestGeneration = _requestGeneration;
+    setState(() => _togglingTaskId = task.id);
+
+    try {
+      await widget.tasksRepository.toggleTaskActive(
+        accessToken: widget.session.accessToken,
+        taskId: task.id,
+      );
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+
+      setState(() => _togglingTaskId = null);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            key: const ValueKey('task-status-updated-message'),
+            content: Text('Status da tarefa "${task.description}" alterado.'),
+          ),
+        );
+
+      final result = _result;
+      await _loadTasks(page: result?.number ?? _requestedPage, size: _pageSize);
+    } on ApiFailure catch (failure) {
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+      setState(() => _togglingTaskId = null);
+      if (failure.kind == ApiFailureKind.unauthorized) {
+        widget.onSessionExpired?.call();
+        return;
+      }
+      _showTaskStatusError(failure);
+      if (_shouldRefreshTasksAfterToggleFailure(failure)) {
+        final result = _result;
+        await _loadTasks(
+          page: result?.number ?? _requestedPage,
+          size: _pageSize,
+        );
+      }
+    } on Object {
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+      setState(() => _togglingTaskId = null);
+      const failure = ApiFailure(ApiFailureKind.unknown);
+      _showTaskStatusError(failure);
+      final result = _result;
+      await _loadTasks(page: result?.number ?? _requestedPage, size: _pageSize);
+    }
+  }
+
+  void _showTaskStatusError(ApiFailure failure) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('task-status-error'),
+          content: Text(_toggleTaskFailureMessage(failure)),
+        ),
+      );
+  }
+
   bool get _hasActiveFilters {
     return (_appliedFilters.description?.trim().isNotEmpty ?? false) ||
         _appliedFilters.score != null ||
@@ -376,7 +455,7 @@ class _TasksPageState extends State<TasksPage> {
       floatingActionButton: widget.canEditTasks
           ? FloatingActionButton.extended(
               key: const ValueKey('create-task-button'),
-              onPressed: _isLoading ? null : _openCreateTask,
+              onPressed: _isBusy ? null : _openCreateTask,
               icon: const Icon(Icons.add_task_rounded),
               label: const Text('Nova tarefa'),
             )
@@ -431,7 +510,7 @@ class _TasksPageState extends State<TasksPage> {
             maxScoreController: _maxScoreController,
             selectedActive: _selectedActive,
             selectedCategories: _selectedCategories,
-            isLoading: _isLoading,
+            isLoading: _isBusy,
             isExpanded: _areFiltersExpanded,
             hasActiveFilters: _hasActiveFilters,
             validationMessage: _filterValidationMessage,
@@ -466,7 +545,12 @@ class _TasksPageState extends State<TasksPage> {
               for (final task in result.content) ...[
                 _TaskCard(
                   task: task,
-                  onEdit: widget.canEditTasks
+                  canEdit: widget.canEditTasks,
+                  isToggling: _togglingTaskId == task.id,
+                  onToggleActive: widget.canEditTasks && !_isBusy
+                      ? () => _toggleTaskActive(task)
+                      : null,
+                  onEdit: widget.canEditTasks && !_isBusy
                       ? () => _openEditTask(task)
                       : null,
                 ),
@@ -802,9 +886,18 @@ class _ScoreField extends StatelessWidget {
 }
 
 class _TaskCard extends StatelessWidget {
-  const _TaskCard({required this.task, required this.onEdit});
+  const _TaskCard({
+    required this.task,
+    required this.canEdit,
+    required this.isToggling,
+    required this.onToggleActive,
+    required this.onEdit,
+  });
 
   final TaskSummary task;
+  final bool canEdit;
+  final bool isToggling;
+  final VoidCallback? onToggleActive;
   final VoidCallback? onEdit;
 
   @override
@@ -864,7 +957,7 @@ class _TaskCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onEdit != null) ...[
+                if (canEdit) ...[
                   const SizedBox(width: 8),
                   IconButton(
                     key: ValueKey('task-edit-button-${task.id}'),
@@ -890,11 +983,12 @@ class _TaskCard extends StatelessWidget {
                       : Icons.build_outlined,
                   label: _categoryLabel(task.category),
                 ),
-                _TaskInfoChip(
-                  icon: task.active
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  label: task.active ? 'Ativa' : 'Inativa',
+                _TaskStatusChip(
+                  key: ValueKey('task-active-toggle-${task.id}'),
+                  active: task.active,
+                  canToggle: canEdit,
+                  isToggling: isToggling,
+                  onPressed: onToggleActive,
                 ),
                 if (task.schedule case final schedule?)
                   _TaskInfoChip(
@@ -904,6 +998,87 @@ class _TaskCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskStatusChip extends StatelessWidget {
+  const _TaskStatusChip({
+    required this.active,
+    required this.canToggle,
+    required this.isToggling,
+    required this.onPressed,
+    super.key,
+  });
+
+  final bool active;
+  final bool canToggle;
+  final bool isToggling;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = active ? 'Ativa' : 'Inativa';
+    final actionLabel = active ? 'Desativar tarefa' : 'Ativar tarefa';
+    final tooltip = isToggling
+        ? 'Alterando status da tarefa'
+        : canToggle
+        ? actionLabel
+        : label;
+    return Semantics(
+      button: canToggle,
+      enabled: onPressed != null,
+      liveRegion: isToggling,
+      label: tooltip,
+      value: label,
+      onTap: onPressed,
+      child: ExcludeSemantics(
+        child: Tooltip(
+          message: tooltip,
+          child: Material(
+            color: const Color(0xFFF1F6F5),
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(999),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isToggling)
+                        const SizedBox.square(
+                          key: ValueKey('task-status-progress'),
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        Icon(
+                          active
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 16,
+                          color: const Color(0xFF37615E),
+                        ),
+                      const SizedBox(width: 6),
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: const Color(0xFF37615E),
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1095,5 +1270,41 @@ String _failureMessage(ApiFailureKind kind) {
     ApiFailureKind.malformedResponse =>
       'A API retornou uma resposta inesperada.',
     _ => 'Ocorreu um erro inesperado. Tente novamente.',
+  };
+}
+
+String _toggleTaskFailureMessage(ApiFailure failure) {
+  if (failure.statusCode == 404) {
+    return 'A tarefa não foi encontrada. Atualize a lista e tente novamente.';
+  }
+  return switch (failure.kind) {
+    ApiFailureKind.validation =>
+      'Não foi possível alterar o status desta tarefa.',
+    ApiFailureKind.unauthorized =>
+      'Sua sessão expirou. Entre novamente para continuar.',
+    ApiFailureKind.forbidden =>
+      'Você não tem permissão para alterar o status desta tarefa.',
+    ApiFailureKind.rateLimited =>
+      'Muitas solicitações foram feitas. Aguarde e tente novamente.',
+    ApiFailureKind.timeout ||
+    ApiFailureKind.network ||
+    ApiFailureKind.server ||
+    ApiFailureKind.unknown =>
+      'Não foi possível confirmar a alteração. A lista será atualizada '
+          'para conferir o status.',
+    _ => 'Não foi possível alterar o status da tarefa agora.',
+  };
+}
+
+bool _shouldRefreshTasksAfterToggleFailure(ApiFailure failure) {
+  if (failure.statusCode == 404) {
+    return true;
+  }
+  return switch (failure.kind) {
+    ApiFailureKind.timeout ||
+    ApiFailureKind.network ||
+    ApiFailureKind.server ||
+    ApiFailureKind.unknown => true,
+    _ => false,
   };
 }

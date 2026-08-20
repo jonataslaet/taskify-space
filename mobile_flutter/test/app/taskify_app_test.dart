@@ -257,4 +257,14 @@ final class _FakeTasksRepository implements TasksRepository {
       StateError('Atualização de tarefa não esperada neste teste.'),
     );
   }
+
+  @override
+  Future<void> toggleTaskActive({
+    required String accessToken,
+    required int taskId,
+  }) {
+    return Future<void>.error(
+      StateError('Alteração de status de tarefa não esperada neste teste.'),
+    );
+  }
 }

@@ -380,6 +380,153 @@ void main() {
       );
     });
 
+    test('faz PATCH da tarefa com Bearer e sem body', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'PATCH');
+        expect(request.url.toString(), 'http://localhost:8080/api/tasks/42');
+        expect(request.url.query, isEmpty);
+        expect(request.headers['Accept'], 'application/json');
+        expect(
+          request.headers['Authorization'],
+          'Bearer access-token-test-only',
+        );
+        expect(request.headers, isNot(contains('Content-Type')));
+        expect(request.bodyBytes, isEmpty);
+        return http.Response('', 204);
+      });
+
+      await _repository(
+        client,
+      ).toggleTaskActive(accessToken: ' access-token-test-only ', taskId: 42);
+    });
+
+    test('rejeita PATCH com token ou taskId inválido antes da rede', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          return http.Response('', 204);
+        }),
+      );
+
+      for (final request in <Future<void>>[
+        repository.toggleTaskActive(accessToken: '   ', taskId: 1),
+        repository.toggleTaskActive(accessToken: 'token', taskId: 0),
+        repository.toggleTaskActive(accessToken: 'token', taskId: -1),
+      ]) {
+        await expectLater(
+          request,
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.validation,
+            ),
+          ),
+        );
+      }
+      expect(calls, 0);
+    });
+
+    test('aceita somente 204 como sucesso do PATCH', () async {
+      final repository = _repository(
+        MockClient((_) async => http.Response('', 200)),
+      );
+
+      await expectLater(
+        repository.toggleTaskActive(
+          accessToken: 'access-token-test-only',
+          taskId: 1,
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having((failure) => failure.kind, 'kind', ApiFailureKind.unknown)
+              .having((failure) => failure.statusCode, 'statusCode', 200),
+        ),
+      );
+    });
+
+    for (final errorCase in <(int, ApiFailureKind)>[
+      (401, ApiFailureKind.unauthorized),
+      (403, ApiFailureKind.forbidden),
+      (404, ApiFailureKind.unknown),
+      (503, ApiFailureKind.server),
+    ]) {
+      test(
+        'mapeia ${errorCase.$1} do PATCH para ${errorCase.$2.name}',
+        () async {
+          final repository = _repository(
+            MockClient((_) async => http.Response('{}', errorCase.$1)),
+          );
+
+          await expectLater(
+            repository.toggleTaskActive(
+              accessToken: 'access-token-test-only',
+              taskId: 1,
+            ),
+            throwsA(
+              isA<ApiFailure>()
+                  .having((failure) => failure.kind, 'kind', errorCase.$2)
+                  .having(
+                    (failure) => failure.statusCode,
+                    'statusCode',
+                    errorCase.$1,
+                  ),
+            ),
+          );
+        },
+      );
+    }
+
+    test('mapeia falha do cliente no PATCH para network', () async {
+      final repository = _repository(
+        MockClient((request) async {
+          throw http.ClientException('Falha simulada.', request.url);
+        }),
+      );
+
+      await expectLater(
+        repository.toggleTaskActive(
+          accessToken: 'access-token-test-only',
+          taskId: 1,
+        ),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.network,
+          ),
+        ),
+      );
+    });
+
+    test('mapeia timeout do PATCH sem repetir a requisição', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          return http.Response('', 204);
+        }),
+        timeout: const Duration(milliseconds: 1),
+      );
+
+      await expectLater(
+        repository.toggleTaskActive(
+          accessToken: 'access-token-test-only',
+          taskId: 1,
+        ),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.timeout,
+          ),
+        ),
+      );
+      expect(calls, 1);
+    });
+
     test('faz PUT com Bearer e preserva a agenda usando frequence', () async {
       final client = MockClient((request) async {
         expect(request.method, 'PUT');

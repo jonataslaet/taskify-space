@@ -224,16 +224,25 @@ typedef UpdateTaskHandler =
     );
 typedef CreateTaskHandler =
     Future<TaskSummary> Function(String accessToken, TaskCreation creation);
+typedef ToggleTaskActiveHandler =
+    Future<void> Function(String accessToken, int taskId);
 
 final class FakeTasksRepository implements TasksRepository {
-  FakeTasksRepository({this.handler, this.createHandler, this.updateHandler});
+  FakeTasksRepository({
+    this.handler,
+    this.createHandler,
+    this.updateHandler,
+    this.toggleTaskActiveHandler,
+  });
 
   final FetchTasksHandler? handler;
   final CreateTaskHandler? createHandler;
   final UpdateTaskHandler? updateHandler;
+  final ToggleTaskActiveHandler? toggleTaskActiveHandler;
   int fetchTasksCalls = 0;
   int createTaskCalls = 0;
   int updateTaskCalls = 0;
+  int toggleTaskActiveCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedFilters = <TaskFilters>[];
   final receivedPages = <int>[];
@@ -243,6 +252,8 @@ final class FakeTasksRepository implements TasksRepository {
   final receivedUpdateAccessTokens = <String>[];
   final receivedTaskIds = <int>[];
   final receivedTaskUpdates = <TaskUpdate>[];
+  final receivedToggleTaskActiveAccessTokens = <String>[];
+  final receivedToggleTaskActiveIds = <int>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -297,6 +308,23 @@ final class FakeTasksRepository implements TasksRepository {
       );
     }
     return handler(accessToken, taskId, update);
+  }
+
+  @override
+  Future<void> toggleTaskActive({
+    required String accessToken,
+    required int taskId,
+  }) {
+    toggleTaskActiveCalls += 1;
+    receivedToggleTaskActiveAccessTokens.add(accessToken);
+    receivedToggleTaskActiveIds.add(taskId);
+    final handler = toggleTaskActiveHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de status de tarefa não configurado.'),
+      );
+    }
+    return handler(accessToken, taskId);
   }
 }
 

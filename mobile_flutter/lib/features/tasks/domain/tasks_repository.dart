@@ -22,4 +22,9 @@ abstract interface class TasksRepository {
     required int taskId,
     required TaskUpdate update,
   });
+
+  Future<void> toggleTaskActive({
+    required String accessToken,
+    required int taskId,
+  });
 }

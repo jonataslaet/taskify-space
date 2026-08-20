@@ -90,6 +90,12 @@ de `PUT /tasks/{taskId}`. A agenda atual é sempre reenviada para preservá-la;
 ela só é removida quando a opção de agenda é desligada explicitamente.
 Situação e criador são somente leitura nesse endpoint.
 
+O ícone de visibilidade no chip de situação permite que administradores e
+gerentes ativem ou desativem a tarefa por meio de `PATCH /tasks/{taskId}`, sem
+corpo na requisição. A operação considera somente `204 No Content` como sucesso
+e, em seguida, recarrega a página e os filtros atuais para refletir o novo
+estado retornado pela API.
+
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. A allowlist contém `localhost` e `10.0.2.2`,
 o alias usado pelo Android Emulator. O manifest principal contém a
