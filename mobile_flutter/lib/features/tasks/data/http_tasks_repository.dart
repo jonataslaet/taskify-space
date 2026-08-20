@@ -264,7 +264,8 @@ final class HttpTasksRepository implements TasksRepository {
     }
 
     return schedule == null ||
-        (schedule.localDates.isNotEmpty &&
+        ((schedule.frequency == TaskFrequency.daily ||
+                schedule.localDates.isNotEmpty) &&
             schedule.localDates.every(
               (date) => date.year >= 1 && date.year <= 9999,
             ));

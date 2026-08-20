@@ -98,7 +98,10 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
 
     final score = _parseScore(_scoreController.text).value!;
     final dates = _hasSchedule
-        ? _parseDates(_datesController.text).value!
+        ? _parseDates(
+            _datesController.text,
+            allowEmpty: _frequency == TaskFrequency.daily,
+          ).value!
         : null;
     final schedule = _hasSchedule
         ? TaskScheduleSummary(localDates: dates!, frequency: _frequency!)
@@ -171,7 +174,10 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
     if (!_hasSchedule) {
       return null;
     }
-    return _parseDates(value ?? '').error;
+    return _parseDates(
+      value ?? '',
+      allowEmpty: _frequency == TaskFrequency.daily,
+    ).error;
   }
 
   @override
@@ -362,13 +368,19 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
   return (value: value, error: null);
 }
 
-({List<DateTime>? value, String? error}) _parseDates(String rawValue) {
+({List<DateTime>? value, String? error}) _parseDates(
+  String rawValue, {
+  bool allowEmpty = false,
+}) {
   final parts = rawValue
       .split(RegExp(r'[,;\n\r]+'))
       .map((part) => part.trim())
       .where((part) => part.isNotEmpty)
       .toList();
   if (parts.isEmpty) {
+    if (allowEmpty) {
+      return (value: const <DateTime>[], error: null);
+    }
     return (value: null, error: 'Informe ao menos uma data para a agenda.');
   }
 

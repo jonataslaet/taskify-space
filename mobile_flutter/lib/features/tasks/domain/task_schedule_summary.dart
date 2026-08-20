@@ -33,13 +33,20 @@ final class TaskScheduleSummary {
   }) : localDates = List<DateTime>.unmodifiable(localDates);
 
   factory TaskScheduleSummary.fromJson(Map<String, dynamic> json) {
+    final frequency = TaskFrequency.fromApiValue(json['frequence']);
     final rawLocalDates = json['localDates'];
+    if (rawLocalDates == null && frequency == TaskFrequency.daily) {
+      return TaskScheduleSummary(
+        localDates: const <DateTime>[],
+        frequency: frequency,
+      );
+    }
     if (rawLocalDates is! List<dynamic>) {
       throw const FormatException(
         'Campo schedule.localDates ausente ou inválido.',
       );
     }
-    if (rawLocalDates.isEmpty) {
+    if (rawLocalDates.isEmpty && frequency != TaskFrequency.daily) {
       throw const FormatException(
         'Campo schedule.localDates deve conter ao menos uma data.',
       );
@@ -50,7 +57,7 @@ final class TaskScheduleSummary {
         for (var index = 0; index < rawLocalDates.length; index += 1)
           _parseLocalDate(rawLocalDates[index], index),
       ],
-      frequency: TaskFrequency.fromApiValue(json['frequence']),
+      frequency: frequency,
     );
   }
 

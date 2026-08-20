@@ -70,7 +70,22 @@ void main() {
       expect(() => TaskSummary.fromJson(invalidDate), throwsFormatException);
     });
 
-    test('rejeita agenda sem datas como o TaskScheduleRecordDTO', () {
+    test('aceita agenda diária com datas vazias, nulas ou omitidas', () {
+      for (final scheduleJson in <Map<String, dynamic>>[
+        <String, dynamic>{'localDates': <String>[], 'frequence': 'DAILY'},
+        <String, dynamic>{'localDates': null, 'frequence': 'DAILY'},
+        <String, dynamic>{'frequence': 'DAILY'},
+      ]) {
+        final task = TaskSummary.fromJson(
+          _validTaskJson()..['schedule'] = scheduleJson,
+        );
+
+        expect(task.schedule?.frequency, TaskFrequency.daily);
+        expect(task.schedule?.localDates, isEmpty);
+      }
+    });
+
+    test('rejeita agenda não diária sem datas', () {
       final json = _validTaskJson();
       (json['schedule'] as Map<String, dynamic>)['localDates'] = <String>[];
 

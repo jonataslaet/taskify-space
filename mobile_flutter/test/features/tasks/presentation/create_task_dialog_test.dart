@@ -113,6 +113,62 @@ void main() {
     },
   );
 
+  testWidgets('permite criar agenda diária sem datas', (tester) async {
+    final repository = FakeTasksRepository(
+      createHandler: (_, creation) async => _createdTask(creation),
+    );
+
+    await _pumpDialog(tester, repository: repository);
+    await _fillMinimumValidForm(tester);
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('create-task-schedule-switch')),
+    );
+    await _selectDropdownOption(
+      tester,
+      fieldKey: 'create-task-frequency-field',
+      optionLabel: 'Diária',
+    );
+
+    await _submitAndSettle(tester);
+
+    expect(repository.createTaskCalls, 1);
+    final schedule = repository.receivedTaskCreations.single.schedule!;
+    expect(schedule.frequency, TaskFrequency.daily);
+    expect(schedule.localDates, isEmpty);
+    expect(find.byType(CreateTaskDialog), findsNothing);
+  });
+
+  testWidgets('agenda diária ainda valida datas informadas', (tester) async {
+    final repository = FakeTasksRepository(
+      createHandler: (_, creation) async => _createdTask(creation),
+    );
+
+    await _pumpDialog(tester, repository: repository);
+    await _fillMinimumValidForm(tester);
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('create-task-schedule-switch')),
+    );
+    await _selectDropdownOption(
+      tester,
+      fieldKey: 'create-task-frequency-field',
+      optionLabel: 'Diária',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('create-task-dates-field')),
+      '2026-02-30',
+    );
+
+    await _submitAndSettle(tester);
+
+    expect(repository.createTaskCalls, 0);
+    expect(
+      find.text('Use datas válidas no formato AAAA-MM-DD.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('dados inválidos não chamam o repositório', (tester) async {
     final repository = FakeTasksRepository(
       createHandler: (_, creation) async => _createdTask(creation),

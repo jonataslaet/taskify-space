@@ -91,6 +91,54 @@ void main() {
     expect(repository.receivedTaskUpdates.single.schedule, isNull);
   });
 
+  testWidgets('permite salvar agenda diária sem datas', (tester) async {
+    final task = _task(
+      schedule: TaskScheduleSummary(
+        localDates: const <DateTime>[],
+        frequency: TaskFrequency.daily,
+      ),
+    );
+    final repository = FakeTasksRepository(
+      updateHandler: (_, _, update) async => _applyUpdate(task, update),
+    );
+
+    await _pumpDialog(tester, repository: repository, task: task);
+
+    expect(_fieldText(tester, 'edit-task-dates-field'), isEmpty);
+    expect(find.text('Diária'), findsOneWidget);
+
+    await _submitAndSettle(tester);
+
+    expect(repository.updateTaskCalls, 1);
+    final schedule = repository.receivedTaskUpdates.single.schedule!;
+    expect(schedule.frequency, TaskFrequency.daily);
+    expect(schedule.localDates, isEmpty);
+  });
+
+  testWidgets('exige datas ao trocar a frequência diária por semanal', (
+    tester,
+  ) async {
+    final task = _task(
+      schedule: TaskScheduleSummary(
+        localDates: const <DateTime>[],
+        frequency: TaskFrequency.daily,
+      ),
+    );
+    final repository = FakeTasksRepository(
+      updateHandler: (_, _, update) async => _applyUpdate(task, update),
+    );
+
+    await _pumpDialog(tester, repository: repository, task: task);
+    await _selectFrequency(tester, 'Semanal');
+    await _submitAndSettle(tester);
+
+    expect(repository.updateTaskCalls, 0);
+    expect(
+      find.text('Informe ao menos uma data para a agenda.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'agenda habilitada exige frequência e datas e normaliza duplicatas',
     (tester) async {

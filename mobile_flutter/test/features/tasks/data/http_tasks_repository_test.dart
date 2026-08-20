@@ -172,6 +172,50 @@ void main() {
       expect(result.schedule?.frequency, TaskFrequency.weekly);
     });
 
+    test('aceita POST com agenda diária sem datas', () async {
+      late http.Request receivedRequest;
+      final client = MockClient((request) async {
+        receivedRequest = request;
+        return _jsonResponse(<String, dynamic>{
+          ..._validTaskBody(),
+          'schedule': <String, dynamic>{
+            'localDates': <String>[],
+            'frequence': 'DAILY',
+          },
+        }, statusCode: 201);
+      });
+
+      final result = await _repository(client).createTask(
+        accessToken: 'access-token-test-only',
+        creation: _validCreation(
+          schedule: TaskScheduleSummary(
+            localDates: const <DateTime>[],
+            frequency: TaskFrequency.daily,
+          ),
+        ),
+      );
+
+      expect(receivedRequest.method, 'POST');
+      expect(receivedRequest.url.path, '/api/tasks');
+      expect(
+        jsonDecode(utf8.decode(receivedRequest.bodyBytes)),
+        <String, dynamic>{
+          'spaceId': 7,
+          'description': 'Trocar o botijão',
+          'score': 90.5,
+          'category': 'OPERATIONAL',
+          'active': true,
+          'creatorName': 'Joice Laet',
+          'schedule': <String, dynamic>{
+            'localDates': <String>[],
+            'frequence': 'DAILY',
+          },
+        },
+      );
+      expect(result.schedule?.frequency, TaskFrequency.daily);
+      expect(result.schedule?.localDates, isEmpty);
+    });
+
     test('envia schedule nulo quando a tarefa não possui agenda', () async {
       late http.Request receivedRequest;
       final client = MockClient((request) async {
@@ -399,6 +443,47 @@ void main() {
       ]);
     });
 
+    test('aceita PUT com agenda diária sem datas', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'PUT');
+        expect(request.url.path, '/api/tasks/1');
+        expect(jsonDecode(request.body), <String, dynamic>{
+          'description': 'Trocar o botijão',
+          'score': 90.5,
+          'category': 'OPERATIONAL',
+          'schedule': <String, dynamic>{
+            'localDates': <String>[],
+            'frequence': 'DAILY',
+          },
+        });
+
+        return _jsonResponse(<String, dynamic>{
+          ..._validTaskBody(),
+          'schedule': <String, dynamic>{
+            'localDates': <String>[],
+            'frequence': 'DAILY',
+          },
+        });
+      });
+
+      final result = await _repository(client).updateTask(
+        accessToken: 'access-token-test-only',
+        taskId: 1,
+        update: TaskUpdate(
+          description: 'Trocar o botijão',
+          score: 90.5,
+          category: TaskCategory.operational,
+          schedule: TaskScheduleSummary(
+            localDates: const <DateTime>[],
+            frequency: TaskFrequency.daily,
+          ),
+        ),
+      );
+
+      expect(result.schedule?.frequency, TaskFrequency.daily);
+      expect(result.schedule?.localDates, isEmpty);
+    });
+
     test('envia schedule nulo explicitamente para remover a agenda', () async {
       final client = MockClient((request) async {
         final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -481,7 +566,7 @@ void main() {
             category: TaskCategory.operational,
             schedule: TaskScheduleSummary(
               localDates: const <DateTime>[],
-              frequency: TaskFrequency.daily,
+              frequency: TaskFrequency.weekly,
             ),
           ),
         ),
