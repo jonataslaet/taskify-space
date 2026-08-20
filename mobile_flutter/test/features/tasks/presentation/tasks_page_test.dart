@@ -5,12 +5,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
+import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
@@ -416,6 +418,106 @@ void main() {
     expect(find.textContaining('resposta inesperada'), findsOneWidget);
   });
 
+  for (final createCase in <({bool canEdit, Matcher matcher, String label})>[
+    (canEdit: true, matcher: findsOneWidget, label: 'permitida'),
+    (canEdit: false, matcher: findsNothing, label: 'não permitida'),
+  ]) {
+    testWidgets(
+      'renderiza a ação de criar quando a permissão é ${createCase.label}',
+      (tester) async {
+        final repository = _FakeTasksRepository(
+          (_, _, page, size) async => _page(number: page, size: size),
+        );
+
+        await tester.pumpWidget(
+          _testApp(repository, canEditTasks: createCase.canEdit),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('create-task-button')),
+          createCase.matcher,
+        );
+      },
+    );
+  }
+
+  testWidgets('cria uma tarefa e recarrega a lista do espaço', (tester) async {
+    TaskSummary? createdTask;
+    final repository = _FakeTasksRepository(
+      (_, _, page, size) async => _page(
+        content: createdTask == null ? const [] : [createdTask!],
+        number: page,
+        size: size,
+      ),
+      createHandler: (_, creation) async {
+        createdTask = _task(
+          id: 15,
+          description: creation.description,
+          score: creation.score,
+          category: creation.category,
+          schedule: creation.schedule,
+          active: creation.active,
+          creatorName: creation.creatorName,
+        );
+        return createdTask!;
+      },
+    );
+
+    await tester.pumpWidget(_testApp(repository, canEditTasks: true));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('create-task-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CreateTaskDialog), findsOneWidget);
+    expect(find.text('Ativa · Criada por Usuário de Teste'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('create-task-description-field')),
+      '  Pagar conta de água  ',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('create-task-score-field')),
+      '80,00',
+    );
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('create-task-schedule-switch')),
+    );
+    await _selectDropdownOption(
+      tester,
+      find.byKey(const ValueKey('create-task-frequency-field')),
+      'Semanal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('create-task-dates-field')),
+      '2024-02-29, 2024-02-28, 2024-02-27',
+    );
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('create-task-submit-button')),
+    );
+
+    expect(repository.createCalls, 1);
+    expect(repository.createAccessTokens, [_session.accessToken]);
+    final creation = repository.creations.single;
+    expect(creation.spaceId, 7);
+    expect(creation.description, 'Pagar conta de água');
+    expect(creation.score, 80);
+    expect(creation.category, TaskCategory.operational);
+    expect(creation.active, isTrue);
+    expect(creation.creatorName, 'Usuário de Teste');
+    expect(creation.schedule?.frequency, TaskFrequency.weekly);
+    expect(creation.schedule?.localDates, [
+      DateTime.utc(2024, 2, 27),
+      DateTime.utc(2024, 2, 28),
+      DateTime.utc(2024, 2, 29),
+    ]);
+    expect(repository.fetchCalls, 2);
+    expect(find.byKey(const ValueKey('task-created-message')), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-card-15')), findsOneWidget);
+  });
+
   for (final editCase in <({bool canEdit, Matcher matcher, String label})>[
     (canEdit: true, matcher: findsOneWidget, label: 'permitida'),
     (canEdit: false, matcher: findsNothing, label: 'não permitida'),
@@ -544,18 +646,24 @@ typedef _UpdateHandler =
       int taskId,
       TaskUpdate update,
     );
+typedef _CreateHandler =
+    Future<TaskSummary> Function(String accessToken, TaskCreation creation);
 
 final class _FakeTasksRepository implements TasksRepository {
-  _FakeTasksRepository(this._handler, {this.updateHandler});
+  _FakeTasksRepository(this._handler, {this.createHandler, this.updateHandler});
 
   final _FetchHandler _handler;
+  final _CreateHandler? createHandler;
   final _UpdateHandler? updateHandler;
   int fetchCalls = 0;
+  int createCalls = 0;
   int updateCalls = 0;
   final accessTokens = <String>[];
   final filters = <TaskFilters>[];
   final pages = <int>[];
   final sizes = <int>[];
+  final createAccessTokens = <String>[];
+  final creations = <TaskCreation>[];
   final updateAccessTokens = <String>[];
   final taskIds = <int>[];
   final updates = <TaskUpdate>[];
@@ -573,6 +681,23 @@ final class _FakeTasksRepository implements TasksRepository {
     pages.add(page);
     sizes.add(size);
     return _handler(accessToken, filters, page, size);
+  }
+
+  @override
+  Future<TaskSummary> createTask({
+    required String accessToken,
+    required TaskCreation creation,
+  }) {
+    createCalls += 1;
+    createAccessTokens.add(accessToken);
+    creations.add(creation);
+    final handler = createHandler;
+    if (handler == null) {
+      return Future<TaskSummary>.error(
+        StateError('Handler de criação de tarefa não configurado.'),
+      );
+    }
+    return handler(accessToken, creation);
   }
 
   @override
@@ -674,6 +799,18 @@ Future<void> _scrollToAndTap(WidgetTester tester, Finder finder) async {
 
 Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(finder, 400, scrollable: _tasksScrollable());
+  await tester.pumpAndSettle();
+}
+
+Future<void> _selectDropdownOption(
+  WidgetTester tester,
+  Finder dropdown,
+  String label,
+) async {
+  await tester.ensureVisible(dropdown);
+  await tester.tap(dropdown);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
 

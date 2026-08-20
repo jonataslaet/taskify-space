@@ -5,8 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
@@ -25,6 +27,59 @@ final class HttpTasksRepository implements TasksRepository {
   final http.Client _client;
   final AppConfig _config;
   final Duration _timeout;
+
+  @override
+  Future<TaskSummary> createTask({
+    required String accessToken,
+    required TaskCreation creation,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || !_isValidCreation(creation)) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .post(
+            _config.endpoint('/tasks'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode(creation.toJson()),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 201) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de criação de tarefa não é um objeto JSON.',
+        );
+      }
+      final createdTask = TaskSummary.fromJson(decodedBody);
+      if (createdTask.spaceId != creation.spaceId) {
+        throw const FormatException(
+          'A API criou a tarefa em um espaço diferente do solicitado.',
+        );
+      }
+      return createdTask;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
 
   @override
   Future<TaskSummary> updateTask({
@@ -169,12 +224,33 @@ final class HttpTasksRepository implements TasksRepository {
   }
 
   bool _isValidUpdate(TaskUpdate update) {
-    final description = update.description.trim();
-    if (description.isEmpty || description.length > 255) {
+    return _isValidTaskFields(
+      description: update.description,
+      score: update.score,
+      schedule: update.schedule,
+    );
+  }
+
+  bool _isValidCreation(TaskCreation creation) {
+    return creation.spaceId > 0 &&
+        creation.creatorName.trim().isNotEmpty &&
+        _isValidTaskFields(
+          description: creation.description,
+          score: creation.score,
+          schedule: creation.schedule,
+        );
+  }
+
+  bool _isValidTaskFields({
+    required String description,
+    required num score,
+    required TaskScheduleSummary? schedule,
+  }) {
+    final normalizedDescription = description.trim();
+    if (normalizedDescription.isEmpty || normalizedDescription.length > 255) {
       return false;
     }
 
-    final score = update.score;
     if (!score.isFinite || score <= 0 || !_hasAtMostTwoDecimalPlaces(score)) {
       return false;
     }
@@ -187,7 +263,6 @@ final class HttpTasksRepository implements TasksRepository {
       return false;
     }
 
-    final schedule = update.schedule;
     return schedule == null ||
         (schedule.localDates.isNotEmpty &&
             schedule.localDates.every(

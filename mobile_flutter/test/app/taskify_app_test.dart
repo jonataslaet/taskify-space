@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/app/taskify_app.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
@@ -220,6 +221,16 @@ Future<void> _fillValidCredentials(WidgetTester tester) async {
 }
 
 final class _FakeTasksRepository implements TasksRepository {
+  @override
+  Future<TaskSummary> createTask({
+    required String accessToken,
+    required TaskCreation creation,
+  }) {
+    return Future<TaskSummary>.error(
+      StateError('Criação de tarefa não esperada neste teste.'),
+    );
+  }
+
   @override
   Future<TaskPageResult> fetchTasks({
     required String accessToken,

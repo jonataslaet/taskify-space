@@ -8,6 +8,7 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
@@ -221,18 +222,24 @@ typedef UpdateTaskHandler =
       int taskId,
       TaskUpdate update,
     );
+typedef CreateTaskHandler =
+    Future<TaskSummary> Function(String accessToken, TaskCreation creation);
 
 final class FakeTasksRepository implements TasksRepository {
-  FakeTasksRepository({this.handler, this.updateHandler});
+  FakeTasksRepository({this.handler, this.createHandler, this.updateHandler});
 
   final FetchTasksHandler? handler;
+  final CreateTaskHandler? createHandler;
   final UpdateTaskHandler? updateHandler;
   int fetchTasksCalls = 0;
+  int createTaskCalls = 0;
   int updateTaskCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedFilters = <TaskFilters>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
+  final receivedCreateAccessTokens = <String>[];
+  final receivedTaskCreations = <TaskCreation>[];
   final receivedUpdateAccessTokens = <String>[];
   final receivedTaskIds = <int>[];
   final receivedTaskUpdates = <TaskUpdate>[];
@@ -254,6 +261,23 @@ final class FakeTasksRepository implements TasksRepository {
       return fetchHandler(accessToken, filters, page, size);
     }
     return Future<TaskPageResult>.value(makeTaskPage());
+  }
+
+  @override
+  Future<TaskSummary> createTask({
+    required String accessToken,
+    required TaskCreation creation,
+  }) {
+    createTaskCalls += 1;
+    receivedCreateAccessTokens.add(accessToken);
+    receivedTaskCreations.add(creation);
+    final handler = createHandler;
+    if (handler == null) {
+      return Future<TaskSummary>.error(
+        StateError('Handler de criação de tarefa não configurado.'),
+      );
+    }
+    return handler(accessToken, creation);
   }
 
   @override

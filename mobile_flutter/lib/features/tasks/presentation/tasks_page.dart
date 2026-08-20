@@ -11,6 +11,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
+import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
 
 class TasksPage extends StatefulWidget {
@@ -323,6 +324,36 @@ class _TasksPageState extends State<TasksPage> {
     await _loadTasks(page: result?.number ?? _requestedPage, size: _pageSize);
   }
 
+  Future<void> _openCreateTask() async {
+    final creatorName = widget.session.name ?? widget.session.username;
+    final createdTask = await showDialog<TaskSummary>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => CreateTaskDialog(
+        spaceId: widget.spaceId,
+        creatorName: creatorName,
+        accessToken: widget.session.accessToken,
+        tasksRepository: widget.tasksRepository,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || createdTask == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('task-created-message'),
+          content: Text('Tarefa "${createdTask.description}" criada.'),
+        ),
+      );
+
+    final result = _result;
+    await _loadTasks(page: result?.number ?? _requestedPage, size: _pageSize);
+  }
+
   bool get _hasActiveFilters {
     return (_appliedFilters.description?.trim().isNotEmpty ?? false) ||
         _appliedFilters.score != null ||
@@ -342,6 +373,14 @@ class _TasksPageState extends State<TasksPage> {
             : [LogoutButton(onLogout: widget.onLogout!)],
       ),
       body: SafeArea(child: _buildBody(context)),
+      floatingActionButton: widget.canEditTasks
+          ? FloatingActionButton.extended(
+              key: const ValueKey('create-task-button'),
+              onPressed: _isLoading ? null : _openCreateTask,
+              icon: const Icon(Icons.add_task_rounded),
+              label: const Text('Nova tarefa'),
+            )
+          : null,
     );
   }
 
@@ -373,7 +412,12 @@ class _TasksPageState extends State<TasksPage> {
         controller: _scrollController,
         key: const ValueKey('tasks-list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          widget.canEditTasks ? 100 : 32,
+        ),
         children: [
           _TasksHeader(
             spaceName: widget.spaceName,

@@ -7,6 +7,7 @@ import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/data/http_tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
@@ -92,6 +93,246 @@ void main() {
       await _repository(client).fetchTasks(
         accessToken: 'access-token-test-only',
         filters: const TaskFilters(description: '   '),
+      );
+    });
+
+    test('faz POST /task com Bearer e payload completo com agenda', () async {
+      late http.Request receivedRequest;
+      final client = MockClient((request) async {
+        receivedRequest = request;
+
+        return _jsonResponse(<String, dynamic>{
+          ..._validTaskBody(),
+          'id': 9,
+          'spaceId': 1,
+          'description': 'Pagar conta de água',
+          'score': 80.0,
+          'category': 'FINANCIAL',
+          'active': true,
+          'creatorName': 'Joice Laet',
+          'schedule': <String, dynamic>{
+            'localDates': <String>['2024-02-29', '2024-02-28', '2024-02-27'],
+            'frequence': 'WEEKLY',
+          },
+        }, statusCode: 201);
+      });
+
+      final result = await _repository(client).createTask(
+        accessToken: ' access-token-test-only ',
+        creation: TaskCreation(
+          spaceId: 1,
+          description: 'Pagar conta de água',
+          score: 80.0,
+          category: TaskCategory.financial,
+          active: true,
+          creatorName: 'Joice Laet',
+          schedule: TaskScheduleSummary(
+            localDates: <DateTime>[
+              DateTime.utc(2024, 2, 29),
+              DateTime.utc(2024, 2, 28),
+              DateTime.utc(2024, 2, 27),
+            ],
+            frequency: TaskFrequency.weekly,
+          ),
+        ),
+      );
+
+      expect(receivedRequest.method, 'POST');
+      expect(receivedRequest.url.toString(), 'http://localhost:8080/api/tasks');
+      expect(receivedRequest.url.query, isEmpty);
+      expect(receivedRequest.headers['Accept'], 'application/json');
+      expect(
+        receivedRequest.headers['Authorization'],
+        'Bearer access-token-test-only',
+      );
+      expect(
+        receivedRequest.headers['Content-Type'],
+        'application/json; charset=utf-8',
+      );
+      expect(
+        jsonDecode(utf8.decode(receivedRequest.bodyBytes)),
+        <String, dynamic>{
+          'spaceId': 1,
+          'description': 'Pagar conta de água',
+          'score': 80.0,
+          'category': 'FINANCIAL',
+          'active': true,
+          'creatorName': 'Joice Laet',
+          'schedule': <String, dynamic>{
+            'localDates': <String>['2024-02-29', '2024-02-28', '2024-02-27'],
+            'frequence': 'WEEKLY',
+          },
+        },
+      );
+      expect(result.id, 9);
+      expect(result.spaceId, 1);
+      expect(result.description, 'Pagar conta de água');
+      expect(result.active, isTrue);
+      expect(result.creatorName, 'Joice Laet');
+      expect(result.schedule?.frequency, TaskFrequency.weekly);
+    });
+
+    test('envia schedule nulo quando a tarefa não possui agenda', () async {
+      late http.Request receivedRequest;
+      final client = MockClient((request) async {
+        receivedRequest = request;
+
+        final responseBody = _validTaskBody()..remove('schedule');
+        return _jsonResponse(responseBody, statusCode: 201);
+      });
+
+      final result = await _repository(client).createTask(
+        accessToken: 'access-token-test-only',
+        creation: const TaskCreation(
+          spaceId: 7,
+          description: 'Trocar o botijão',
+          score: 90.5,
+          category: TaskCategory.operational,
+          schedule: null,
+          active: true,
+          creatorName: 'Joice Laet',
+        ),
+      );
+
+      expect(receivedRequest.method, 'POST');
+      expect(receivedRequest.url.path, '/api/tasks');
+      expect(
+        jsonDecode(utf8.decode(receivedRequest.bodyBytes)),
+        <String, dynamic>{
+          'spaceId': 7,
+          'description': 'Trocar o botijão',
+          'score': 90.5,
+          'category': 'OPERATIONAL',
+          'active': true,
+          'creatorName': 'Joice Laet',
+          'schedule': null,
+        },
+      );
+      expect(result.schedule, isNull);
+    });
+
+    test('exige status 201 na criação', () async {
+      final repository = _repository(
+        MockClient((_) async => _jsonResponse(_validTaskBody())),
+      );
+
+      await expectLater(
+        repository.createTask(
+          accessToken: 'access-token-test-only',
+          creation: const TaskCreation(
+            spaceId: 7,
+            description: 'Trocar o botijão',
+            score: 90.5,
+            category: TaskCategory.operational,
+            schedule: null,
+            active: true,
+            creatorName: 'Joice Laet',
+          ),
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having((failure) => failure.kind, 'kind', ApiFailureKind.unknown)
+              .having((failure) => failure.statusCode, 'statusCode', 200),
+        ),
+      );
+    });
+
+    test('rejeita criação inválida antes de acessar a rede', () async {
+      var calls = 0;
+      final repository = _repository(
+        MockClient((_) async {
+          calls += 1;
+          return _jsonResponse(_validTaskBody(), statusCode: 201);
+        }),
+      );
+      final requests = <Future<Object?>>[
+        repository.createTask(accessToken: '   ', creation: _validCreation()),
+        repository.createTask(
+          accessToken: 'token',
+          creation: _validCreation(spaceId: 0),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          creation: _validCreation(description: '   '),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          creation: _validCreation(score: 0),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          creation: _validCreation(creatorName: '   '),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          creation: _validCreation(
+            schedule: TaskScheduleSummary(
+              localDates: const [],
+              frequency: TaskFrequency.weekly,
+            ),
+          ),
+        ),
+      ];
+
+      for (final request in requests) {
+        await expectLater(
+          request,
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.validation,
+            ),
+          ),
+        );
+      }
+      expect(calls, 0);
+    });
+
+    test('rejeita criação retornada para outro espaço', () async {
+      final repository = _repository(
+        MockClient(
+          (_) async => _jsonResponse(<String, dynamic>{
+            ..._validTaskBody(),
+            'spaceId': 8,
+          }, statusCode: 201),
+        ),
+      );
+
+      await expectLater(
+        repository.createTask(
+          accessToken: 'access-token-test-only',
+          creation: _validCreation(),
+        ),
+        throwsA(
+          isA<ApiFailure>().having(
+            (failure) => failure.kind,
+            'kind',
+            ApiFailureKind.malformedResponse,
+          ),
+        ),
+      );
+    });
+
+    test('mapeia conflito 409 da criação para validation', () async {
+      final repository = _repository(
+        MockClient((_) async => http.Response('{}', 409)),
+      );
+
+      await expectLater(
+        repository.createTask(
+          accessToken: 'access-token-test-only',
+          creation: _validCreation(),
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              )
+              .having((failure) => failure.statusCode, 'statusCode', 409),
+        ),
       );
     });
 
@@ -484,10 +725,10 @@ HttpTasksRepository _repository(
   );
 }
 
-http.Response _jsonResponse(Map<String, dynamic> body) {
+http.Response _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
   return http.Response.bytes(
     utf8.encode(jsonEncode(body)),
-    200,
+    statusCode,
     headers: const {'content-type': 'application/json; charset=utf-8'},
   );
 }
@@ -518,4 +759,22 @@ Map<String, dynamic> _validTaskBody() {
     'active': true,
     'creatorName': 'Joice Laet',
   };
+}
+
+TaskCreation _validCreation({
+  int spaceId = 7,
+  String description = 'Trocar o botijão',
+  num score = 90.5,
+  String creatorName = 'Joice Laet',
+  TaskScheduleSummary? schedule,
+}) {
+  return TaskCreation(
+    spaceId: spaceId,
+    description: description,
+    score: score,
+    category: TaskCategory.operational,
+    active: true,
+    creatorName: creatorName,
+    schedule: schedule,
+  );
 }
