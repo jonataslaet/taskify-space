@@ -68,6 +68,14 @@ permite navegar pelas páginas e escolher 5, 10, 20 ou 50 registros por página.
 Ao alterar essa quantidade, aplicar ou limpar filtros, a consulta reinicia na
 página zero.
 
+Em espaços com participação aprovada, o chip com a quantidade de participantes
+abre uma tela própria por meio de `GET /spaces/{spaceId}/participants`. A lista
+exibe nome, papel, categorias consideradas e pontuação, com paginação e filtros
+opcionais por `name`, `spaceUserRole` e `taskCategories`. Também é possível
+ordenar por identificador, nome, papel ou pontuação; sem ordenação explícita, o
+backend usa nome crescente. As categorias selecionadas determinam quais
+execuções compõem a pontuação e não removem participantes sem execução nelas.
+
 O botão **Novo espaço** chama `POST /spaces` com o mesmo access token e envia
 somente o campo `name`, normalizado e validado com o limite de 255 caracteres.
 O backend cria esse espaço como inativo e registra o usuário autenticado como

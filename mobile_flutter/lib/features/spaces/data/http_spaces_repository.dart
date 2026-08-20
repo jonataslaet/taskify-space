@@ -7,7 +7,10 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 
 final class HttpSpacesRepository implements SpacesRepository {
   factory HttpSpacesRepository({
@@ -128,6 +131,66 @@ final class HttpSpacesRepository implements SpacesRepository {
     }
   }
 
+  @override
+  Future<SpaceParticipantPageResult> fetchSpaceParticipants({
+    required String accessToken,
+    required int spaceId,
+    SpaceParticipantFilters filters = const SpaceParticipantFilters(),
+    int page = 0,
+    int size = 10,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0 || page < 0 || size <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .get(
+            _spaceParticipantsEndpoint(
+              spaceId,
+              filters,
+              page: page,
+              size: size,
+            ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de participantes não é um objeto JSON.',
+        );
+      }
+      final result = SpaceParticipantPageResult.fromJson(decodedBody);
+      if (result.number != page) {
+        throw FormatException(
+          'A API retornou a página ${result.number}, mas a página $page foi '
+          'solicitada.',
+        );
+      }
+      return result;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
   Uri _spacesEndpoint(
     SpaceFilters filters, {
     required int page,
@@ -147,6 +210,33 @@ final class HttpSpacesRepository implements SpacesRepository {
 
     final endpoint = _config.endpoint('/spaces');
     return endpoint.replace(queryParameters: queryParameters);
+  }
+
+  Uri _spaceParticipantsEndpoint(
+    int spaceId,
+    SpaceParticipantFilters filters, {
+    required int page,
+    required int size,
+  }) {
+    final normalizedName = filters.name?.trim();
+    final selectedTaskCategories = <String>[
+      for (final category in TaskCategory.values)
+        if (filters.taskCategories.contains(category)) category.apiValue,
+    ];
+    final queryParameters = <String, Object>{
+      'page': page.toString(),
+      'size': size.toString(),
+      if (normalizedName != null && normalizedName.isNotEmpty)
+        'name': normalizedName,
+      if (filters.role case final role?) 'spaceUserRole': role.apiValue,
+      if (selectedTaskCategories.isNotEmpty)
+        'taskCategories': selectedTaskCategories,
+      if (filters.sort case final sort?) 'sort': sort.apiValue,
+    };
+
+    return _config
+        .endpoint('/spaces/$spaceId/participants')
+        .replace(queryParameters: queryParameters);
   }
 
   ApiFailure _mapFailure(http.Response response) {

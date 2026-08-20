@@ -4,6 +4,9 @@ import 'package:mobile_flutter/core/storage/session_store.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
@@ -152,25 +155,41 @@ typedef FetchSpacesPageHandler =
     Future<SpacePageResult> Function(String accessToken, int page, int size);
 typedef CreateSpaceHandler =
     Future<CreatedSpace> Function(String accessToken, String name);
+typedef FetchSpaceParticipantsHandler =
+    Future<SpaceParticipantPageResult> Function(
+      String accessToken,
+      int spaceId,
+      SpaceParticipantFilters filters,
+      int page,
+      int size,
+    );
 
 final class FakeSpacesRepository implements SpacesRepository {
   FakeSpacesRepository(
     this._handler, {
     this.fetchPageHandler,
     this.createHandler,
+    this.fetchParticipantsHandler,
   });
 
   final FetchSpacesHandler _handler;
   final FetchSpacesPageHandler? fetchPageHandler;
   final CreateSpaceHandler? createHandler;
+  final FetchSpaceParticipantsHandler? fetchParticipantsHandler;
   int fetchSpacesCalls = 0;
   int createSpaceCalls = 0;
+  int fetchSpaceParticipantsCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
   final receivedCreateAccessTokens = <String>[];
   final receivedSpaceNames = <String>[];
   final receivedFilters = <SpaceFilters>[];
+  final receivedParticipantAccessTokens = <String>[];
+  final receivedParticipantSpaceIds = <int>[];
+  final receivedParticipantFilters = <SpaceParticipantFilters>[];
+  final receivedParticipantPages = <int>[];
+  final receivedParticipantPageSizes = <int>[];
 
   @override
   Future<CreatedSpace> createSpace({
@@ -206,6 +225,29 @@ final class FakeSpacesRepository implements SpacesRepository {
       return pageHandler(accessToken, page, size);
     }
     return _handler(accessToken);
+  }
+
+  @override
+  Future<SpaceParticipantPageResult> fetchSpaceParticipants({
+    required String accessToken,
+    required int spaceId,
+    SpaceParticipantFilters filters = const SpaceParticipantFilters(),
+    int page = 0,
+    int size = 10,
+  }) {
+    fetchSpaceParticipantsCalls += 1;
+    receivedParticipantAccessTokens.add(accessToken);
+    receivedParticipantSpaceIds.add(spaceId);
+    receivedParticipantFilters.add(filters);
+    receivedParticipantPages.add(page);
+    receivedParticipantPageSizes.add(size);
+    final handler = fetchParticipantsHandler;
+    if (handler == null) {
+      return Future<SpaceParticipantPageResult>.error(
+        StateError('Handler de participantes não configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId, filters, page, size);
   }
 }
 
@@ -354,6 +396,22 @@ SpacePageResult makeSpacePage({List<SpaceSummary> content = const []}) {
     number: 0,
     totalElements: content.length,
     totalPages: content.isEmpty ? 0 : 1,
+  );
+}
+
+SpaceParticipantPageResult makeSpaceParticipantPage({
+  List<SpaceParticipant> content = const [],
+  int size = 10,
+  int number = 0,
+  int? totalElements,
+  int? totalPages,
+}) {
+  return SpaceParticipantPageResult(
+    content: content,
+    size: size,
+    number: number,
+    totalElements: totalElements ?? content.length,
+    totalPages: totalPages ?? (content.isEmpty ? 0 : 1),
   );
 }
 

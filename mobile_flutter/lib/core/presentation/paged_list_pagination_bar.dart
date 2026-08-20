@@ -189,6 +189,7 @@ class _PageNumberButton extends StatelessWidget {
       button: true,
       selected: isCurrent,
       label: isCurrent ? 'Página $label, atual' : 'Ir para página $label',
+      onTap: isCurrent ? null : onPressed,
       child: ExcludeSemantics(child: button),
     );
   }

@@ -7,6 +7,7 @@ import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
+import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
@@ -311,6 +312,113 @@ void main() {
       expect(tasksRepository.receivedFilters.single.spaceId, testSpace.id);
       expect(tasksRepository.receivedPages, [0]);
       expect(tasksRepository.receivedPageSizes, [10]);
+    },
+  );
+
+  testWidgets(
+    'abre participantes do espaço aprovado e faz uma busca contextual',
+    (tester) async {
+      final repository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+        fetchParticipantsHandler: (_, _, _, page, size) async =>
+            makeSpaceParticipantPage(number: page, size: size),
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      final participantsChip = find.byKey(
+        const ValueKey('space-participants-button-1'),
+      );
+      expect(participantsChip, findsOneWidget);
+      final inkWell = tester.widget<InkWell>(
+        find.descendant(of: participantsChip, matching: find.byType(InkWell)),
+      );
+      expect(inkWell.onTap, isNotNull);
+      final targetSize = tester.getSize(
+        find.descendant(
+          of: participantsChip,
+          matching: find.byType(ConstrainedBox),
+        ),
+      );
+      expect(targetSize.width, greaterThanOrEqualTo(48));
+      expect(targetSize.height, greaterThanOrEqualTo(48));
+      expect(repository.fetchSpaceParticipantsCalls, 0);
+
+      await tester.tap(participantsChip);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SpaceParticipantsPage), findsOneWidget);
+      expect(repository.fetchSpaceParticipantsCalls, 1);
+      expect(repository.receivedParticipantAccessTokens, [
+        testSession.accessToken,
+      ]);
+      expect(repository.receivedParticipantSpaceIds, [testSpace.id]);
+      expect(repository.receivedParticipantPages, [0]);
+      expect(repository.receivedParticipantPageSizes, [10]);
+      expect(repository.receivedParticipantFilters.single.name, isNull);
+      expect(repository.receivedParticipantFilters.single.role, isNull);
+      expect(
+        repository.receivedParticipantFilters.single.taskCategories,
+        isEmpty,
+      );
+      expect(repository.receivedParticipantFilters.single.sort, isNull);
+    },
+  );
+
+  testWidgets(
+    'desabilita participantes sem vínculo ou com participação pendente',
+    (tester) async {
+      const availableSpace = SpaceSummary(
+        id: 20,
+        name: 'Espaço sem vínculo',
+        spaceAdminName: 'Responsável',
+        active: true,
+        spaceUserRole: null,
+        spaceMembershipStatus: null,
+        activeParticipationsCount: 1,
+      );
+      const pendingSpace = SpaceSummary(
+        id: 21,
+        name: 'Espaço pendente',
+        spaceAdminName: 'Responsável',
+        active: true,
+        spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+        spaceMembershipStatus: 'PENDING',
+        activeParticipationsCount: 2,
+      );
+      final repository = FakeSpacesRepository(
+        (_) async =>
+            makeSpacePage(content: const [availableSpace, pendingSpace]),
+        fetchParticipantsHandler: (_, _, _, page, size) async =>
+            makeSpaceParticipantPage(number: page, size: size),
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      for (final id in <int>[availableSpace.id, pendingSpace.id]) {
+        final participantsChip = find.byKey(
+          ValueKey('space-participants-button-$id'),
+        );
+        expect(participantsChip, findsOneWidget);
+        await tester.ensureVisible(participantsChip);
+        await tester.pump();
+        final inkWell = tester.widget<InkWell>(
+          find.descendant(of: participantsChip, matching: find.byType(InkWell)),
+        );
+        expect(inkWell.onTap, isNull);
+        final targetSize = tester.getSize(
+          find.descendant(
+            of: participantsChip,
+            matching: find.byType(ConstrainedBox),
+          ),
+        );
+        expect(targetSize.width, greaterThanOrEqualTo(48));
+        expect(targetSize.height, greaterThanOrEqualTo(48));
+      }
+      expect(repository.fetchSpaceParticipantsCalls, 0);
+      expect(find.byType(SpaceParticipantsPage), findsNothing);
     },
   );
 
