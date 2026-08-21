@@ -92,6 +92,12 @@ mínima ou máxima. Aplicar ou limpar filtros e trocar a quantidade de registros
 reinicia a consulta na página zero; a barra inferior permite navegar pelas
 páginas e escolher 5, 10, 20 ou 50 registros.
 
+Ao tocar no nome de uma tarefa, o aplicativo abre seu histórico por meio de
+`GET /spaces/{spaceId}/tasks/{taskId}/executions`, com `page` e `size`. A lista
+vem ordenada das execuções mais recentes para as mais antigas e mostra a data,
+a hora e a pontuação de cada execução; os nomes dos executores ficam ocultos
+até o usuário tocar no ícone de participantes do respectivo item.
+
 Administradores e gerentes criam tarefas por meio de
 `POST /spaces/{spaceId}/tasks`. O identificador do espaço é enviado no caminho
 e também no corpo, conforme o contrato atual do DTO de criação.

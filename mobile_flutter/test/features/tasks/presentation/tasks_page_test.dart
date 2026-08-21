@@ -6,6 +6,7 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
@@ -14,6 +15,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
+import 'package:mobile_flutter/features/tasks/presentation/task_executions_page.dart';
 import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
 void main() {
@@ -62,6 +64,58 @@ void main() {
     expect(find.text('Ativa'), findsOneWidget);
     expect(find.text('Criada por: Joice Laet'), findsOneWidget);
     expect(find.text('Semanal · 03/08/2026'), findsOneWidget);
+  });
+
+  testWidgets('abre as execuções ao tocar no nome da tarefa', (tester) async {
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: [_task(id: 23)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      fetchTaskExecutionsHandler:
+          (accessToken, spaceId, taskId, page, size) async {
+            expect(accessToken, _session.accessToken);
+            expect(spaceId, 7);
+            expect(taskId, 23);
+            return TaskExecutionPageResult(
+              content: const [],
+              size: size,
+              number: page,
+              totalElements: 0,
+              totalPages: 0,
+            );
+          },
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    final executionsButton = find.byKey(
+      const ValueKey('task-executions-button-23'),
+    );
+    expect(executionsButton, findsOneWidget);
+    expect(tester.getSize(executionsButton).height, greaterThanOrEqualTo(48));
+    expect(
+      tester.getSemantics(executionsButton),
+      matchesSemantics(
+        label: 'Ver execuções de Tarefa 23',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+
+    await tester.tap(executionsButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TaskExecutionsPage), findsOneWidget);
+    expect(repository.fetchTaskExecutionsCalls, 1);
+    expect(repository.executionSpaceIds, [7]);
+    expect(repository.executionTaskIds, [23]);
+    expect(repository.executionPages, [0]);
+    expect(repository.executionSizes, [10]);
   });
 
   testWidgets(
@@ -955,6 +1009,14 @@ typedef _CreateHandler =
     );
 typedef _ToggleTaskActiveHandler =
     Future<void> Function(String accessToken, int spaceId, int taskId);
+typedef _FetchTaskExecutionsHandler =
+    Future<TaskExecutionPageResult> Function(
+      String accessToken,
+      int spaceId,
+      int taskId,
+      int page,
+      int size,
+    );
 
 final class _FakeTasksRepository implements TasksRepository {
   _FakeTasksRepository(
@@ -962,16 +1024,19 @@ final class _FakeTasksRepository implements TasksRepository {
     this.createHandler,
     this.updateHandler,
     this.toggleTaskActiveHandler,
+    this.fetchTaskExecutionsHandler,
   });
 
   final _FetchHandler _handler;
   final _CreateHandler? createHandler;
   final _UpdateHandler? updateHandler;
   final _ToggleTaskActiveHandler? toggleTaskActiveHandler;
+  final _FetchTaskExecutionsHandler? fetchTaskExecutionsHandler;
   int fetchCalls = 0;
   int createCalls = 0;
   int updateCalls = 0;
   int toggleTaskActiveCalls = 0;
+  int fetchTaskExecutionsCalls = 0;
   final accessTokens = <String>[];
   final spaceIds = <int>[];
   final filters = <TaskFilters>[];
@@ -987,6 +1052,11 @@ final class _FakeTasksRepository implements TasksRepository {
   final toggleTaskActiveAccessTokens = <String>[];
   final toggleTaskActiveSpaceIds = <int>[];
   final toggledTaskIds = <int>[];
+  final executionAccessTokens = <String>[];
+  final executionSpaceIds = <int>[];
+  final executionTaskIds = <int>[];
+  final executionPages = <int>[];
+  final executionSizes = <int>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -1003,6 +1073,35 @@ final class _FakeTasksRepository implements TasksRepository {
     pages.add(page);
     sizes.add(size);
     return _handler(accessToken, spaceId, filters, page, size);
+  }
+
+  @override
+  Future<TaskExecutionPageResult> fetchTaskExecutions({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    int page = 0,
+    int size = 10,
+  }) {
+    fetchTaskExecutionsCalls += 1;
+    executionAccessTokens.add(accessToken);
+    executionSpaceIds.add(spaceId);
+    executionTaskIds.add(taskId);
+    executionPages.add(page);
+    executionSizes.add(size);
+    final handler = fetchTaskExecutionsHandler;
+    if (handler != null) {
+      return handler(accessToken, spaceId, taskId, page, size);
+    }
+    return Future<TaskExecutionPageResult>.value(
+      TaskExecutionPageResult(
+        content: const [],
+        size: size,
+        number: page,
+        totalElements: 0,
+        totalPages: 0,
+      ),
+    );
   }
 
   @override

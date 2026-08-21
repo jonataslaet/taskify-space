@@ -12,6 +12,8 @@ import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_execution_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
@@ -259,6 +261,14 @@ typedef FetchTasksHandler =
       int page,
       int size,
     );
+typedef FetchTaskExecutionsHandler =
+    Future<TaskExecutionPageResult> Function(
+      String accessToken,
+      int spaceId,
+      int taskId,
+      int page,
+      int size,
+    );
 typedef UpdateTaskHandler =
     Future<TaskSummary> Function(
       String accessToken,
@@ -278,16 +288,19 @@ typedef ToggleTaskActiveHandler =
 final class FakeTasksRepository implements TasksRepository {
   FakeTasksRepository({
     this.handler,
+    this.fetchTaskExecutionsHandler,
     this.createHandler,
     this.updateHandler,
     this.toggleTaskActiveHandler,
   });
 
   final FetchTasksHandler? handler;
+  final FetchTaskExecutionsHandler? fetchTaskExecutionsHandler;
   final CreateTaskHandler? createHandler;
   final UpdateTaskHandler? updateHandler;
   final ToggleTaskActiveHandler? toggleTaskActiveHandler;
   int fetchTasksCalls = 0;
+  int fetchTaskExecutionsCalls = 0;
   int createTaskCalls = 0;
   int updateTaskCalls = 0;
   int toggleTaskActiveCalls = 0;
@@ -296,6 +309,11 @@ final class FakeTasksRepository implements TasksRepository {
   final receivedFilters = <TaskFilters>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
+  final receivedTaskExecutionAccessTokens = <String>[];
+  final receivedTaskExecutionSpaceIds = <int>[];
+  final receivedTaskExecutionTaskIds = <int>[];
+  final receivedTaskExecutionPages = <int>[];
+  final receivedTaskExecutionPageSizes = <int>[];
   final receivedCreateAccessTokens = <String>[];
   final receivedCreateSpaceIds = <int>[];
   final receivedTaskCreations = <TaskCreation>[];
@@ -326,6 +344,29 @@ final class FakeTasksRepository implements TasksRepository {
       return fetchHandler(accessToken, spaceId, filters, page, size);
     }
     return Future<TaskPageResult>.value(makeTaskPage());
+  }
+
+  @override
+  Future<TaskExecutionPageResult> fetchTaskExecutions({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    int page = 0,
+    int size = 10,
+  }) {
+    fetchTaskExecutionsCalls += 1;
+    receivedTaskExecutionAccessTokens.add(accessToken);
+    receivedTaskExecutionSpaceIds.add(spaceId);
+    receivedTaskExecutionTaskIds.add(taskId);
+    receivedTaskExecutionPages.add(page);
+    receivedTaskExecutionPageSizes.add(size);
+    final handler = fetchTaskExecutionsHandler;
+    if (handler != null) {
+      return handler(accessToken, spaceId, taskId, page, size);
+    }
+    return Future<TaskExecutionPageResult>.value(
+      makeTaskExecutionPage(size: size, number: page),
+    );
   }
 
   @override
@@ -440,5 +481,21 @@ TaskPageResult makeTaskPage({List<TaskSummary> content = const []}) {
     number: 0,
     totalElements: content.length,
     totalPages: content.isEmpty ? 0 : 1,
+  );
+}
+
+TaskExecutionPageResult makeTaskExecutionPage({
+  List<TaskExecutionSummary> content = const [],
+  int size = 10,
+  int number = 0,
+  int? totalElements,
+  int? totalPages,
+}) {
+  return TaskExecutionPageResult(
+    content: content,
+    size: size,
+    number: number,
+    totalElements: totalElements ?? content.length,
+    totalPages: totalPages ?? (content.isEmpty ? 0 : 1),
   );
 }

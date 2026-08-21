@@ -13,6 +13,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
+import 'package:mobile_flutter/features/tasks/presentation/task_executions_page.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({
@@ -284,6 +285,23 @@ class _TasksPageState extends State<TasksPage> {
     unawaited(_loadTasks(page: 0, size: size));
   }
 
+  void _openTaskExecutions(TaskSummary task) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => TaskExecutionsPage(
+          session: widget.session,
+          spaceId: widget.spaceId,
+          spaceName: widget.spaceName,
+          taskId: task.id,
+          taskDescription: task.description,
+          tasksRepository: widget.tasksRepository,
+          onSessionExpired: widget.onSessionExpired,
+          onLogout: widget.onLogout,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openEditTask(TaskSummary task) async {
     if (_isBusy) {
       return;
@@ -532,6 +550,7 @@ class _TasksPageState extends State<TasksPage> {
                   task: task,
                   canEdit: widget.canEditTasks,
                   isToggling: _togglingTaskId == task.id,
+                  onShowExecutions: () => _openTaskExecutions(task),
                   onToggleActive: widget.canEditTasks && !_isBusy
                       ? () => _toggleTaskActive(task)
                       : null,
@@ -875,6 +894,7 @@ class _TaskCard extends StatelessWidget {
     required this.task,
     required this.canEdit,
     required this.isToggling,
+    required this.onShowExecutions,
     required this.onToggleActive,
     required this.onEdit,
   });
@@ -882,6 +902,7 @@ class _TaskCard extends StatelessWidget {
   final TaskSummary task;
   final bool canEdit;
   final bool isToggling;
+  final VoidCallback onShowExecutions;
   final VoidCallback? onToggleActive;
   final VoidCallback? onEdit;
 
@@ -923,11 +944,28 @@ class _TaskCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        task.description,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFF173B38),
-                          fontWeight: FontWeight.w800,
+                      Semantics(
+                        key: ValueKey('task-executions-button-${task.id}'),
+                        label: 'Ver execuções de ${task.description}',
+                        container: true,
+                        button: true,
+                        excludeSemantics: true,
+                        onTap: onShowExecutions,
+                        child: TextButton(
+                          onPressed: onShowExecutions,
+                          style: TextButton.styleFrom(
+                            alignment: Alignment.centerLeft,
+                            minimumSize: const Size(48, 48),
+                            padding: EdgeInsets.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            task.description,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: const Color(0xFF173B38),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
                       ),
                       if (task.creatorName != null) ...[

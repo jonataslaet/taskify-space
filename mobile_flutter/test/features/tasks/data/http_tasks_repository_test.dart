@@ -1044,6 +1044,353 @@ void main() {
       );
       expect(calls, 1);
     });
+
+    group('fetchTaskExecutions', () {
+      test(
+        'faz GET contextual paginado com Bearer e interpreta a resposta',
+        () async {
+          final client = MockClient((request) async {
+            expect(request.method, 'GET');
+            expect(request.url.path, '/api/spaces/7/tasks/42/executions');
+            expect(request.url.queryParametersAll, <String, List<String>>{
+              'page': <String>['0'],
+              'size': <String>['10'],
+              'sort': <String>['createdAt,desc', 'id,desc'],
+            });
+            expect(request.headers['Accept'], 'application/json');
+            expect(
+              request.headers['Authorization'],
+              'Bearer access-token-test-only',
+            );
+            expect(request.headers, isNot(contains('Content-Type')));
+            return _jsonResponse(_validExecutionPageBody());
+          });
+
+          final result = await _repository(client).fetchTaskExecutions(
+            accessToken: ' access-token-test-only ',
+            spaceId: 7,
+            taskId: 42,
+          );
+
+          expect(result.content, hasLength(1));
+          expect(result.content.single.id, 1);
+          expect(
+            result.content.single.executionDate,
+            DateTime.utc(2026, 8, 21, 18, 31),
+          );
+          expect(result.content.single.score, 90.0);
+          expect(result.content.single.executorNames, <String>[
+            'Bella Laet',
+            'Joice Laet',
+            'Jonatas Laet',
+            'Ralph Laet',
+          ]);
+          expect(result.totalElements, 1);
+        },
+      );
+
+      test('envia paginação e ordena o histórico de forma estável', () async {
+        final client = MockClient((request) async {
+          expect(request.url.queryParametersAll, <String, List<String>>{
+            'page': <String>['2'],
+            'size': <String>['25'],
+            'sort': <String>['createdAt,desc', 'id,desc'],
+          });
+          return _jsonResponse(
+            _validExecutionPageBody(
+              page: 2,
+              size: 25,
+              totalElements: 51,
+              totalPages: 3,
+            ),
+          );
+        });
+
+        final result = await _repository(client).fetchTaskExecutions(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+          taskId: 42,
+          page: 2,
+          size: 25,
+        );
+
+        expect(result.number, 2);
+        expect(result.size, 25);
+        expect(result.totalElements, 51);
+      });
+
+      test('rejeita token, IDs ou paginação inválidos antes da rede', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            return _jsonResponse(_validExecutionPageBody());
+          }),
+        );
+        final requests = <Future<Object?>>[
+          repository.fetchTaskExecutions(
+            accessToken: '   ',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          repository.fetchTaskExecutions(
+            accessToken: 'token',
+            spaceId: 0,
+            taskId: 42,
+          ),
+          repository.fetchTaskExecutions(
+            accessToken: 'token',
+            spaceId: -1,
+            taskId: 42,
+          ),
+          repository.fetchTaskExecutions(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 0,
+          ),
+          repository.fetchTaskExecutions(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: -1,
+          ),
+          repository.fetchTaskExecutions(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            page: -1,
+          ),
+          repository.fetchTaskExecutions(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            size: 0,
+          ),
+        ];
+
+        for (final request in requests) {
+          await expectLater(
+            request,
+            throwsA(
+              isA<ApiFailure>().having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              ),
+            ),
+          );
+        }
+        expect(calls, 0);
+      });
+
+      test('aceita somente 200 como sucesso', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async =>
+                _jsonResponse(_validExecutionPageBody(), statusCode: 201),
+          ),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.unknown,
+                )
+                .having((failure) => failure.statusCode, 'statusCode', 201),
+          ),
+        );
+      });
+
+      test('rejeita página diferente da solicitada', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async =>
+                _jsonResponse(_validExecutionPageBody(page: 1, totalPages: 2)),
+          ),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.malformedResponse,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia resposta incompatível para malformedResponse', () async {
+        final repository = _repository(
+          MockClient((_) async => http.Response('[1, 2]', 200)),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.malformedResponse,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia execução incompatível para malformedResponse', () async {
+        final body = _validExecutionPageBody();
+        final execution = (body['content'] as List<dynamic>).single;
+        (execution as Map<String, dynamic>)['executionDate'] =
+            '31/02/2026 18:31';
+        final repository = _repository(
+          MockClient((_) async => _jsonResponse(body)),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.malformedResponse,
+            ),
+          ),
+        );
+      });
+
+      for (final errorCase in <(int, ApiFailureKind)>[
+        (400, ApiFailureKind.validation),
+        (401, ApiFailureKind.unauthorized),
+        (403, ApiFailureKind.forbidden),
+        (404, ApiFailureKind.unknown),
+        (409, ApiFailureKind.validation),
+        (503, ApiFailureKind.server),
+      ]) {
+        test('mapeia ${errorCase.$1} para ${errorCase.$2.name}', () async {
+          final repository = _repository(
+            MockClient((_) async => http.Response('{}', errorCase.$1)),
+          );
+
+          await expectLater(
+            repository.fetchTaskExecutions(
+              accessToken: 'access-token-test-only',
+              spaceId: 7,
+              taskId: 42,
+            ),
+            throwsA(
+              isA<ApiFailure>()
+                  .having((failure) => failure.kind, 'kind', errorCase.$2)
+                  .having(
+                    (failure) => failure.statusCode,
+                    'statusCode',
+                    errorCase.$1,
+                  ),
+            ),
+          );
+        });
+      }
+
+      test('lê Retry-After no 429', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async =>
+                http.Response('{}', 429, headers: const {'Retry-After': '12'}),
+          ),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.rateLimited,
+                )
+                .having(
+                  (failure) => failure.retryAfter,
+                  'retryAfter',
+                  const Duration(seconds: 12),
+                ),
+          ),
+        );
+      });
+
+      test('mapeia falha do cliente para network', () async {
+        final repository = _repository(
+          MockClient((request) async {
+            throw http.ClientException('Falha simulada.', request.url);
+          }),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.network,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia timeout sem repetir a requisição', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            return _jsonResponse(_validExecutionPageBody());
+          }),
+          timeout: const Duration(milliseconds: 1),
+        );
+
+        await expectLater(
+          repository.fetchTaskExecutions(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.timeout,
+            ),
+          ),
+        );
+        expect(calls, 1);
+      });
+    });
   });
 }
 
@@ -1091,6 +1438,35 @@ Map<String, dynamic> _validTaskBody() {
     },
     'active': true,
     'creatorName': 'Joice Laet',
+  };
+}
+
+Map<String, dynamic> _validExecutionPageBody({
+  int page = 0,
+  int size = 10,
+  int totalElements = 1,
+  int totalPages = 1,
+}) {
+  return <String, dynamic>{
+    'content': <dynamic>[
+      <String, dynamic>{
+        'id': 1,
+        'executionDate': '21/08/2026 18:31',
+        'score': 90.0,
+        'executorNames': <dynamic>[
+          'Bella Laet',
+          'Joice Laet',
+          'Jonatas Laet',
+          'Ralph Laet',
+        ],
+      },
+    ],
+    'page': <String, dynamic>{
+      'size': size,
+      'number': page,
+      'totalElements': totalElements,
+      'totalPages': totalPages,
+    },
   };
 }
 

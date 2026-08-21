@@ -6,6 +6,7 @@ import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
@@ -231,6 +232,65 @@ final class HttpTasksRepository implements TasksRepository {
     }
   }
 
+  @override
+  Future<TaskExecutionPageResult> fetchTaskExecutions({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    int page = 0,
+    int size = 10,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty ||
+        spaceId <= 0 ||
+        taskId <= 0 ||
+        page < 0 ||
+        size <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .get(
+            _taskExecutionsEndpoint(spaceId, taskId, page: page, size: size),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de execuções não é um objeto JSON.',
+        );
+      }
+      final result = TaskExecutionPageResult.fromJson(decodedBody);
+      if (result.number != page) {
+        throw FormatException(
+          'A API retornou a página ${result.number}, mas a página $page foi '
+          'solicitada.',
+        );
+      }
+      return result;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
   Uri _tasksEndpoint(
     int spaceId,
     TaskFilters filters, {
@@ -260,6 +320,23 @@ final class HttpTasksRepository implements TasksRepository {
     return _config
         .endpoint('/spaces/$spaceId/tasks')
         .replace(queryParameters: queryParameters);
+  }
+
+  Uri _taskExecutionsEndpoint(
+    int spaceId,
+    int taskId, {
+    required int page,
+    required int size,
+  }) {
+    return _config
+        .endpoint('/spaces/$spaceId/tasks/$taskId/executions')
+        .replace(
+          queryParameters: <String, Object>{
+            'page': <String>[page.toString()],
+            'size': <String>[size.toString()],
+            'sort': const <String>['createdAt,desc', 'id,desc'],
+          },
+        );
   }
 
   bool _hasNonFiniteScore(TaskFilters filters) {

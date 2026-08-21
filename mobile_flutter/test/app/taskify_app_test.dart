@@ -6,6 +6,7 @@ import 'package:mobile_flutter/app/taskify_app.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
@@ -241,6 +242,23 @@ final class _FakeTasksRepository implements TasksRepository {
     int size = 10,
   }) async {
     return TaskPageResult(
+      content: const [],
+      size: size,
+      number: page,
+      totalElements: 0,
+      totalPages: 0,
+    );
+  }
+
+  @override
+  Future<TaskExecutionPageResult> fetchTaskExecutions({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    int page = 0,
+    int size = 10,
+  }) async {
+    return TaskExecutionPageResult(
       content: const [],
       size: size,
       number: page,
