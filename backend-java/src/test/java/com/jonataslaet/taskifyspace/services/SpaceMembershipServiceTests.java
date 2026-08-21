@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantSummaryDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
@@ -19,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -189,6 +191,37 @@ class SpaceMembershipServiceTests {
 
         verify(spaceMembershipRepository, never()).save(org.mockito.ArgumentMatchers.any(SpaceMembership.class));
         assertThat(space.getSpaceMemberships()).isEmpty();
+    }
+
+    @Test
+    void readParticipantsByNameReturnsApprovedParticipantsWhenAuthenticatedUserParticipates() {
+        List<ParticipantSummaryDTO> participants = List.of(new ParticipantSummaryDTO(2L, "Ana"));
+
+        when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
+            10L, 1L, APPROVED))
+            .thenReturn(true);
+        when(spaceMembershipRepository.findApprovedParticipantSummariesBySpaceIdAndName(10L, "ana"))
+            .thenReturn(participants);
+
+        List<ParticipantSummaryDTO> foundParticipants =
+            spaceMembershipService.readParticipantsByName(10L, 1L, "ana");
+
+        assertThat(foundParticipants).isSameAs(participants);
+        verify(spaceMembershipRepository).findApprovedParticipantSummariesBySpaceIdAndName(10L, "ana");
+    }
+
+    @Test
+    void readParticipantsByNamePreventsUserWithoutApprovedParticipation() {
+        when(spaceMembershipRepository.existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
+            10L, 1L, APPROVED))
+            .thenReturn(false);
+
+        assertThatThrownBy(() -> spaceMembershipService.readParticipantsByName(10L, 1L, "ana"))
+            .isInstanceOf(ForbiddenException.class);
+
+        verify(spaceMembershipRepository, never()).findApprovedParticipantSummariesBySpaceIdAndName(
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyString());
     }
 
     private User createUser(Long id) {

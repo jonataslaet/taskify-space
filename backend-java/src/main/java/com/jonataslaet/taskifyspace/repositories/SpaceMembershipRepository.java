@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.repositories;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantSummaryDTO;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
@@ -13,6 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -28,6 +30,27 @@ public interface SpaceMembershipRepository extends JpaRepository<
         @Param("spaceId") Long spaceId,
         @Param("usersIds") Set<Long> ids,
         @Param("status") SpaceMembershipStatusEnum status);
+
+    @Query("""
+        SELECT new com.jonataslaet.taskifyspace.controllers.dtos.ParticipantSummaryDTO(
+            spaceMembership.user.id,
+            spaceMembership.user.name
+        )
+        FROM SpaceMembership spaceMembership
+        WHERE spaceMembership.space.id = :spaceId
+            AND spaceMembership.spaceMembershipStatusEnum = :status
+            AND LOWER(spaceMembership.user.name) LIKE LOWER(CONCAT('%', :name, '%'))
+        ORDER BY spaceMembership.user.name ASC, spaceMembership.user.id ASC
+        """)
+    List<ParticipantSummaryDTO> findApprovedParticipantSummariesBySpaceIdAndName(
+        @Param("spaceId") Long spaceId,
+        @Param("name") String name,
+        @Param("status") SpaceMembershipStatusEnum status);
+
+    default List<ParticipantSummaryDTO> findApprovedParticipantSummariesBySpaceIdAndName(
+        Long spaceId, String name) {
+        return findApprovedParticipantSummariesBySpaceIdAndName(spaceId, name, SpaceMembershipStatusEnum.APPROVED);
+    }
 
     @Query(value = """
         SELECT sm FROM SpaceMembership sm WHERE (:usersIds IS NULL or sm.user.id in (:usersIds)) AND sm.space.id = :spaceId

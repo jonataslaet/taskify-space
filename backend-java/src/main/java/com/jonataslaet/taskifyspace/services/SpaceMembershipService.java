@@ -1,6 +1,7 @@
 package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantSummaryDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceMembershipRecordDTO;
 import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
@@ -71,14 +72,15 @@ public class SpaceMembershipService {
                 SpaceUserRoleEnum.ROLE_SPACE_ADMIN) && sm.getUser().getId().equals(authenticatedUser.getId())) {
                 hasAuthenticatedUserAsAdmin.set(true);
             }
-            if (usersIds.contains(sm.getUser().getId()) && !sm.getSpaceMembershipStatusEnum().equals(SpaceMembershipStatusEnum.APPROVED)) {
+            if (usersIds.contains(sm.getUser().getId())
+                && !sm.getSpaceMembershipStatusEnum().equals(SpaceMembershipStatusEnum.APPROVED)) {
                 featureAccessService.requireFeatureWithUsageLock(
                     requireSpaceCreator(sm.getSpace()), approvalFeature(sm.getSpaceUserRole()), sm.getSpace());
                 sm.setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum.APPROVED);
             }
         });
         if (!hasAuthenticatedUserAsAdmin.get()) {
-            throw new ForbiddenException("Esse espaço não possui o usuário logado como administrador");
+            throw new ForbiddenException("Esse espaco nao possui o usuario logado como administrador");
         }
         spaceMembershipRepository.saveAll(spaceMemberships);
     }
@@ -92,14 +94,16 @@ public class SpaceMembershipService {
         SpaceMembershipStatusEnum status, SpaceUserRoleEnum spaceUserRole, User authenticatedUser) {
 
         SpaceMembership spaceMembership = spaceMembershipRepository.findByIdAndSpaceId(spaceMembershipId, spaceId)
-            .orElseThrow(() -> new ResourceNotFoundException("Participação não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Participacao nao encontrada"));
 
         if (Objects.isNull(status) && Objects.isNull(spaceUserRole)) return SpaceMembershipMapper.toDTO(spaceMembership);
 
-        SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole) ?
-            spaceUserRole : spaceMembership.getSpaceUserRole();
-        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status) ?
-            status : spaceMembership.getSpaceMembershipStatusEnum();
+        SpaceUserRoleEnum targetSpaceUserRole = Objects.nonNull(spaceUserRole)
+            ? spaceUserRole
+            : spaceMembership.getSpaceUserRole();
+        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status)
+            ? status
+            : spaceMembership.getSpaceMembershipStatusEnum();
 
         validateParticipationUpdatePermission(spaceMembership, spaceUserRole, targetSpaceUserRole, authenticatedUser);
         validNotDuplicateParticipation(spaceMembership);
@@ -118,8 +122,9 @@ public class SpaceMembershipService {
 
     private boolean willIncreaseApprovedRoleCount(SpaceMembership spaceMembership, SpaceMembershipStatusEnum status,
         SpaceUserRoleEnum targetSpaceUserRole) {
-        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status) ?
-            status : spaceMembership.getSpaceMembershipStatusEnum();
+        SpaceMembershipStatusEnum targetStatus = Objects.nonNull(status)
+            ? status
+            : spaceMembership.getSpaceMembershipStatusEnum();
 
         return SpaceMembershipStatusEnum.APPROVED.equals(targetStatus)
             && (!SpaceMembershipStatusEnum.APPROVED.equals(spaceMembership.getSpaceMembershipStatusEnum())
@@ -142,7 +147,7 @@ public class SpaceMembershipService {
                 spaceMembership.getSpace().getId(), authenticatedUser.getId(), APPROVED, ROLE_SPACE_ADMIN);
 
         if (!authenticatedUserIsApprovedAdmin) {
-            throw new ForbiddenException("Somente administradores do espaço podem alterar administradores ou gerentes");
+            throw new ForbiddenException("Somente administradores do espaco podem alterar administradores ou gerentes");
         }
     }
 
@@ -172,7 +177,7 @@ public class SpaceMembershipService {
                 spaceMembership.getSpace().getId(), APPROVED, ROLE_SPACE_ADMIN);
 
         if (approvedAdmins.size() <= 1) {
-            throw new ForbiddenException("O espaço precisa manter pelo menos um administrador aprovado");
+            throw new ForbiddenException("O espaco precisa manter pelo menos um administrador aprovado");
         }
     }
 
@@ -192,7 +197,7 @@ public class SpaceMembershipService {
         boolean isDuplicated = spaceMembershipRepository.existsBySpaceIdAndUserIdAndIdNot(
             spaceMembership.getSpace().getId(), spaceMembership.getUser().getId(), spaceMembership.getId());
         if (isDuplicated) {
-            throw new DuplicationException("Já existe uma participação deste usuário neste espaço");
+            throw new DuplicationException("Ja existe uma participacao deste usuario neste espaco");
         }
     }
 
@@ -209,7 +214,7 @@ public class SpaceMembershipService {
                 spaceId, authUser.getId(), SpaceMembershipStatusEnum.APPROVED);
 
         if (!currentUserParticipatesInThisSpace) {
-            throw new ForbiddenException("Usuário não possui permissão para visualizar as participações desse espaço");
+            throw new ForbiddenException("Usuario nao possui permissao para visualizar as participacoes desse espaco");
         }
 
         Specification<@NonNull SpaceMembership> finalSpec =
@@ -224,12 +229,25 @@ public class SpaceMembershipService {
 
         boolean currentUserParticipatesInThisSpace = spaceMembershipRepository
             .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
-                spaceId, authUserId,  SpaceMembershipStatusEnum.APPROVED);
+                spaceId, authUserId, SpaceMembershipStatusEnum.APPROVED);
 
         if (!currentUserParticipatesInThisSpace) {
-            throw new ForbiddenException("Usuário não possui permissão para visualizar os participantes desse espaço");
+            throw new ForbiddenException("Usuario nao possui permissao para visualizar os participantes desse espaco");
         }
 
         return participantRepository.findParticipantsWithScores(spaceId, pageable, name, spaceUserRole, taskCategories);
+    }
+
+    public List<ParticipantSummaryDTO> readParticipantsByName(Long spaceId, Long authUserId, String name) {
+        boolean currentUserParticipatesInThisSpace = spaceMembershipRepository
+            .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
+                spaceId, authUserId, SpaceMembershipStatusEnum.APPROVED);
+
+        if (!currentUserParticipatesInThisSpace) {
+            throw new ForbiddenException("Usuario nao possui permissao para visualizar os participantes desse espaco");
+        }
+
+        return spaceMembershipRepository.findApprovedParticipantSummariesBySpaceIdAndName(
+            spaceId, Objects.requireNonNullElse(name, ""));
     }
 }
