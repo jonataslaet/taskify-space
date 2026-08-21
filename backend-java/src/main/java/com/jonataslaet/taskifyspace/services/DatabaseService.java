@@ -244,23 +244,19 @@ public class DatabaseService {
         ).forEach(spaceName -> createActiveSpace(spaceName, adminJonatasLaet));
     }
 
-    public TaskRecordDTO getTaskRecordTrocarBotijaoDTO(SpaceRecordDTO spaceRecordDTO) {
-        Space space = spaceService.getSpaceEntity(spaceRecordDTO.id());
+    public TaskRecordDTO getTaskRecordTrocarBotijaoDTO() {
         Task task = new Task();
         task.setCategory(TaskCategoryEnum.OPERATIONAL);
         task.setScore(new BigDecimal("90.0"));
         task.setDescription("Trocar o botijão de gás");
-        task.setSpace(space);
         return TaskMapper.toDTO(task);
     }
 
-    public TaskRecordDTO getTaskRecordPagarContaAguaDTO(SpaceRecordDTO spaceRecordDTO) {
-        Space space = spaceService.getSpaceEntity(spaceRecordDTO.id());
+    public TaskRecordDTO getTaskRecordPagarContaAguaDTO() {
         Task task = new Task();
         task.setCategory(TaskCategoryEnum.FINANCIAL);
         task.setScore(new BigDecimal("80.0"));
         task.setDescription("Pagar conta de água");
-        task.setSpace(space);
         return TaskMapper.toDTO(task);
     }
 
@@ -298,8 +294,8 @@ public class DatabaseService {
         SpaceRecordDTO spaceBella = spaceService.createSpace(getSpaceBellaResidenceDTO(), userBellaLaet);
         spaceService.toggleActiveSpace(userBellaLaet, spaceBella.id());
 
-        TaskRecordDTO taskRecordDTO1 = taskService.createTask(userJoiceLaet, getTaskRecordTrocarBotijaoDTO(spaceResidenciaCasalLaet));
-        TaskRecordDTO taskRecordDTO2 = taskService.createTask(userJoiceLaet, getTaskRecordPagarContaAguaDTO(spaceResidenciaCasalLaet));
+        TaskRecordDTO taskRecordDTO1 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordTrocarBotijaoDTO());
+        TaskRecordDTO taskRecordDTO2 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordPagarContaAguaDTO());
 
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO1.id());
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO2.id());

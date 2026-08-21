@@ -229,7 +229,7 @@ class TaskServiceTests {
         when(spaceService.getSpaceEntity(space.getId())).thenReturn(space);
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskRecordDTO createdTask = taskService.createTask(authenticatedUser, taskRecordDTO);
+        TaskRecordDTO createdTask = taskService.createTask(space.getId(), authenticatedUser, taskRecordDTO);
 
         ArgumentCaptor<Task> taskCaptor = ArgumentCaptor.forClass(Task.class);
         verify(taskRepository).save(taskCaptor.capture());

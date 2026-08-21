@@ -6,6 +6,7 @@ import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
+import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
@@ -56,8 +57,8 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskRecordDTO createTask(User authenticatedUser, TaskRecordDTO taskRecordDTO) {
-        Space space = spaceService.getSpaceEntity(taskRecordDTO.spaceId());
+    public TaskRecordDTO createTask(Long spaceId, User authenticatedUser, TaskRecordDTO taskRecordDTO) {
+        Space space = spaceService.getSpaceEntity(spaceId);
         featureAccessService.requireFeatureWithUsageLock(authenticatedUser, FeatureEnum.CREATE_TASK, space);
         spaceService.validActiveSpace(space);
         spaceService.validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
@@ -181,17 +182,19 @@ public class TaskService {
     }
 
     public Page<@NonNull TaskRecordDTO> findAll(
-        Specification<@NonNull Task> TaskSpecification, Pageable pageable, User authenticatedUser) {
+        Long spaceId, Specification<@NonNull Task> taskSpecification, Pageable pageable, User authenticatedUser) {
+
         Specification<@NonNull Task> authenticatedUserTasks = (root, query, criteriaBuilder) -> {
             query.distinct(true);
             var spaceMembershipJoin = root.join("space").join("spaceMemberships");
             return criteriaBuilder.and(
+                criteriaBuilder.equal(root.get("space").get("id"), spaceId),
                 criteriaBuilder.equal(spaceMembershipJoin.get("user").get("id"), authenticatedUser.getId()),
                 criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED)
             );
         };
         Specification<@NonNull Task> finalSpecification = authenticatedUserTasks;
-        if (Objects.nonNull(TaskSpecification)) finalSpecification = authenticatedUserTasks.and(TaskSpecification);
+        if (Objects.nonNull(taskSpecification)) finalSpecification = authenticatedUserTasks.and(taskSpecification);
 
         return taskRepository.findAll(finalSpecification, pageable).map(TaskMapper::toDTO);
     }

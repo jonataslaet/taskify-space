@@ -90,7 +90,7 @@ public class TaskServiceJpaTests {
         taskRepository.save(createTask(pendingSpace, "Pending task"));
         taskRepository.save(createTask(otherUserSpace, "Other user task"));
 
-        Page<TaskRecordDTO> tasks = taskService.findAll(null, Pageable.unpaged(), authenticatedUser);
+        Page<TaskRecordDTO> tasks = taskService.findAll(approvedSpace.getId(), null, Pageable.unpaged(), authenticatedUser);
 
         List<Long> taskIds = tasks.getContent().stream().map(TaskRecordDTO::id).toList();
         assertThat(taskIds).containsExactly(visibleTask.getId());

@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/tasks")
+@RequestMapping("/spaces/{spaceId}/tasks")
 public class TaskController {
 
     private final TaskService taskService;
@@ -37,7 +37,7 @@ public class TaskController {
         this.taskService = taskService;
     }
 
-    @GetMapping("/spaces/{spaceId}/schedules")
+    @GetMapping("/schedules")
     public ResponseEntity<@NonNull Page<@NonNull TaskRecordDTO>> readAllScheduledTasks(@PathVariable Long spaceId,
         SpecificationTemplate.TaskSpecification taskSpecification, Pageable pageable,
         @AuthenticationPrincipal User authenticatedUser) {
@@ -47,23 +47,26 @@ public class TaskController {
 
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull TaskRecordDTO>> readAllTasks(
+        @PathVariable("spaceId") Long spaceId,
         SpecificationTemplate.TaskSpecification taskSpecification,
         Pageable pageable,
         @AuthenticationPrincipal User authenticatedUser) {
         Page<@NonNull TaskRecordDTO> taskModelPage = taskService.findAll(
-            taskSpecification, pageable, authenticatedUser);
+            spaceId, taskSpecification, pageable, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(taskModelPage);
     }
 
     @JsonView(TaskRecordDTO.TaskView.ReadTask.class)
     @PostMapping
     public ResponseEntity<@NonNull TaskRecordDTO> createTask(@AuthenticationPrincipal User authenticatedUser,
+        @PathVariable("spaceId") Long spaceId,
         @RequestBody @Validated(TaskRecordDTO.TaskView.CreateTask.class)
         @JsonView(TaskRecordDTO.TaskView.CreateTask.class) TaskRecordDTO taskRecordDTO){
-        return ResponseEntity.status(HttpStatus.CREATED).body(taskService.createTask(authenticatedUser, taskRecordDTO));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            taskService.createTask(spaceId, authenticatedUser, taskRecordDTO));
     }
 
-    @PostMapping("/{taskId}/spaces/{spaceId}")
+    @PostMapping("/{taskId}")
     public ResponseEntity<@NonNull Void> finishTask(@PathVariable Long taskId,
         @PathVariable Long spaceId, @AuthenticationPrincipal User authenticatedUser,
         @RequestParam(value = "usersIds", required = false) Set<Long> usersIds,

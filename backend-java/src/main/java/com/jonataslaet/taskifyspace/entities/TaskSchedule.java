@@ -62,7 +62,7 @@ public class TaskSchedule {
     private Set<LocalDate> localDates = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "frequence", nullable = false)
+    @Column(name = "frequence_enum", nullable = false)
     private FrequenceEnum frequenceEnum;
 
     public TaskSchedule() {
