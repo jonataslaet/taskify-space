@@ -41,6 +41,7 @@ class CreateTaskDialog extends StatelessWidget {
       onSubmit: (task) async {
         final createdTask = await tasksRepository.createTask(
           accessToken: accessToken,
+          spaceId: spaceId,
           creation: TaskCreation(
             spaceId: spaceId,
             description: task.description,

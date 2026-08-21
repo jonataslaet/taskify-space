@@ -15,11 +15,11 @@ import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 void main() {
   group('HttpTasksRepository', () {
     test(
-      'faz GET /tasks paginado com Bearer e interpreta a resposta',
+      'faz GET /spaces/{spaceId}/tasks paginado com Bearer e interpreta a resposta',
       () async {
         final client = MockClient((request) async {
           expect(request.method, 'GET');
-          expect(request.url.path, '/api/tasks');
+          expect(request.url.path, '/api/spaces/7/tasks');
           expect(request.url.queryParameters, <String, String>{
             'page': '0',
             'size': '10',
@@ -36,7 +36,7 @@ void main() {
 
         final result = await _repository(
           client,
-        ).fetchTasks(accessToken: ' access-token-test-only ');
+        ).fetchTasks(accessToken: ' access-token-test-only ', spaceId: 7);
 
         expect(result.content, hasLength(1));
         expect(result.content.single.description, 'Trocar o botijão');
@@ -50,7 +50,6 @@ void main() {
           'page': '2',
           'size': '25',
           'sort': 'id,asc',
-          'spaceId': '7',
           'description': 'Conta de água',
           'score': '12.5',
           'active': 'false',
@@ -63,8 +62,8 @@ void main() {
 
       await _repository(client).fetchTasks(
         accessToken: 'access-token-test-only',
+        spaceId: 7,
         filters: const TaskFilters(
-          spaceId: 7,
           description: '  Conta de água  ',
           score: 12.5,
           active: false,
@@ -92,11 +91,12 @@ void main() {
 
       await _repository(client).fetchTasks(
         accessToken: 'access-token-test-only',
+        spaceId: 7,
         filters: const TaskFilters(description: '   '),
       );
     });
 
-    test('faz POST /task com Bearer e payload completo com agenda', () async {
+    test('faz POST /spaces/{spaceId}/tasks com payload completo', () async {
       late http.Request receivedRequest;
       final client = MockClient((request) async {
         receivedRequest = request;
@@ -119,6 +119,7 @@ void main() {
 
       final result = await _repository(client).createTask(
         accessToken: ' access-token-test-only ',
+        spaceId: 1,
         creation: TaskCreation(
           spaceId: 1,
           description: 'Pagar conta de água',
@@ -138,7 +139,10 @@ void main() {
       );
 
       expect(receivedRequest.method, 'POST');
-      expect(receivedRequest.url.toString(), 'http://localhost:8080/api/tasks');
+      expect(
+        receivedRequest.url.toString(),
+        'http://localhost:8080/api/spaces/1/tasks',
+      );
       expect(receivedRequest.url.query, isEmpty);
       expect(receivedRequest.headers['Accept'], 'application/json');
       expect(
@@ -187,6 +191,7 @@ void main() {
 
       final result = await _repository(client).createTask(
         accessToken: 'access-token-test-only',
+        spaceId: 7,
         creation: _validCreation(
           schedule: TaskScheduleSummary(
             localDates: const <DateTime>[],
@@ -196,7 +201,7 @@ void main() {
       );
 
       expect(receivedRequest.method, 'POST');
-      expect(receivedRequest.url.path, '/api/tasks');
+      expect(receivedRequest.url.path, '/api/spaces/7/tasks');
       expect(
         jsonDecode(utf8.decode(receivedRequest.bodyBytes)),
         <String, dynamic>{
@@ -227,6 +232,7 @@ void main() {
 
       final result = await _repository(client).createTask(
         accessToken: 'access-token-test-only',
+        spaceId: 7,
         creation: const TaskCreation(
           spaceId: 7,
           description: 'Trocar o botijão',
@@ -239,7 +245,7 @@ void main() {
       );
 
       expect(receivedRequest.method, 'POST');
-      expect(receivedRequest.url.path, '/api/tasks');
+      expect(receivedRequest.url.path, '/api/spaces/7/tasks');
       expect(
         jsonDecode(utf8.decode(receivedRequest.bodyBytes)),
         <String, dynamic>{
@@ -263,6 +269,7 @@ void main() {
       await expectLater(
         repository.createTask(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           creation: const TaskCreation(
             spaceId: 7,
             description: 'Trocar o botijão',
@@ -281,7 +288,7 @@ void main() {
       );
     });
 
-    test('rejeita criação inválida antes de acessar a rede', () async {
+    test('rejeita criação ou espaço inválido antes da rede', () async {
       var calls = 0;
       final repository = _repository(
         MockClient((_) async {
@@ -290,25 +297,49 @@ void main() {
         }),
       );
       final requests = <Future<Object?>>[
-        repository.createTask(accessToken: '   ', creation: _validCreation()),
+        repository.createTask(
+          accessToken: '   ',
+          spaceId: 7,
+          creation: _validCreation(),
+        ),
         repository.createTask(
           accessToken: 'token',
+          spaceId: 0,
+          creation: _validCreation(),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          spaceId: -1,
+          creation: _validCreation(),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          spaceId: 7,
           creation: _validCreation(spaceId: 0),
         ),
         repository.createTask(
           accessToken: 'token',
+          spaceId: 8,
+          creation: _validCreation(spaceId: 7),
+        ),
+        repository.createTask(
+          accessToken: 'token',
+          spaceId: 7,
           creation: _validCreation(description: '   '),
         ),
         repository.createTask(
           accessToken: 'token',
+          spaceId: 7,
           creation: _validCreation(score: 0),
         ),
         repository.createTask(
           accessToken: 'token',
+          spaceId: 7,
           creation: _validCreation(creatorName: '   '),
         ),
         repository.createTask(
           accessToken: 'token',
+          spaceId: 7,
           creation: _validCreation(
             schedule: TaskScheduleSummary(
               localDates: const [],
@@ -346,6 +377,7 @@ void main() {
       await expectLater(
         repository.createTask(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           creation: _validCreation(),
         ),
         throwsA(
@@ -366,6 +398,7 @@ void main() {
       await expectLater(
         repository.createTask(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           creation: _validCreation(),
         ),
         throwsA(
@@ -383,7 +416,10 @@ void main() {
     test('faz PATCH da tarefa com Bearer e sem body', () async {
       final client = MockClient((request) async {
         expect(request.method, 'PATCH');
-        expect(request.url.toString(), 'http://localhost:8080/api/tasks/42');
+        expect(
+          request.url.toString(),
+          'http://localhost:8080/api/spaces/7/tasks/42',
+        );
         expect(request.url.query, isEmpty);
         expect(request.headers['Accept'], 'application/json');
         expect(
@@ -395,12 +431,14 @@ void main() {
         return http.Response('', 204);
       });
 
-      await _repository(
-        client,
-      ).toggleTaskActive(accessToken: ' access-token-test-only ', taskId: 42);
+      await _repository(client).toggleTaskActive(
+        accessToken: ' access-token-test-only ',
+        spaceId: 7,
+        taskId: 42,
+      );
     });
 
-    test('rejeita PATCH com token ou taskId inválido antes da rede', () async {
+    test('rejeita PATCH inválido antes da rede', () async {
       var calls = 0;
       final repository = _repository(
         MockClient((_) async {
@@ -410,9 +448,27 @@ void main() {
       );
 
       for (final request in <Future<void>>[
-        repository.toggleTaskActive(accessToken: '   ', taskId: 1),
-        repository.toggleTaskActive(accessToken: 'token', taskId: 0),
-        repository.toggleTaskActive(accessToken: 'token', taskId: -1),
+        repository.toggleTaskActive(accessToken: '   ', spaceId: 7, taskId: 1),
+        repository.toggleTaskActive(
+          accessToken: 'token',
+          spaceId: 0,
+          taskId: 1,
+        ),
+        repository.toggleTaskActive(
+          accessToken: 'token',
+          spaceId: -1,
+          taskId: 1,
+        ),
+        repository.toggleTaskActive(
+          accessToken: 'token',
+          spaceId: 7,
+          taskId: 0,
+        ),
+        repository.toggleTaskActive(
+          accessToken: 'token',
+          spaceId: 7,
+          taskId: -1,
+        ),
       ]) {
         await expectLater(
           request,
@@ -436,6 +492,7 @@ void main() {
       await expectLater(
         repository.toggleTaskActive(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           taskId: 1,
         ),
         throwsA(
@@ -462,6 +519,7 @@ void main() {
           await expectLater(
             repository.toggleTaskActive(
               accessToken: 'access-token-test-only',
+              spaceId: 7,
               taskId: 1,
             ),
             throwsA(
@@ -488,6 +546,7 @@ void main() {
       await expectLater(
         repository.toggleTaskActive(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           taskId: 1,
         ),
         throwsA(
@@ -514,6 +573,7 @@ void main() {
       await expectLater(
         repository.toggleTaskActive(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           taskId: 1,
         ),
         throwsA(
@@ -530,7 +590,7 @@ void main() {
     test('faz PUT com Bearer e preserva a agenda usando frequence', () async {
       final client = MockClient((request) async {
         expect(request.method, 'PUT');
-        expect(request.url.path, '/api/tasks/42');
+        expect(request.url.path, '/api/spaces/7/tasks/42');
         expect(request.url.query, isEmpty);
         expect(request.headers['Accept'], 'application/json');
         expect(
@@ -566,6 +626,7 @@ void main() {
 
       final result = await _repository(client).updateTask(
         accessToken: ' access-token-test-only ',
+        spaceId: 7,
         taskId: 42,
         update: TaskUpdate(
           description: '  Pagar conta de água  ',
@@ -593,7 +654,7 @@ void main() {
     test('aceita PUT com agenda diária sem datas', () async {
       final client = MockClient((request) async {
         expect(request.method, 'PUT');
-        expect(request.url.path, '/api/tasks/1');
+        expect(request.url.path, '/api/spaces/7/tasks/1');
         expect(jsonDecode(request.body), <String, dynamic>{
           'description': 'Trocar o botijão',
           'score': 90.5,
@@ -615,6 +676,7 @@ void main() {
 
       final result = await _repository(client).updateTask(
         accessToken: 'access-token-test-only',
+        spaceId: 7,
         taskId: 1,
         update: TaskUpdate(
           description: 'Trocar o botijão',
@@ -648,6 +710,7 @@ void main() {
 
       final result = await _repository(client).updateTask(
         accessToken: 'access-token-test-only',
+        spaceId: 7,
         taskId: 1,
         update: const TaskUpdate(
           description: 'Trocar o botijão',
@@ -660,7 +723,7 @@ void main() {
       expect(result.schedule, isNull);
     });
 
-    test('rejeita update inválido antes de acessar a rede', () async {
+    test('rejeita update inválido antes da rede', () async {
       var calls = 0;
       final repository = _repository(
         MockClient((_) async {
@@ -678,14 +741,33 @@ void main() {
         ),
       );
       final requests = <Future<Object?>>[
-        repository.updateTask(accessToken: ' ', taskId: 1, update: validUpdate),
+        repository.updateTask(
+          accessToken: ' ',
+          spaceId: 7,
+          taskId: 1,
+          update: validUpdate,
+        ),
         repository.updateTask(
           accessToken: 'token',
+          spaceId: 0,
+          taskId: 1,
+          update: validUpdate,
+        ),
+        repository.updateTask(
+          accessToken: 'token',
+          spaceId: -1,
+          taskId: 1,
+          update: validUpdate,
+        ),
+        repository.updateTask(
+          accessToken: 'token',
+          spaceId: 7,
           taskId: 0,
           update: validUpdate,
         ),
         repository.updateTask(
           accessToken: 'token',
+          spaceId: 7,
           taskId: 1,
           update: const TaskUpdate(
             description: ' ',
@@ -696,6 +778,7 @@ void main() {
         ),
         repository.updateTask(
           accessToken: 'token',
+          spaceId: 7,
           taskId: 1,
           update: const TaskUpdate(
             description: 'Tarefa',
@@ -706,6 +789,7 @@ void main() {
         ),
         repository.updateTask(
           accessToken: 'token',
+          spaceId: 7,
           taskId: 1,
           update: TaskUpdate(
             description: 'Tarefa',
@@ -742,6 +826,7 @@ void main() {
       await expectLater(
         repository.updateTask(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           taskId: 1,
           update: const TaskUpdate(
             description: 'Tarefa duplicada',
@@ -770,6 +855,7 @@ void main() {
       await expectLater(
         repository.updateTask(
           accessToken: 'access-token-test-only',
+          spaceId: 7,
           taskId: 42,
           update: const TaskUpdate(
             description: 'Tarefa',
@@ -799,19 +885,19 @@ void main() {
           }),
         );
         final requests = <Future<Object?>>[
-          repository.fetchTasks(accessToken: '   '),
-          repository.fetchTasks(accessToken: 'token', page: -1),
-          repository.fetchTasks(accessToken: 'token', size: 0),
+          repository.fetchTasks(accessToken: '   ', spaceId: 7),
+          repository.fetchTasks(accessToken: 'token', spaceId: 0),
+          repository.fetchTasks(accessToken: 'token', spaceId: -1),
+          repository.fetchTasks(accessToken: 'token', spaceId: 7, page: -1),
+          repository.fetchTasks(accessToken: 'token', spaceId: 7, size: 0),
           repository.fetchTasks(
             accessToken: 'token',
-            filters: const TaskFilters(spaceId: 0),
-          ),
-          repository.fetchTasks(
-            accessToken: 'token',
+            spaceId: 7,
             filters: const TaskFilters(score: double.nan),
           ),
           repository.fetchTasks(
             accessToken: 'token',
+            spaceId: 7,
             filters: const TaskFilters(maxScore: double.infinity),
           ),
         ];
@@ -844,7 +930,10 @@ void main() {
         );
 
         await expectLater(
-          repository.fetchTasks(accessToken: 'access-token-test-only'),
+          repository.fetchTasks(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+          ),
           throwsA(
             isA<ApiFailure>()
                 .having((failure) => failure.kind, 'kind', errorCase.$2)
@@ -867,7 +956,10 @@ void main() {
       );
 
       await expectLater(
-        repository.fetchTasks(accessToken: 'access-token-test-only'),
+        repository.fetchTasks(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+        ),
         throwsA(
           isA<ApiFailure>()
               .having(
@@ -890,7 +982,10 @@ void main() {
       );
 
       await expectLater(
-        repository.fetchTasks(accessToken: 'access-token-test-only'),
+        repository.fetchTasks(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+        ),
         throwsA(
           isA<ApiFailure>().having(
             (failure) => failure.kind,
@@ -909,7 +1004,10 @@ void main() {
       );
 
       await expectLater(
-        repository.fetchTasks(accessToken: 'access-token-test-only'),
+        repository.fetchTasks(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+        ),
         throwsA(
           isA<ApiFailure>().having(
             (failure) => failure.kind,
@@ -932,7 +1030,10 @@ void main() {
       );
 
       await expectLater(
-        repository.fetchTasks(accessToken: 'access-token-test-only'),
+        repository.fetchTasks(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+        ),
         throwsA(
           isA<ApiFailure>().having(
             (failure) => failure.kind,

@@ -224,6 +224,7 @@ final class _FakeTasksRepository implements TasksRepository {
   @override
   Future<TaskSummary> createTask({
     required String accessToken,
+    required int spaceId,
     required TaskCreation creation,
   }) {
     return Future<TaskSummary>.error(
@@ -234,6 +235,7 @@ final class _FakeTasksRepository implements TasksRepository {
   @override
   Future<TaskPageResult> fetchTasks({
     required String accessToken,
+    required int spaceId,
     TaskFilters filters = const TaskFilters(),
     int page = 0,
     int size = 10,
@@ -250,6 +252,7 @@ final class _FakeTasksRepository implements TasksRepository {
   @override
   Future<TaskSummary> updateTask({
     required String accessToken,
+    required int spaceId,
     required int taskId,
     required TaskUpdate update,
   }) {
@@ -261,6 +264,7 @@ final class _FakeTasksRepository implements TasksRepository {
   @override
   Future<void> toggleTaskActive({
     required String accessToken,
+    required int spaceId,
     required int taskId,
   }) {
     return Future<void>.error(

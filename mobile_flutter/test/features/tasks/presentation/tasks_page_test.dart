@@ -21,7 +21,7 @@ void main() {
     tester,
   ) async {
     final response = Completer<TaskPageResult>();
-    final repository = _FakeTasksRepository((_, _, _, _) => response.future);
+    final repository = _FakeTasksRepository((_, _, _, _, _) => response.future);
 
     await tester.pumpWidget(_testApp(repository));
     await tester.pump();
@@ -29,7 +29,7 @@ void main() {
     expect(find.byKey(const ValueKey('tasks-loading')), findsOneWidget);
     expect(repository.fetchCalls, 1);
     expect(repository.accessTokens, [_session.accessToken]);
-    expect(repository.filters.single.spaceId, 7);
+    expect(repository.spaceIds, [7]);
     expect(repository.pages, [0]);
     expect(repository.sizes, [10]);
 
@@ -68,7 +68,7 @@ void main() {
     'aplica todos os filtros com vírgula, reseta a página e permite limpar',
     (tester) async {
       final repository = _FakeTasksRepository(
-        (_, _, page, size) async => _page(number: page, size: size),
+        (_, _, _, page, size) async => _page(number: page, size: size),
       );
 
       await tester.pumpWidget(_testApp(repository));
@@ -118,7 +118,7 @@ void main() {
       expect(repository.pages, [0, 0]);
       expect(repository.sizes, [10, 10]);
       final filters = repository.filters.last;
-      expect(filters.spaceId, 7);
+      expect(repository.spaceIds, [7, 7]);
       expect(filters.description, '  conta de água  ');
       expect(filters.score, 10.5);
       expect(filters.active, isTrue);
@@ -139,7 +139,7 @@ void main() {
       expect(repository.fetchCalls, 3);
       expect(repository.pages, [0, 0, 0]);
       final cleared = repository.filters.last;
-      expect(cleared.spaceId, 7);
+      expect(repository.spaceIds, [7, 7, 7]);
       expect(cleared.description, isNull);
       expect(cleared.score, isNull);
       expect(cleared.active, isNull);
@@ -164,7 +164,7 @@ void main() {
     tester,
   ) async {
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(number: page, size: size),
+      (_, _, _, page, size) async => _page(number: page, size: size),
     );
 
     await tester.pumpWidget(_testApp(repository));
@@ -209,8 +209,8 @@ void main() {
     tester,
   ) async {
     final repository = _FakeTasksRepository(
-      (_, filters, page, size) async => _page(
-        content: [_task(id: page + size, spaceId: filters.spaceId!)],
+      (_, spaceId, _, page, size) async => _page(
+        content: [_task(id: page + size, spaceId: spaceId)],
         number: page,
         size: size,
         totalElements: 60,
@@ -246,8 +246,8 @@ void main() {
     tester,
   ) async {
     final repository = _FakeTasksRepository(
-      (_, filters, page, size) async => _page(
-        content: [_task(id: 1000 + page + size, spaceId: filters.spaceId!)],
+      (_, spaceId, _, page, size) async => _page(
+        content: [_task(id: 1000 + page + size, spaceId: spaceId)],
         number: page,
         size: size,
         totalElements: 60,
@@ -284,14 +284,14 @@ void main() {
     expect(repository.pages, [0, 0, 0, 1, 1]);
     expect(repository.sizes, [10, 20, 20, 20, 20]);
     expect(repository.filters.last.description, 'mensal');
-    expect(repository.filters.last.spaceId, 7);
+    expect(repository.spaceIds.last, 7);
   });
 
   testWidgets('erro inicial mantém retry e estado vazio distingue filtros', (
     tester,
   ) async {
     var shouldFail = true;
-    final repository = _FakeTasksRepository((_, _, page, size) async {
+    final repository = _FakeTasksRepository((_, _, _, page, size) async {
       if (shouldFail) {
         shouldFail = false;
         throw const ApiFailure(ApiFailureKind.network);
@@ -328,8 +328,8 @@ void main() {
 
   testWidgets('ignora resposta antiga ao trocar o espaço', (tester) async {
     final oldResponse = Completer<TaskPageResult>();
-    final repository = _FakeTasksRepository((_, filters, page, size) {
-      if (filters.spaceId == 1) {
+    final repository = _FakeTasksRepository((_, spaceId, _, page, size) {
+      if (spaceId == 1) {
         return oldResponse.future;
       }
       return Future<TaskPageResult>.value(
@@ -389,7 +389,7 @@ void main() {
 
   testWidgets('rejeita número de página divergente', (tester) async {
     final repository = _FakeTasksRepository(
-      (_, _, _, _) async => _page(number: 1, totalPages: 2),
+      (_, _, _, _, _) async => _page(number: 1, totalPages: 2),
     );
 
     await tester.pumpWidget(_testApp(repository));
@@ -401,7 +401,7 @@ void main() {
 
   testWidgets('rejeita tarefa pertencente a outro espaço', (tester) async {
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 99, spaceId: 99)],
         number: page,
         size: size,
@@ -422,7 +422,7 @@ void main() {
     tester,
   ) async {
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 1)],
         number: page,
         size: size,
@@ -465,14 +465,15 @@ void main() {
       (tester) async {
         var active = toggleCase.initialActive;
         final repository = _FakeTasksRepository(
-          (_, _, page, size) async => _page(
+          (_, _, _, page, size) async => _page(
             content: [_task(id: 1, active: active)],
             number: page,
             size: size,
             totalElements: 1,
             totalPages: 1,
           ),
-          toggleTaskActiveHandler: (_, taskId) async {
+          toggleTaskActiveHandler: (_, spaceId, taskId) async {
+            expect(spaceId, 7);
             expect(taskId, 1);
             active = !active;
           },
@@ -495,6 +496,7 @@ void main() {
 
         expect(repository.toggleTaskActiveCalls, 1);
         expect(repository.toggleTaskActiveAccessTokens, [_session.accessToken]);
+        expect(repository.toggleTaskActiveSpaceIds, [7]);
         expect(repository.toggledTaskIds, [1]);
         expect(repository.fetchCalls, 2);
         expect(repository.pages, [0, 0]);
@@ -519,14 +521,14 @@ void main() {
   ) async {
     final response = Completer<void>();
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 1)],
         number: page,
         size: size,
         totalElements: 1,
         totalPages: 1,
       ),
-      toggleTaskActiveHandler: (_, _) => response.future,
+      toggleTaskActiveHandler: (_, _, _) => response.future,
     );
 
     await tester.pumpWidget(_testApp(repository, canEditTasks: true));
@@ -561,14 +563,14 @@ void main() {
   ) async {
     var active = true;
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 1, active: active)],
         number: page,
         size: size,
         totalElements: 60,
         totalPages: 3,
       ),
-      toggleTaskActiveHandler: (_, _) async => active = false,
+      toggleTaskActiveHandler: (_, _, _) async => active = false,
     );
 
     await tester.pumpWidget(_testApp(repository, canEditTasks: true));
@@ -598,7 +600,7 @@ void main() {
     expect(repository.toggleTaskActiveCalls, 1);
     expect(repository.pages, [0, 0, 0, 1, 1]);
     expect(repository.sizes, [10, 20, 20, 20, 20]);
-    expect(repository.filters.last.spaceId, 7);
+    expect(repository.spaceIds.last, 7);
     expect(repository.filters.last.description, 'mensal');
   });
 
@@ -607,14 +609,14 @@ void main() {
   ) async {
     var sessionExpiredCalls = 0;
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 1)],
         number: page,
         size: size,
         totalElements: 1,
         totalPages: 1,
       ),
-      toggleTaskActiveHandler: (_, _) async =>
+      toggleTaskActiveHandler: (_, _, _) async =>
           throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
     );
 
@@ -643,14 +645,14 @@ void main() {
   ) async {
     var sessionExpiredCalls = 0;
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 1)],
         number: page,
         size: size,
         totalElements: 1,
         totalPages: 1,
       ),
-      toggleTaskActiveHandler: (_, _) async =>
+      toggleTaskActiveHandler: (_, _, _) async =>
           throw const ApiFailure(ApiFailureKind.forbidden, statusCode: 403),
     );
 
@@ -680,14 +682,14 @@ void main() {
   ) async {
     var active = true;
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: [_task(id: 1, active: active)],
         number: page,
         size: size,
         totalElements: 1,
         totalPages: 1,
       ),
-      toggleTaskActiveHandler: (_, _) async {
+      toggleTaskActiveHandler: (_, _, _) async {
         active = false;
         throw const ApiFailure(ApiFailureKind.network);
       },
@@ -720,7 +722,7 @@ void main() {
       'renderiza a ação de criar quando a permissão é ${createCase.label}',
       (tester) async {
         final repository = _FakeTasksRepository(
-          (_, _, page, size) async => _page(number: page, size: size),
+          (_, _, _, page, size) async => _page(number: page, size: size),
         );
 
         await tester.pumpWidget(
@@ -739,12 +741,13 @@ void main() {
   testWidgets('cria uma tarefa e recarrega a lista do espaço', (tester) async {
     TaskSummary? createdTask;
     final repository = _FakeTasksRepository(
-      (_, _, page, size) async => _page(
+      (_, _, _, page, size) async => _page(
         content: createdTask == null ? const [] : [createdTask!],
         number: page,
         size: size,
       ),
-      createHandler: (_, creation) async {
+      createHandler: (_, spaceId, creation) async {
+        expect(spaceId, 7);
         createdTask = _task(
           id: 15,
           description: creation.description,
@@ -794,6 +797,7 @@ void main() {
 
     expect(repository.createCalls, 1);
     expect(repository.createAccessTokens, [_session.accessToken]);
+    expect(repository.createSpaceIds, [7]);
     final creation = repository.creations.single;
     expect(creation.spaceId, 7);
     expect(creation.description, 'Pagar conta de água');
@@ -820,7 +824,7 @@ void main() {
       'renderiza a ação de editar quando a permissão é ${editCase.label}',
       (tester) async {
         final repository = _FakeTasksRepository(
-          (_, _, page, size) async => _page(
+          (_, _, _, page, size) async => _page(
             content: [_task(id: 1)],
             number: page,
             size: size,
@@ -860,7 +864,7 @@ void main() {
         schedule: schedule,
       );
       var fetchSequence = 0;
-      final repository = _FakeTasksRepository((_, _, page, size) async {
+      final repository = _FakeTasksRepository((_, _, _, page, size) async {
         fetchSequence += 1;
         return _page(
           content: [fetchSequence >= 4 ? updatedTask : originalTask],
@@ -869,7 +873,7 @@ void main() {
           totalElements: 20,
           totalPages: 2,
         );
-      }, updateHandler: (_, _, _) async => updatedTask);
+      }, updateHandler: (_, _, _, _) async => updatedTask);
 
       await tester.pumpWidget(_testApp(repository, canEditTasks: true));
       await tester.pumpAndSettle();
@@ -907,6 +911,7 @@ void main() {
       );
       expect(repository.updateCalls, 1);
       expect(repository.updateAccessTokens, [_session.accessToken]);
+      expect(repository.updateSpaceIds, [7]);
       expect(repository.taskIds, [originalTask.id]);
       final update = repository.updates.single;
       expect(update.description, 'Tarefa revisada');
@@ -918,7 +923,7 @@ void main() {
       expect(repository.fetchCalls, 4);
       expect(repository.pages, [0, 0, 1, 1]);
       expect(repository.sizes, [10, 10, 10, 10]);
-      expect(repository.filters.last.spaceId, 7);
+      expect(repository.spaceIds.last, 7);
       expect(repository.filters.last.categories, {TaskCategory.operational});
       await _scrollTo(tester, find.byKey(const ValueKey('task-card-1')));
       expect(find.text('Tarefa antiga'), findsNothing);
@@ -930,6 +935,7 @@ void main() {
 typedef _FetchHandler =
     Future<TaskPageResult> Function(
       String accessToken,
+      int spaceId,
       TaskFilters filters,
       int page,
       int size,
@@ -937,13 +943,18 @@ typedef _FetchHandler =
 typedef _UpdateHandler =
     Future<TaskSummary> Function(
       String accessToken,
+      int spaceId,
       int taskId,
       TaskUpdate update,
     );
 typedef _CreateHandler =
-    Future<TaskSummary> Function(String accessToken, TaskCreation creation);
+    Future<TaskSummary> Function(
+      String accessToken,
+      int spaceId,
+      TaskCreation creation,
+    );
 typedef _ToggleTaskActiveHandler =
-    Future<void> Function(String accessToken, int taskId);
+    Future<void> Function(String accessToken, int spaceId, int taskId);
 
 final class _FakeTasksRepository implements TasksRepository {
   _FakeTasksRepository(
@@ -962,39 +973,47 @@ final class _FakeTasksRepository implements TasksRepository {
   int updateCalls = 0;
   int toggleTaskActiveCalls = 0;
   final accessTokens = <String>[];
+  final spaceIds = <int>[];
   final filters = <TaskFilters>[];
   final pages = <int>[];
   final sizes = <int>[];
   final createAccessTokens = <String>[];
+  final createSpaceIds = <int>[];
   final creations = <TaskCreation>[];
   final updateAccessTokens = <String>[];
+  final updateSpaceIds = <int>[];
   final taskIds = <int>[];
   final updates = <TaskUpdate>[];
   final toggleTaskActiveAccessTokens = <String>[];
+  final toggleTaskActiveSpaceIds = <int>[];
   final toggledTaskIds = <int>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
     required String accessToken,
+    required int spaceId,
     TaskFilters filters = const TaskFilters(),
     int page = 0,
     int size = 10,
   }) {
     fetchCalls += 1;
     accessTokens.add(accessToken);
+    spaceIds.add(spaceId);
     this.filters.add(filters);
     pages.add(page);
     sizes.add(size);
-    return _handler(accessToken, filters, page, size);
+    return _handler(accessToken, spaceId, filters, page, size);
   }
 
   @override
   Future<TaskSummary> createTask({
     required String accessToken,
+    required int spaceId,
     required TaskCreation creation,
   }) {
     createCalls += 1;
     createAccessTokens.add(accessToken);
+    createSpaceIds.add(spaceId);
     creations.add(creation);
     final handler = createHandler;
     if (handler == null) {
@@ -1002,17 +1021,19 @@ final class _FakeTasksRepository implements TasksRepository {
         StateError('Handler de criação de tarefa não configurado.'),
       );
     }
-    return handler(accessToken, creation);
+    return handler(accessToken, spaceId, creation);
   }
 
   @override
   Future<TaskSummary> updateTask({
     required String accessToken,
+    required int spaceId,
     required int taskId,
     required TaskUpdate update,
   }) {
     updateCalls += 1;
     updateAccessTokens.add(accessToken);
+    updateSpaceIds.add(spaceId);
     taskIds.add(taskId);
     updates.add(update);
     final handler = updateHandler;
@@ -1021,16 +1042,18 @@ final class _FakeTasksRepository implements TasksRepository {
         StateError('Handler de atualização de tarefa não configurado.'),
       );
     }
-    return handler(accessToken, taskId, update);
+    return handler(accessToken, spaceId, taskId, update);
   }
 
   @override
   Future<void> toggleTaskActive({
     required String accessToken,
+    required int spaceId,
     required int taskId,
   }) {
     toggleTaskActiveCalls += 1;
     toggleTaskActiveAccessTokens.add(accessToken);
+    toggleTaskActiveSpaceIds.add(spaceId);
     toggledTaskIds.add(taskId);
     final handler = toggleTaskActiveHandler;
     if (handler == null) {
@@ -1038,7 +1061,7 @@ final class _FakeTasksRepository implements TasksRepository {
         StateError('Handler de status de tarefa não configurado.'),
       );
     }
-    return handler(accessToken, taskId);
+    return handler(accessToken, spaceId, taskId);
   }
 }
 

@@ -49,7 +49,7 @@ void main() {
     'envia agenda normalizada e todos os campos obrigatórios da criação',
     (tester) async {
       final repository = FakeTasksRepository(
-        createHandler: (_, creation) async => _createdTask(creation),
+        createHandler: (_, _, creation) async => _createdTask(creation),
       );
 
       await _pumpDialog(tester, repository: repository);
@@ -84,6 +84,7 @@ void main() {
 
       expect(repository.createTaskCalls, 1);
       expect(repository.receivedCreateAccessTokens, [_accessToken]);
+      expect(repository.receivedCreateSpaceIds, [_spaceId]);
       final creation = repository.receivedTaskCreations.single;
       expect(creation.spaceId, _spaceId);
       expect(creation.description, 'Pagar conta de água');
@@ -115,7 +116,7 @@ void main() {
 
   testWidgets('permite criar agenda diária sem datas', (tester) async {
     final repository = FakeTasksRepository(
-      createHandler: (_, creation) async => _createdTask(creation),
+      createHandler: (_, _, creation) async => _createdTask(creation),
     );
 
     await _pumpDialog(tester, repository: repository);
@@ -141,7 +142,7 @@ void main() {
 
   testWidgets('agenda diária ainda valida datas informadas', (tester) async {
     final repository = FakeTasksRepository(
-      createHandler: (_, creation) async => _createdTask(creation),
+      createHandler: (_, _, creation) async => _createdTask(creation),
     );
 
     await _pumpDialog(tester, repository: repository);
@@ -171,7 +172,7 @@ void main() {
 
   testWidgets('dados inválidos não chamam o repositório', (tester) async {
     final repository = FakeTasksRepository(
-      createHandler: (_, creation) async => _createdTask(creation),
+      createHandler: (_, _, creation) async => _createdTask(creation),
     );
 
     await _pumpDialog(tester, repository: repository);
@@ -204,7 +205,7 @@ void main() {
       '${failureCase.label} bloqueia reenvio e troca Cancelar por Fechar',
       (tester) async {
         final repository = FakeTasksRepository(
-          createHandler: (_, _) async => throw failureCase.failure,
+          createHandler: (_, _, _) async => throw failureCase.failure,
         );
 
         await _pumpDialog(tester, repository: repository);
@@ -234,7 +235,7 @@ void main() {
   ) async {
     var sessionExpiredCalls = 0;
     final repository = FakeTasksRepository(
-      createHandler: (_, _) async =>
+      createHandler: (_, _, _) async =>
           throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
     );
 

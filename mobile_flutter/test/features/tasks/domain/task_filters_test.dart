@@ -7,7 +7,6 @@ void main() {
   group('TaskFilters', () {
     test('mantém todos os filtros aceitos pela specification', () {
       const filters = TaskFilters(
-        spaceId: 7,
         description: 'Conta',
         score: 20.5,
         active: true,
@@ -16,7 +15,6 @@ void main() {
         maxScore: 30,
       );
 
-      expect(filters.spaceId, 7);
       expect(filters.description, 'Conta');
       expect(filters.score, 20.5);
       expect(filters.active, isTrue);

@@ -42,6 +42,7 @@ class EditTaskDialog extends StatelessWidget {
       onSubmit: (update) async {
         final updatedTask = await tasksRepository.updateTask(
           accessToken: accessToken,
+          spaceId: task.spaceId,
           taskId: task.id,
           update: update,
         );

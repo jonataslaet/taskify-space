@@ -65,7 +65,7 @@ class _TasksPageState extends State<TasksPage> {
   @override
   void initState() {
     super.initState();
-    _appliedFilters = TaskFilters(spaceId: widget.spaceId);
+    _appliedFilters = const TaskFilters();
     unawaited(_loadTasks());
   }
 
@@ -88,7 +88,7 @@ class _TasksPageState extends State<TasksPage> {
     _failure = null;
     _selectedActive = null;
     _selectedCategories.clear();
-    _appliedFilters = TaskFilters(spaceId: widget.spaceId);
+    _appliedFilters = const TaskFilters();
     _isLoading = false;
     _togglingTaskId = null;
     _areFiltersExpanded = false;
@@ -96,9 +96,7 @@ class _TasksPageState extends State<TasksPage> {
     _requestedPage = 0;
     _pageSize = 10;
     _clearFilterControllers();
-    unawaited(
-      _loadTasks(filters: TaskFilters(spaceId: widget.spaceId), page: 0),
-    );
+    unawaited(_loadTasks(filters: const TaskFilters(), page: 0));
   }
 
   @override
@@ -116,7 +114,7 @@ class _TasksPageState extends State<TasksPage> {
       return;
     }
 
-    final requestedFilters = _scopedFilters(filters ?? _appliedFilters);
+    final requestedFilters = filters ?? _appliedFilters;
     final requestedPage = page ?? _result?.number ?? 0;
     final requestedSize = size ?? _pageSize;
     final requestGeneration = ++_requestGeneration;
@@ -135,6 +133,7 @@ class _TasksPageState extends State<TasksPage> {
     try {
       final result = await widget.tasksRepository.fetchTasks(
         accessToken: widget.session.accessToken,
+        spaceId: widget.spaceId,
         filters: requestedFilters,
         page: requestedPage,
         size: requestedSize,
@@ -188,18 +187,6 @@ class _TasksPageState extends State<TasksPage> {
     }
   }
 
-  TaskFilters _scopedFilters(TaskFilters filters) {
-    return TaskFilters(
-      spaceId: widget.spaceId,
-      description: filters.description,
-      score: filters.score,
-      active: filters.active,
-      categories: Set<TaskCategory>.unmodifiable(filters.categories),
-      minScore: filters.minScore,
-      maxScore: filters.maxScore,
-    );
-  }
-
   void _applyFilters() {
     if (_isBusy) {
       return;
@@ -229,7 +216,6 @@ class _TasksPageState extends State<TasksPage> {
     unawaited(
       _loadTasks(
         filters: TaskFilters(
-          spaceId: widget.spaceId,
           description: _descriptionController.text,
           score: score.value,
           active: _selectedActive,
@@ -252,9 +238,7 @@ class _TasksPageState extends State<TasksPage> {
       _selectedCategories.clear();
       _filterValidationMessage = null;
     });
-    unawaited(
-      _loadTasks(filters: TaskFilters(spaceId: widget.spaceId), page: 0),
-    );
+    unawaited(_loadTasks(filters: const TaskFilters(), page: 0));
   }
 
   void _clearFilterControllers() {
@@ -375,6 +359,7 @@ class _TasksPageState extends State<TasksPage> {
     try {
       await widget.tasksRepository.toggleTaskActive(
         accessToken: widget.session.accessToken,
+        spaceId: widget.spaceId,
         taskId: task.id,
       );
       if (!mounted || requestGeneration != _requestGeneration) {

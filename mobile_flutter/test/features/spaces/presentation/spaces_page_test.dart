@@ -309,7 +309,7 @@ void main() {
       expect(find.byType(TasksPage), findsOneWidget);
       expect(tasksRepository.fetchTasksCalls, 1);
       expect(tasksRepository.receivedAccessTokens, [testSession.accessToken]);
-      expect(tasksRepository.receivedFilters.single.spaceId, testSpace.id);
+      expect(tasksRepository.receivedSpaceIds, [testSpace.id]);
       expect(tasksRepository.receivedPages, [0]);
       expect(tasksRepository.receivedPageSizes, [10]);
     },
@@ -448,7 +448,7 @@ void main() {
           (_) async => makeSpacePage(content: [space]),
         );
         final tasksRepository = FakeTasksRepository(
-          handler: (_, filters, page, size) async => TaskPageResult(
+          handler: (_, _, filters, page, size) async => TaskPageResult(
             content: const [_roleTestTask],
             size: size,
             number: page,

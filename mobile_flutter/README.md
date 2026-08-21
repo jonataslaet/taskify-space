@@ -84,25 +84,29 @@ confirma a criação sem inserir o novo espaço na listagem atual; ele só poder
 aparecer depois de ser ativado.
 
 Em espaços com participação aprovada, o botão **Ver tarefas** abre uma listagem
-que chama `GET /tasks` com `spaceId`, `page`, `size` e `sort=id,asc`. O filtro por
-espaço é aplicado no backend para que `totalElements` e `totalPages` representem
+que chama `GET /spaces/{spaceId}/tasks` com `page`, `size` e `sort=id,asc`. O
+espaço é definido pelo caminho para que `totalElements` e `totalPages` representem
 somente as tarefas daquele espaço. A tela também permite combinar, por meio do
 Specification, descrição parcial, situação, categorias e pontuação exata,
 mínima ou máxima. Aplicar ou limpar filtros e trocar a quantidade de registros
 reinicia a consulta na página zero; a barra inferior permite navegar pelas
 páginas e escolher 5, 10, 20 ou 50 registros.
 
+Administradores e gerentes criam tarefas por meio de
+`POST /spaces/{spaceId}/tasks`. O identificador do espaço é enviado no caminho
+e também no corpo, conforme o contrato atual do DTO de criação.
+
 Administradores e gerentes do espaço podem editar cada tarefa pelo botão de
 lápis. O formulário atualiza descrição, pontuação, categoria e agenda por meio
-de `PUT /tasks/{taskId}`. A agenda atual é sempre reenviada para preservá-la;
-ela só é removida quando a opção de agenda é desligada explicitamente.
+de `PUT /spaces/{spaceId}/tasks/{taskId}`. A agenda atual é sempre reenviada para
+preservá-la; ela só é removida quando a opção de agenda é desligada explicitamente.
 Situação e criador são somente leitura nesse endpoint.
 
 O ícone de visibilidade no chip de situação permite que administradores e
-gerentes ativem ou desativem a tarefa por meio de `PATCH /tasks/{taskId}`, sem
-corpo na requisição. A operação considera somente `204 No Content` como sucesso
-e, em seguida, recarrega a página e os filtros atuais para refletir o novo
-estado retornado pela API.
+gerentes ativem ou desativem a tarefa por meio de
+`PATCH /spaces/{spaceId}/tasks/{taskId}`, sem corpo na requisição. A operação
+considera somente `204 No Content` como sucesso e, em seguida, recarrega a
+página e os filtros atuais para refletir o novo estado retornado pela API.
 
 O Android permite HTTP apenas no build `debug` e somente para os hosts locais
 de desenvolvimento configurados. A allowlist contém `localhost` e `10.0.2.2`,

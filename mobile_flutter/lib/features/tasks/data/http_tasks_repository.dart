@@ -31,17 +31,21 @@ final class HttpTasksRepository implements TasksRepository {
   @override
   Future<TaskSummary> createTask({
     required String accessToken,
+    required int spaceId,
     required TaskCreation creation,
   }) async {
     final normalizedToken = accessToken.trim();
-    if (normalizedToken.isEmpty || !_isValidCreation(creation)) {
+    if (normalizedToken.isEmpty ||
+        spaceId <= 0 ||
+        creation.spaceId != spaceId ||
+        !_isValidCreation(creation)) {
       throw const ApiFailure(ApiFailureKind.validation);
     }
 
     try {
       final response = await _client
           .post(
-            _config.endpoint('/tasks'),
+            _config.endpoint('/spaces/$spaceId/tasks'),
             headers: <String, String>{
               'Accept': 'application/json',
               'Authorization': 'Bearer $normalizedToken',
@@ -84,18 +88,22 @@ final class HttpTasksRepository implements TasksRepository {
   @override
   Future<TaskSummary> updateTask({
     required String accessToken,
+    required int spaceId,
     required int taskId,
     required TaskUpdate update,
   }) async {
     final normalizedToken = accessToken.trim();
-    if (normalizedToken.isEmpty || taskId <= 0 || !_isValidUpdate(update)) {
+    if (normalizedToken.isEmpty ||
+        spaceId <= 0 ||
+        taskId <= 0 ||
+        !_isValidUpdate(update)) {
       throw const ApiFailure(ApiFailureKind.validation);
     }
 
     try {
       final response = await _client
           .put(
-            _config.endpoint('/tasks/$taskId'),
+            _config.endpoint('/spaces/$spaceId/tasks/$taskId'),
             headers: <String, String>{
               'Accept': 'application/json',
               'Authorization': 'Bearer $normalizedToken',
@@ -138,17 +146,18 @@ final class HttpTasksRepository implements TasksRepository {
   @override
   Future<void> toggleTaskActive({
     required String accessToken,
+    required int spaceId,
     required int taskId,
   }) async {
     final normalizedToken = accessToken.trim();
-    if (normalizedToken.isEmpty || taskId <= 0) {
+    if (normalizedToken.isEmpty || spaceId <= 0 || taskId <= 0) {
       throw const ApiFailure(ApiFailureKind.validation);
     }
 
     try {
       final response = await _client
           .patch(
-            _config.endpoint('/tasks/$taskId'),
+            _config.endpoint('/spaces/$spaceId/tasks/$taskId'),
             headers: <String, String>{
               'Accept': 'application/json',
               'Authorization': 'Bearer $normalizedToken',
@@ -173,15 +182,16 @@ final class HttpTasksRepository implements TasksRepository {
   @override
   Future<TaskPageResult> fetchTasks({
     required String accessToken,
+    required int spaceId,
     TaskFilters filters = const TaskFilters(),
     int page = 0,
     int size = 10,
   }) async {
     final normalizedToken = accessToken.trim();
     if (normalizedToken.isEmpty ||
+        spaceId <= 0 ||
         page < 0 ||
         size <= 0 ||
-        (filters.spaceId != null && filters.spaceId! <= 0) ||
         _hasNonFiniteScore(filters)) {
       throw const ApiFailure(ApiFailureKind.validation);
     }
@@ -189,7 +199,7 @@ final class HttpTasksRepository implements TasksRepository {
     try {
       final response = await _client
           .get(
-            _tasksEndpoint(filters, page: page, size: size),
+            _tasksEndpoint(spaceId, filters, page: page, size: size),
             headers: <String, String>{
               'Accept': 'application/json',
               'Authorization': 'Bearer $normalizedToken',
@@ -222,6 +232,7 @@ final class HttpTasksRepository implements TasksRepository {
   }
 
   Uri _tasksEndpoint(
+    int spaceId,
     TaskFilters filters, {
     required int page,
     required int size,
@@ -235,7 +246,6 @@ final class HttpTasksRepository implements TasksRepository {
       'page': page.toString(),
       'size': size.toString(),
       'sort': 'id,asc',
-      if (filters.spaceId case final spaceId?) 'spaceId': spaceId.toString(),
       if (normalizedDescription != null && normalizedDescription.isNotEmpty)
         'description': normalizedDescription,
       if (filters.score case final score?) 'score': score.toString(),
@@ -247,7 +257,9 @@ final class HttpTasksRepository implements TasksRepository {
         'maxScore': maxScore.toString(),
     };
 
-    return _config.endpoint('/tasks').replace(queryParameters: queryParameters);
+    return _config
+        .endpoint('/spaces/$spaceId/tasks')
+        .replace(queryParameters: queryParameters);
   }
 
   bool _hasNonFiniteScore(TaskFilters filters) {

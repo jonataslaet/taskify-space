@@ -2,7 +2,6 @@ import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 
 final class TaskFilters {
   const TaskFilters({
-    this.spaceId,
     this.description,
     this.score,
     this.active,
@@ -11,7 +10,6 @@ final class TaskFilters {
     this.maxScore,
   });
 
-  final int? spaceId;
   final String? description;
   final num? score;
   final bool? active;

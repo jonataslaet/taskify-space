@@ -7,11 +7,13 @@ import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 abstract interface class TasksRepository {
   Future<TaskSummary> createTask({
     required String accessToken,
+    required int spaceId,
     required TaskCreation creation,
   });
 
   Future<TaskPageResult> fetchTasks({
     required String accessToken,
+    required int spaceId,
     TaskFilters filters = const TaskFilters(),
     int page = 0,
     int size = 10,
@@ -19,12 +21,14 @@ abstract interface class TasksRepository {
 
   Future<TaskSummary> updateTask({
     required String accessToken,
+    required int spaceId,
     required int taskId,
     required TaskUpdate update,
   });
 
   Future<void> toggleTaskActive({
     required String accessToken,
+    required int spaceId,
     required int taskId,
   });
 }

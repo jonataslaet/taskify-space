@@ -254,6 +254,7 @@ final class FakeSpacesRepository implements SpacesRepository {
 typedef FetchTasksHandler =
     Future<TaskPageResult> Function(
       String accessToken,
+      int spaceId,
       TaskFilters filters,
       int page,
       int size,
@@ -261,13 +262,18 @@ typedef FetchTasksHandler =
 typedef UpdateTaskHandler =
     Future<TaskSummary> Function(
       String accessToken,
+      int spaceId,
       int taskId,
       TaskUpdate update,
     );
 typedef CreateTaskHandler =
-    Future<TaskSummary> Function(String accessToken, TaskCreation creation);
+    Future<TaskSummary> Function(
+      String accessToken,
+      int spaceId,
+      TaskCreation creation,
+    );
 typedef ToggleTaskActiveHandler =
-    Future<void> Function(String accessToken, int taskId);
+    Future<void> Function(String accessToken, int spaceId, int taskId);
 
 final class FakeTasksRepository implements TasksRepository {
   FakeTasksRepository({
@@ -286,32 +292,38 @@ final class FakeTasksRepository implements TasksRepository {
   int updateTaskCalls = 0;
   int toggleTaskActiveCalls = 0;
   final receivedAccessTokens = <String>[];
+  final receivedSpaceIds = <int>[];
   final receivedFilters = <TaskFilters>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
   final receivedCreateAccessTokens = <String>[];
+  final receivedCreateSpaceIds = <int>[];
   final receivedTaskCreations = <TaskCreation>[];
   final receivedUpdateAccessTokens = <String>[];
+  final receivedUpdateSpaceIds = <int>[];
   final receivedTaskIds = <int>[];
   final receivedTaskUpdates = <TaskUpdate>[];
   final receivedToggleTaskActiveAccessTokens = <String>[];
+  final receivedToggleTaskActiveSpaceIds = <int>[];
   final receivedToggleTaskActiveIds = <int>[];
 
   @override
   Future<TaskPageResult> fetchTasks({
     required String accessToken,
+    required int spaceId,
     TaskFilters filters = const TaskFilters(),
     int page = 0,
     int size = 10,
   }) {
     fetchTasksCalls += 1;
     receivedAccessTokens.add(accessToken);
+    receivedSpaceIds.add(spaceId);
     receivedFilters.add(filters);
     receivedPages.add(page);
     receivedPageSizes.add(size);
     final fetchHandler = handler;
     if (fetchHandler != null) {
-      return fetchHandler(accessToken, filters, page, size);
+      return fetchHandler(accessToken, spaceId, filters, page, size);
     }
     return Future<TaskPageResult>.value(makeTaskPage());
   }
@@ -319,10 +331,12 @@ final class FakeTasksRepository implements TasksRepository {
   @override
   Future<TaskSummary> createTask({
     required String accessToken,
+    required int spaceId,
     required TaskCreation creation,
   }) {
     createTaskCalls += 1;
     receivedCreateAccessTokens.add(accessToken);
+    receivedCreateSpaceIds.add(spaceId);
     receivedTaskCreations.add(creation);
     final handler = createHandler;
     if (handler == null) {
@@ -330,17 +344,19 @@ final class FakeTasksRepository implements TasksRepository {
         StateError('Handler de criação de tarefa não configurado.'),
       );
     }
-    return handler(accessToken, creation);
+    return handler(accessToken, spaceId, creation);
   }
 
   @override
   Future<TaskSummary> updateTask({
     required String accessToken,
+    required int spaceId,
     required int taskId,
     required TaskUpdate update,
   }) {
     updateTaskCalls += 1;
     receivedUpdateAccessTokens.add(accessToken);
+    receivedUpdateSpaceIds.add(spaceId);
     receivedTaskIds.add(taskId);
     receivedTaskUpdates.add(update);
     final handler = updateHandler;
@@ -349,16 +365,18 @@ final class FakeTasksRepository implements TasksRepository {
         StateError('Handler de atualização de tarefa não configurado.'),
       );
     }
-    return handler(accessToken, taskId, update);
+    return handler(accessToken, spaceId, taskId, update);
   }
 
   @override
   Future<void> toggleTaskActive({
     required String accessToken,
+    required int spaceId,
     required int taskId,
   }) {
     toggleTaskActiveCalls += 1;
     receivedToggleTaskActiveAccessTokens.add(accessToken);
+    receivedToggleTaskActiveSpaceIds.add(spaceId);
     receivedToggleTaskActiveIds.add(taskId);
     final handler = toggleTaskActiveHandler;
     if (handler == null) {
@@ -366,7 +384,7 @@ final class FakeTasksRepository implements TasksRepository {
         StateError('Handler de status de tarefa não configurado.'),
       );
     }
-    return handler(accessToken, taskId);
+    return handler(accessToken, spaceId, taskId);
   }
 }
 

@@ -23,7 +23,7 @@ void main() {
         ),
       );
       final repository = FakeTasksRepository(
-        updateHandler: (_, _, update) async => _applyUpdate(task, update),
+        updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
       );
 
       await _pumpDialog(tester, repository: repository, task: task);
@@ -48,6 +48,7 @@ void main() {
 
       expect(repository.updateTaskCalls, 1);
       expect(repository.receivedUpdateAccessTokens, [_accessToken]);
+      expect(repository.receivedUpdateSpaceIds, [task.spaceId]);
       expect(repository.receivedTaskIds, [task.id]);
       final update = repository.receivedTaskUpdates.single;
       expect(update.description, 'Descrição atualizada');
@@ -70,7 +71,7 @@ void main() {
       ),
     );
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, update) async => _applyUpdate(task, update),
+      updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
     );
 
     await _pumpDialog(tester, repository: repository, task: task);
@@ -99,7 +100,7 @@ void main() {
       ),
     );
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, update) async => _applyUpdate(task, update),
+      updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
     );
 
     await _pumpDialog(tester, repository: repository, task: task);
@@ -125,7 +126,7 @@ void main() {
       ),
     );
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, update) async => _applyUpdate(task, update),
+      updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
     );
 
     await _pumpDialog(tester, repository: repository, task: task);
@@ -144,7 +145,7 @@ void main() {
     (tester) async {
       final task = _task();
       final repository = FakeTasksRepository(
-        updateHandler: (_, _, update) async => _applyUpdate(task, update),
+        updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
       );
 
       await _pumpDialog(tester, repository: repository, task: task);
@@ -183,7 +184,7 @@ void main() {
   ) async {
     final task = _task();
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, update) async => _applyUpdate(task, update),
+      updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
     );
 
     await _pumpDialog(tester, repository: repository, task: task);
@@ -235,7 +236,7 @@ void main() {
     final task = _task();
     final response = Completer<TaskSummary>();
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, _) => response.future,
+      updateHandler: (_, _, _, _) => response.future,
     );
 
     await _pumpDialog(tester, repository: repository, task: task);
@@ -271,7 +272,7 @@ void main() {
     final task = _task();
     var sessionExpiredCalls = 0;
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, _) async =>
+      updateHandler: (_, _, _, _) async =>
           throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
     );
 
@@ -303,7 +304,7 @@ void main() {
       var sessionExpiredCalls = 0;
       var attempts = 0;
       final repository = FakeTasksRepository(
-        updateHandler: (_, _, update) async {
+        updateHandler: (_, _, _, update) async {
           attempts += 1;
           if (attempts == 1) {
             throw const ApiFailure(ApiFailureKind.forbidden, statusCode: 403);
@@ -338,7 +339,7 @@ void main() {
     final task = _task();
     var attempts = 0;
     final repository = FakeTasksRepository(
-      updateHandler: (_, _, update) async {
+      updateHandler: (_, _, _, update) async {
         attempts += 1;
         if (attempts == 1) {
           throw const ApiFailure(ApiFailureKind.validation, statusCode: 409);
