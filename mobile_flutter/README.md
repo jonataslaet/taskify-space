@@ -92,6 +92,15 @@ mínima ou máxima. Aplicar ou limpar filtros e trocar a quantidade de registros
 reinicia a consulta na página zero; a barra inferior permite navegar pelas
 páginas e escolher 5, 10, 20 ou 50 registros.
 
+O ícone à esquerda de cada tarefa ativa abre a confirmação de execução.
+O diálogo inicia com a data e a hora atuais e com o usuário autenticado entre
+os executores. Como o backend sempre inclui esse usuário, ele permanece fixo;
+a data, o horário e os demais executores podem ser alterados. A busca do
+multiselect usa `GET /spaces/{spaceId}/participants/search?name=...`. Confirmar
+envia `POST /spaces/{spaceId}/tasks/{taskId}` com `executionDate` no formato
+`yyyy-MM-dd-HH-mm` e, quando houver executores adicionais, seus identificadores
+em `usersIds`. Sem adicionais, `usersIds` é omitido.
+
 Ao tocar no nome de uma tarefa, o aplicativo abre seu histórico por meio de
 `GET /spaces/{spaceId}/tasks/{taskId}/executions`, com `page` e `size`. A lista
 vem ordenada das execuções mais recentes para as mais antigas e mostra a data,

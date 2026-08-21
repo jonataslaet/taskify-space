@@ -5,6 +5,7 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/core/presentation/paged_list_pagination_bar.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/presentation/logout_button.dart';
+import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_page_result.dart';
@@ -12,6 +13,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart'
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
+import 'package:mobile_flutter/features/tasks/presentation/confirm_task_execution_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/task_executions_page.dart';
 
@@ -20,6 +22,7 @@ class TasksPage extends StatefulWidget {
     required this.session,
     required this.spaceId,
     required this.spaceName,
+    required this.spacesRepository,
     required this.tasksRepository,
     this.canEditTasks = false,
     this.onSessionExpired,
@@ -30,6 +33,7 @@ class TasksPage extends StatefulWidget {
   final AuthSession session;
   final int spaceId;
   final String spaceName;
+  final SpacesRepository spacesRepository;
   final TasksRepository tasksRepository;
   final bool canEditTasks;
   final VoidCallback? onSessionExpired;
@@ -79,6 +83,7 @@ class _TasksPageState extends State<TasksPage> {
     final sourceChanged =
         sessionChanged ||
         oldWidget.spaceId != widget.spaceId ||
+        !identical(oldWidget.spacesRepository, widget.spacesRepository) ||
         !identical(oldWidget.tasksRepository, widget.tasksRepository);
     if (!sourceChanged) {
       return;
@@ -300,6 +305,37 @@ class _TasksPageState extends State<TasksPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmTaskExecution(TaskSummary task) async {
+    if (!task.active) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ConfirmTaskExecutionDialog(
+        task: task,
+        session: widget.session,
+        initialExecutionDate: DateTime.now(),
+        tasksRepository: widget.tasksRepository,
+        spacesRepository: widget.spacesRepository,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('task-execution-confirmed-message'),
+          content: Text('Execução de "${task.description}" registrada.'),
+        ),
+      );
   }
 
   Future<void> _openEditTask(TaskSummary task) async {
@@ -550,6 +586,9 @@ class _TasksPageState extends State<TasksPage> {
                   task: task,
                   canEdit: widget.canEditTasks,
                   isToggling: _togglingTaskId == task.id,
+                  onConfirmExecution: task.active
+                      ? () => unawaited(_confirmTaskExecution(task))
+                      : null,
                   onShowExecutions: () => _openTaskExecutions(task),
                   onToggleActive: widget.canEditTasks && !_isBusy
                       ? () => _toggleTaskActive(task)
@@ -894,6 +933,7 @@ class _TaskCard extends StatelessWidget {
     required this.task,
     required this.canEdit,
     required this.isToggling,
+    required this.onConfirmExecution,
     required this.onShowExecutions,
     required this.onToggleActive,
     required this.onEdit,
@@ -902,6 +942,7 @@ class _TaskCard extends StatelessWidget {
   final TaskSummary task;
   final bool canEdit;
   final bool isToggling;
+  final VoidCallback? onConfirmExecution;
   final VoidCallback onShowExecutions;
   final VoidCallback? onToggleActive;
   final VoidCallback? onEdit;
@@ -925,18 +966,37 @@ class _TaskCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE3F2EF),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(
-                    task.active
-                        ? Icons.task_alt_rounded
-                        : Icons.pause_circle_outline_rounded,
-                    color: const Color(0xFF006C67),
+                Semantics(
+                  key: ValueKey('task-confirm-execution-button-${task.id}'),
+                  label: task.active
+                      ? 'Confirmar execução de ${task.description}'
+                      : 'Tarefa ${task.description} inativa',
+                  container: true,
+                  button: true,
+                  enabled: task.active,
+                  excludeSemantics: true,
+                  onTap: onConfirmExecution,
+                  child: IconButton(
+                    tooltip: task.active
+                        ? 'Confirmar execução'
+                        : 'Tarefa inativa',
+                    onPressed: onConfirmExecution,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size.square(48),
+                      backgroundColor: const Color(0xFFE3F2EF),
+                      disabledBackgroundColor: const Color(0xFFE8ECEB),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                    icon: Icon(
+                      task.active
+                          ? Icons.task_alt_rounded
+                          : Icons.pause_circle_outline_rounded,
+                      color: task.active
+                          ? const Color(0xFF006C67)
+                          : const Color(0xFF81908E),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),

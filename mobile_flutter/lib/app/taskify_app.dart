@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:mobile_flutter/core/storage/session_store.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
@@ -82,6 +83,9 @@ class _TaskifyAppState extends State<TaskifyApp> {
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Taskify Space',
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const <Locale>[Locale('pt', 'BR')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF006C67),

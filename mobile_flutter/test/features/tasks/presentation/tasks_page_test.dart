@@ -13,10 +13,13 @@ import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart'
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
+import 'package:mobile_flutter/features/tasks/presentation/confirm_task_execution_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/task_executions_page.dart';
 import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
+
+import '../../../helpers/fakes.dart' show FakeSpacesRepository, makeSpacePage;
 
 void main() {
   testWidgets('faz o GET inicial e apresenta tarefa e contexto do espaço', (
@@ -116,6 +119,107 @@ void main() {
     expect(repository.executionTaskIds, [23]);
     expect(repository.executionPages, [0]);
     expect(repository.executionSizes, [10]);
+  });
+
+  testWidgets(
+    'abre a confirmação pelo ícone e registra a execução como participante',
+    (tester) async {
+      DateTime? receivedExecutionDate;
+      final repository = _FakeTasksRepository(
+        (_, _, _, page, size) async => _page(
+          content: [_task(id: 23, description: 'Lavar a louça')],
+          number: page,
+          size: size,
+          totalElements: 1,
+          totalPages: 1,
+        ),
+        confirmTaskExecutionHandler:
+            (accessToken, spaceId, taskId, executorIds, executionDate) async {
+              expect(accessToken, _session.accessToken);
+              expect(spaceId, 7);
+              expect(taskId, 23);
+              expect(executorIds, isEmpty);
+              receivedExecutionDate = executionDate;
+            },
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      final executionButton = find.byKey(
+        const ValueKey('task-confirm-execution-button-23'),
+      );
+      expect(executionButton, findsOneWidget);
+      expect(tester.getSize(executionButton), const Size(48, 48));
+      expect(
+        tester.getSemantics(executionButton),
+        matchesSemantics(
+          label: 'Confirmar execução de Lavar a louça',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+
+      await tester.tap(executionButton);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConfirmTaskExecutionDialog), findsOneWidget);
+      expect(find.text('Usuário de Teste (você)'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('confirm-task-execution-submit-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.confirmTaskExecutionCalls, 1);
+      expect(receivedExecutionDate, isNotNull);
+      expect(receivedExecutionDate!.second, 0);
+      expect(receivedExecutionDate!.millisecond, 0);
+      expect(
+        find.byKey(const ValueKey('task-execution-confirmed-message')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Execução de "Lavar a louça" registrada.'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('mantém o ícone de execução inativa desabilitado', (
+    tester,
+  ) async {
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: [_task(id: 24, active: false)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    final executionButton = find.byKey(
+      const ValueKey('task-confirm-execution-button-24'),
+    );
+    expect(executionButton, findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.descendant(
+              of: executionButton,
+              matching: find.byType(IconButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(repository.confirmTaskExecutionCalls, 0);
   });
 
   testWidgets(
@@ -398,6 +502,7 @@ void main() {
     });
     var selectedSpaceId = 1;
     var selectedSpaceName = 'Espaço antigo';
+    final spacesRepository = FakeSpacesRepository((_) async => makeSpacePage());
     late StateSetter rebuild;
 
     await tester.pumpWidget(
@@ -409,6 +514,7 @@ void main() {
               session: _session,
               spaceId: selectedSpaceId,
               spaceName: selectedSpaceName,
+              spacesRepository: spacesRepository,
               tasksRepository: repository,
             );
           },
@@ -1017,6 +1123,14 @@ typedef _FetchTaskExecutionsHandler =
       int page,
       int size,
     );
+typedef _ConfirmTaskExecutionHandler =
+    Future<void> Function(
+      String accessToken,
+      int spaceId,
+      int taskId,
+      Set<int> executorIds,
+      DateTime? executionDate,
+    );
 
 final class _FakeTasksRepository implements TasksRepository {
   _FakeTasksRepository(
@@ -1025,6 +1139,7 @@ final class _FakeTasksRepository implements TasksRepository {
     this.updateHandler,
     this.toggleTaskActiveHandler,
     this.fetchTaskExecutionsHandler,
+    this.confirmTaskExecutionHandler,
   });
 
   final _FetchHandler _handler;
@@ -1032,11 +1147,13 @@ final class _FakeTasksRepository implements TasksRepository {
   final _UpdateHandler? updateHandler;
   final _ToggleTaskActiveHandler? toggleTaskActiveHandler;
   final _FetchTaskExecutionsHandler? fetchTaskExecutionsHandler;
+  final _ConfirmTaskExecutionHandler? confirmTaskExecutionHandler;
   int fetchCalls = 0;
   int createCalls = 0;
   int updateCalls = 0;
   int toggleTaskActiveCalls = 0;
   int fetchTaskExecutionsCalls = 0;
+  int confirmTaskExecutionCalls = 0;
   final accessTokens = <String>[];
   final spaceIds = <int>[];
   final filters = <TaskFilters>[];
@@ -1057,6 +1174,34 @@ final class _FakeTasksRepository implements TasksRepository {
   final executionTaskIds = <int>[];
   final executionPages = <int>[];
   final executionSizes = <int>[];
+  final confirmedExecutionAccessTokens = <String>[];
+  final confirmedExecutionSpaceIds = <int>[];
+  final confirmedExecutionTaskIds = <int>[];
+  final confirmedExecutionExecutorIds = <Set<int>>[];
+  final confirmedExecutionDates = <DateTime?>[];
+
+  @override
+  Future<void> confirmTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    Set<int> executorIds = const <int>{},
+    DateTime? executionDate,
+  }) {
+    confirmTaskExecutionCalls += 1;
+    confirmedExecutionAccessTokens.add(accessToken);
+    confirmedExecutionSpaceIds.add(spaceId);
+    confirmedExecutionTaskIds.add(taskId);
+    confirmedExecutionExecutorIds.add(Set<int>.unmodifiable(executorIds));
+    confirmedExecutionDates.add(executionDate);
+    final handler = confirmTaskExecutionHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Confirmação de execução não esperada neste teste.'),
+      );
+    }
+    return handler(accessToken, spaceId, taskId, executorIds, executionDate);
+  }
 
   @override
   Future<TaskPageResult> fetchTasks({
@@ -1177,12 +1322,16 @@ Widget _testApp(
   _FakeTasksRepository repository, {
   bool canEditTasks = false,
   VoidCallback? onSessionExpired,
+  FakeSpacesRepository? spacesRepository,
 }) {
   return MaterialApp(
     home: TasksPage(
       session: _session,
       spaceId: 7,
       spaceName: 'Residência do Casal',
+      spacesRepository:
+          spacesRepository ??
+          FakeSpacesRepository((_) async => makeSpacePage()),
       tasksRepository: repository,
       canEditTasks: canEditTasks,
       onSessionExpired: onSessionExpired,

@@ -6,6 +6,14 @@ import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
 
 abstract interface class TasksRepository {
+  Future<void> confirmTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    Set<int> executorIds = const <int>{},
+    DateTime? executionDate,
+  });
+
   Future<TaskSummary> createTask({
     required String accessToken,
     required int spaceId,

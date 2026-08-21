@@ -369,6 +369,19 @@ final class _FakeTasksRepository implements TasksRepository {
   final sizes = <int>[];
 
   @override
+  Future<void> confirmTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    Set<int> executorIds = const <int>{},
+    DateTime? executionDate,
+  }) {
+    return Future<void>.error(
+      StateError('Confirmacao de tarefa nao esperada neste teste.'),
+    );
+  }
+
+  @override
   Future<TaskExecutionPageResult> fetchTaskExecutions({
     required String accessToken,
     required int spaceId,

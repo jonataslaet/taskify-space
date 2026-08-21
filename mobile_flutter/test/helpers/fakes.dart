@@ -6,6 +6,7 @@ import 'package:mobile_flutter/features/auth/domain/authentication_repository.da
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
@@ -165,6 +166,12 @@ typedef FetchSpaceParticipantsHandler =
       int page,
       int size,
     );
+typedef SearchSpaceParticipantsHandler =
+    Future<List<SpaceParticipantSummary>> Function(
+      String accessToken,
+      int spaceId,
+      String name,
+    );
 
 final class FakeSpacesRepository implements SpacesRepository {
   FakeSpacesRepository(
@@ -172,15 +179,18 @@ final class FakeSpacesRepository implements SpacesRepository {
     this.fetchPageHandler,
     this.createHandler,
     this.fetchParticipantsHandler,
+    this.searchParticipantsHandler,
   });
 
   final FetchSpacesHandler _handler;
   final FetchSpacesPageHandler? fetchPageHandler;
   final CreateSpaceHandler? createHandler;
   final FetchSpaceParticipantsHandler? fetchParticipantsHandler;
+  final SearchSpaceParticipantsHandler? searchParticipantsHandler;
   int fetchSpacesCalls = 0;
   int createSpaceCalls = 0;
   int fetchSpaceParticipantsCalls = 0;
+  int searchSpaceParticipantsCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
@@ -192,6 +202,9 @@ final class FakeSpacesRepository implements SpacesRepository {
   final receivedParticipantFilters = <SpaceParticipantFilters>[];
   final receivedParticipantPages = <int>[];
   final receivedParticipantPageSizes = <int>[];
+  final receivedParticipantSearchAccessTokens = <String>[];
+  final receivedParticipantSearchSpaceIds = <int>[];
+  final receivedParticipantSearchNames = <String>[];
 
   @override
   Future<CreatedSpace> createSpace({
@@ -251,6 +264,25 @@ final class FakeSpacesRepository implements SpacesRepository {
     }
     return handler(accessToken, spaceId, filters, page, size);
   }
+
+  @override
+  Future<List<SpaceParticipantSummary>> searchSpaceParticipants({
+    required String accessToken,
+    required int spaceId,
+    required String name,
+  }) {
+    searchSpaceParticipantsCalls += 1;
+    receivedParticipantSearchAccessTokens.add(accessToken);
+    receivedParticipantSearchSpaceIds.add(spaceId);
+    receivedParticipantSearchNames.add(name);
+    final handler = searchParticipantsHandler;
+    if (handler != null) {
+      return handler(accessToken, spaceId, name);
+    }
+    return Future<List<SpaceParticipantSummary>>.value(
+      const <SpaceParticipantSummary>[],
+    );
+  }
 }
 
 typedef FetchTasksHandler =
@@ -268,6 +300,14 @@ typedef FetchTaskExecutionsHandler =
       int taskId,
       int page,
       int size,
+    );
+typedef ConfirmTaskExecutionHandler =
+    Future<void> Function(
+      String accessToken,
+      int spaceId,
+      int taskId,
+      Set<int> executorIds,
+      DateTime? executionDate,
     );
 typedef UpdateTaskHandler =
     Future<TaskSummary> Function(
@@ -289,6 +329,7 @@ final class FakeTasksRepository implements TasksRepository {
   FakeTasksRepository({
     this.handler,
     this.fetchTaskExecutionsHandler,
+    this.confirmTaskExecutionHandler,
     this.createHandler,
     this.updateHandler,
     this.toggleTaskActiveHandler,
@@ -296,11 +337,13 @@ final class FakeTasksRepository implements TasksRepository {
 
   final FetchTasksHandler? handler;
   final FetchTaskExecutionsHandler? fetchTaskExecutionsHandler;
+  final ConfirmTaskExecutionHandler? confirmTaskExecutionHandler;
   final CreateTaskHandler? createHandler;
   final UpdateTaskHandler? updateHandler;
   final ToggleTaskActiveHandler? toggleTaskActiveHandler;
   int fetchTasksCalls = 0;
   int fetchTaskExecutionsCalls = 0;
+  int confirmTaskExecutionCalls = 0;
   int createTaskCalls = 0;
   int updateTaskCalls = 0;
   int toggleTaskActiveCalls = 0;
@@ -314,6 +357,11 @@ final class FakeTasksRepository implements TasksRepository {
   final receivedTaskExecutionTaskIds = <int>[];
   final receivedTaskExecutionPages = <int>[];
   final receivedTaskExecutionPageSizes = <int>[];
+  final receivedConfirmTaskExecutionAccessTokens = <String>[];
+  final receivedConfirmTaskExecutionSpaceIds = <int>[];
+  final receivedConfirmTaskExecutionTaskIds = <int>[];
+  final receivedConfirmTaskExecutionExecutorIds = <Set<int>>[];
+  final receivedConfirmTaskExecutionDates = <DateTime?>[];
   final receivedCreateAccessTokens = <String>[];
   final receivedCreateSpaceIds = <int>[];
   final receivedTaskCreations = <TaskCreation>[];
@@ -324,6 +372,31 @@ final class FakeTasksRepository implements TasksRepository {
   final receivedToggleTaskActiveAccessTokens = <String>[];
   final receivedToggleTaskActiveSpaceIds = <int>[];
   final receivedToggleTaskActiveIds = <int>[];
+
+  @override
+  Future<void> confirmTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    Set<int> executorIds = const <int>{},
+    DateTime? executionDate,
+  }) {
+    confirmTaskExecutionCalls += 1;
+    receivedConfirmTaskExecutionAccessTokens.add(accessToken);
+    receivedConfirmTaskExecutionSpaceIds.add(spaceId);
+    receivedConfirmTaskExecutionTaskIds.add(taskId);
+    receivedConfirmTaskExecutionExecutorIds.add(
+      Set<int>.unmodifiable(executorIds),
+    );
+    receivedConfirmTaskExecutionDates.add(executionDate);
+    final handler = confirmTaskExecutionHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de confirmacao de tarefa nao configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId, taskId, executorIds, executionDate);
+  }
 
   @override
   Future<TaskPageResult> fetchTasks({

@@ -30,6 +30,54 @@ final class HttpTasksRepository implements TasksRepository {
   final Duration _timeout;
 
   @override
+  Future<void> confirmTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    Set<int> executorIds = const <int>{},
+    DateTime? executionDate,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty ||
+        spaceId <= 0 ||
+        taskId <= 0 ||
+        executorIds.any((id) => id <= 0) ||
+        (executionDate != null &&
+            (executionDate.year < 1 || executionDate.year > 9999))) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .post(
+            _taskExecutionConfirmationEndpoint(
+              spaceId,
+              taskId,
+              executorIds: executorIds,
+              executionDate: executionDate,
+            ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 204) {
+        throw _mapFailure(response);
+      }
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<TaskSummary> createTask({
     required String accessToken,
     required int spaceId,
@@ -337,6 +385,33 @@ final class HttpTasksRepository implements TasksRepository {
             'sort': const <String>['createdAt,desc', 'id,desc'],
           },
         );
+  }
+
+  Uri _taskExecutionConfirmationEndpoint(
+    int spaceId,
+    int taskId, {
+    required Set<int> executorIds,
+    required DateTime? executionDate,
+  }) {
+    final sortedExecutorIds = executorIds.toList()..sort();
+    final queryParameters = <String, Object>{
+      if (sortedExecutorIds.isNotEmpty) 'usersIds': sortedExecutorIds.join(','),
+      if (executionDate != null)
+        'executionDate': _formatExecutionDate(executionDate),
+    };
+    final endpoint = _config.endpoint('/spaces/$spaceId/tasks/$taskId');
+    return queryParameters.isEmpty
+        ? endpoint
+        : endpoint.replace(queryParameters: queryParameters);
+  }
+
+  String _formatExecutionDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$year-$month-$day-$hour-$minute';
   }
 
   bool _hasNonFiniteScore(TaskFilters filters) {

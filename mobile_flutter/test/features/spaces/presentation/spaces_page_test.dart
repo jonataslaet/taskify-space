@@ -307,6 +307,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(TasksPage), findsOneWidget);
+      final tasksPage = tester.widget<TasksPage>(find.byType(TasksPage));
+      expect(identical(tasksPage.spacesRepository, spacesRepository), isTrue);
       expect(tasksRepository.fetchTasksCalls, 1);
       expect(tasksRepository.receivedAccessTokens, [testSession.accessToken]);
       expect(tasksRepository.receivedSpaceIds, [testSpace.id]);

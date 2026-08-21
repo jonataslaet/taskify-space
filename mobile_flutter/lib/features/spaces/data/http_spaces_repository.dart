@@ -9,6 +9,7 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 
@@ -191,6 +192,64 @@ final class HttpSpacesRepository implements SpacesRepository {
     }
   }
 
+  @override
+  Future<List<SpaceParticipantSummary>> searchSpaceParticipants({
+    required String accessToken,
+    required int spaceId,
+    required String name,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    final normalizedName = name.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0 || normalizedName.isEmpty) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .get(
+            _config
+                .endpoint('/spaces/$spaceId/participants/search')
+                .replace(
+                  queryParameters: <String, String>{'name': normalizedName},
+                ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! List<dynamic>) {
+        throw const FormatException(
+          'Resposta de busca de participantes não é uma lista JSON.',
+        );
+      }
+      return List<SpaceParticipantSummary>.unmodifiable(<
+        SpaceParticipantSummary
+      >[
+        for (var index = 0; index < decodedBody.length; index += 1)
+          SpaceParticipantSummary.fromJson(
+            _stringKeyedMap(decodedBody[index], field: 'participants[$index]'),
+          ),
+      ]);
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
   Uri _spacesEndpoint(
     SpaceFilters filters, {
     required int page,
@@ -237,6 +296,21 @@ final class HttpSpacesRepository implements SpacesRepository {
     return _config
         .endpoint('/spaces/$spaceId/participants')
         .replace(queryParameters: queryParameters);
+  }
+
+  Map<String, dynamic> _stringKeyedMap(Object? value, {required String field}) {
+    if (value is! Map) {
+      throw FormatException('Campo $field ausente ou inválido.');
+    }
+
+    final result = <String, dynamic>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String) {
+        throw FormatException('Campo $field inválido.');
+      }
+      result[entry.key as String] = entry.value;
+    }
+    return result;
   }
 
   ApiFailure _mapFailure(http.Response response) {

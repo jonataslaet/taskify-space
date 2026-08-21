@@ -1391,6 +1391,297 @@ void main() {
         expect(calls, 1);
       });
     });
+
+    group('confirmTaskExecution', () {
+      test('faz POST com executores ordenados e data em 24 horas', () async {
+        final client = MockClient((request) async {
+          expect(request.method, 'POST');
+          expect(request.url.path, '/api/spaces/7/tasks/42');
+          expect(request.url.queryParametersAll, <String, List<String>>{
+            'usersIds': <String>['2,5,9'],
+            'executionDate': <String>['2026-08-21-18-31'],
+          });
+          expect(request.headers['Accept'], 'application/json');
+          expect(
+            request.headers['Authorization'],
+            'Bearer access-token-test-only',
+          );
+          expect(request.headers, isNot(contains('Content-Type')));
+          expect(request.bodyBytes, isEmpty);
+          return http.Response('', 204);
+        });
+
+        await _repository(client).confirmTaskExecution(
+          accessToken: ' access-token-test-only ',
+          spaceId: 7,
+          taskId: 42,
+          executorIds: <int>{9, 2, 5},
+          executionDate: DateTime(2026, 8, 21, 18, 31, 59),
+        );
+      });
+
+      test('omite todos os parâmetros opcionais', () async {
+        final client = MockClient((request) async {
+          expect(request.url.path, '/api/spaces/7/tasks/42');
+          expect(request.url.query, isEmpty);
+          expect(request.bodyBytes, isEmpty);
+          return http.Response('', 204);
+        });
+
+        await _repository(client).confirmTaskExecution(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+          taskId: 42,
+        );
+      });
+
+      test('omite cada parâmetro opcional de forma independente', () async {
+        var calls = 0;
+        final client = MockClient((request) async {
+          calls += 1;
+          if (calls == 1) {
+            expect(request.url.queryParametersAll, <String, List<String>>{
+              'usersIds': <String>['2,3'],
+            });
+          } else {
+            expect(request.url.queryParametersAll, <String, List<String>>{
+              'executionDate': <String>['2026-08-21-00-05'],
+            });
+          }
+          return http.Response('', 204);
+        });
+        final repository = _repository(client);
+
+        await repository.confirmTaskExecution(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+          taskId: 42,
+          executorIds: const <int>{3, 2},
+        );
+        await repository.confirmTaskExecution(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+          taskId: 42,
+          executionDate: DateTime.utc(2026, 8, 21, 0, 5),
+        );
+
+        expect(calls, 2);
+      });
+
+      test('rejeita token, IDs ou data inválidos antes da rede', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            return http.Response('', 204);
+          }),
+        );
+        final requests = <Future<void>>[
+          repository.confirmTaskExecution(
+            accessToken: '   ',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 0,
+            taskId: 42,
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: -1,
+            taskId: 42,
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 0,
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: -1,
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            executorIds: const <int>{0},
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            executorIds: const <int>{-1},
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            executionDate: DateTime.utc(0, 1, 1),
+          ),
+          repository.confirmTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            executionDate: DateTime.utc(10000, 1, 1),
+          ),
+        ];
+
+        for (final request in requests) {
+          await expectLater(
+            request,
+            throwsA(
+              isA<ApiFailure>().having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              ),
+            ),
+          );
+        }
+        expect(calls, 0);
+      });
+
+      test('aceita somente 204 como sucesso', () async {
+        final repository = _repository(
+          MockClient((_) async => http.Response('{}', 200)),
+        );
+
+        await expectLater(
+          repository.confirmTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.unknown,
+                )
+                .having((failure) => failure.statusCode, 'statusCode', 200),
+          ),
+        );
+      });
+
+      for (final errorCase in <(int, ApiFailureKind)>[
+        (400, ApiFailureKind.validation),
+        (401, ApiFailureKind.unauthorized),
+        (403, ApiFailureKind.forbidden),
+        (404, ApiFailureKind.unknown),
+        (409, ApiFailureKind.validation),
+        (503, ApiFailureKind.server),
+      ]) {
+        test('mapeia ${errorCase.$1} para ${errorCase.$2.name}', () async {
+          final repository = _repository(
+            MockClient((_) async => http.Response('{}', errorCase.$1)),
+          );
+
+          await expectLater(
+            repository.confirmTaskExecution(
+              accessToken: 'access-token-test-only',
+              spaceId: 7,
+              taskId: 42,
+            ),
+            throwsA(
+              isA<ApiFailure>()
+                  .having((failure) => failure.kind, 'kind', errorCase.$2)
+                  .having(
+                    (failure) => failure.statusCode,
+                    'statusCode',
+                    errorCase.$1,
+                  ),
+            ),
+          );
+        });
+      }
+
+      test('lê Retry-After no 429', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async => http.Response(
+              '{}',
+              429,
+              headers: const <String, String>{'Retry-After': '12'},
+            ),
+          ),
+        );
+
+        await expectLater(
+          repository.confirmTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.rateLimited,
+                )
+                .having(
+                  (failure) => failure.retryAfter,
+                  'retryAfter',
+                  const Duration(seconds: 12),
+                ),
+          ),
+        );
+      });
+
+      test('mapeia falha do cliente para network', () async {
+        final repository = _repository(
+          MockClient((request) async {
+            throw http.ClientException('Falha simulada.', request.url);
+          }),
+        );
+
+        await expectLater(
+          repository.confirmTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.network,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia timeout sem repetir a requisição', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            return http.Response('', 204);
+          }),
+          timeout: const Duration(milliseconds: 1),
+        );
+
+        await expectLater(
+          repository.confirmTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.timeout,
+            ),
+          ),
+        );
+        expect(calls, 1);
+      });
+    });
   });
 }
 

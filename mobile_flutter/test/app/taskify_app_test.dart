@@ -223,6 +223,19 @@ Future<void> _fillValidCredentials(WidgetTester tester) async {
 
 final class _FakeTasksRepository implements TasksRepository {
   @override
+  Future<void> confirmTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    Set<int> executorIds = const <int>{},
+    DateTime? executionDate,
+  }) {
+    return Future<void>.error(
+      StateError('Confirmacao de tarefa nao esperada neste teste.'),
+    );
+  }
+
+  @override
   Future<TaskSummary> createTask({
     required String accessToken,
     required int spaceId,
