@@ -6,6 +6,7 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
@@ -364,7 +365,10 @@ void main() {
         repository.receivedParticipantFilters.single.taskCategories,
         isEmpty,
       );
-      expect(repository.receivedParticipantFilters.single.sort, isNull);
+      expect(
+        repository.receivedParticipantFilters.single.sort,
+        ParticipantSort.scoreDescending,
+      );
     },
   );
 

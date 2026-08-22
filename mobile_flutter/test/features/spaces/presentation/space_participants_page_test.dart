@@ -39,7 +39,10 @@ void main() {
       repository.receivedParticipantFilters.single.taskCategories,
       isEmpty,
     );
-    expect(repository.receivedParticipantFilters.single.sort, isNull);
+    expect(
+      repository.receivedParticipantFilters.single.sort,
+      ParticipantSort.scoreDescending,
+    );
 
     completer.complete(
       makeSpaceParticipantPage(
@@ -97,7 +100,13 @@ void main() {
     );
     _roleDropdown(tester).onChanged!(SpaceUserRole.manager);
     await tester.pump();
-    _sortDropdown(tester).onChanged!(ParticipantSort.scoreDescending);
+    final sortDropdown = _sortDropdown(tester);
+    expect(sortDropdown.value, ParticipantSort.scoreDescending);
+    expect(
+      sortDropdown.items!.map((item) => item.value),
+      ParticipantSort.values,
+    );
+    sortDropdown.onChanged!(ParticipantSort.nameDescending);
     await tester.pump();
 
     final operationalFinder = find.byKey(
@@ -126,7 +135,7 @@ void main() {
       TaskCategory.operational,
       TaskCategory.financial,
     });
-    expect(applied.sort, ParticipantSort.scoreDescending);
+    expect(applied.sort, ParticipantSort.nameDescending);
     expect(
       find.byKey(const Key('space-participants-active-filters')),
       findsOneWidget,
@@ -147,7 +156,7 @@ void main() {
     expect(cleared.name, isNull);
     expect(cleared.role, isNull);
     expect(cleared.taskCategories, isEmpty);
-    expect(cleared.sort, isNull);
+    expect(cleared.sort, ParticipantSort.scoreDescending);
     expect(
       tester
           .widget<TextField>(
@@ -158,7 +167,7 @@ void main() {
       isEmpty,
     );
     expect(_roleDropdown(tester).value, isNull);
-    expect(_sortDropdown(tester).value, isNull);
+    expect(_sortDropdown(tester).value, ParticipantSort.scoreDescending);
     expect(tester.widget<FilterChip>(operationalFinder).selected, isFalse);
     expect(tester.widget<FilterChip>(financialFinder).selected, isFalse);
     expect(

@@ -36,6 +36,7 @@ class SpaceParticipantsPage extends StatefulWidget {
 
 class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
   static const _pageSizeOptions = <int>[5, 10, 20, 50];
+  static const _defaultSort = ParticipantSort.scoreDescending;
 
   final _nameFilterController = TextEditingController();
   final _scrollController = ScrollController();
@@ -43,8 +44,10 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
   SpaceParticipantPageResult? _result;
   ApiFailure? _failure;
   SpaceUserRole? _selectedRole;
-  ParticipantSort? _selectedSort;
-  SpaceParticipantFilters _appliedFilters = const SpaceParticipantFilters();
+  ParticipantSort? _selectedSort = _defaultSort;
+  SpaceParticipantFilters _appliedFilters = const SpaceParticipantFilters(
+    sort: _defaultSort,
+  );
   bool _isLoading = false;
   bool _areFiltersExpanded = false;
   int _requestGeneration = 0;
@@ -73,9 +76,9 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
     _result = null;
     _failure = null;
     _selectedRole = null;
-    _selectedSort = null;
+    _selectedSort = _defaultSort;
     _selectedCategories.clear();
-    _appliedFilters = const SpaceParticipantFilters();
+    _appliedFilters = const SpaceParticipantFilters(sort: _defaultSort);
     _isLoading = false;
     _areFiltersExpanded = false;
     _requestedPage = 0;
@@ -182,7 +185,7 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
           name: _nameFilterController.text,
           role: _selectedRole,
           taskCategories: Set<TaskCategory>.unmodifiable(_selectedCategories),
-          sort: _selectedSort,
+          sort: _selectedSort ?? _defaultSort,
         ),
         page: 0,
       ),
@@ -196,11 +199,14 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
     _nameFilterController.clear();
     setState(() {
       _selectedRole = null;
-      _selectedSort = null;
+      _selectedSort = _defaultSort;
       _selectedCategories.clear();
     });
     unawaited(
-      _loadParticipants(filters: const SpaceParticipantFilters(), page: 0),
+      _loadParticipants(
+        filters: const SpaceParticipantFilters(sort: _defaultSort),
+        page: 0,
+      ),
     );
   }
 
@@ -240,7 +246,7 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
     return (_appliedFilters.name?.trim().isNotEmpty ?? false) ||
         _appliedFilters.role != null ||
         _appliedFilters.taskCategories.isNotEmpty ||
-        _appliedFilters.sort != null;
+        _appliedFilters.sort != _defaultSort;
   }
 
   @override
@@ -509,10 +515,11 @@ class _ParticipantsFilterPanel extends StatelessWidget {
                       final sort = _ParticipantDropdown<ParticipantSort>(
                         key: const ValueKey('space-participants-sort-filter'),
                         label: 'Ordenação',
-                        allLabel: 'Padrão (nome)',
+                        allLabel: 'Maior pontuação (padrão)',
                         value: selectedSort,
                         values: ParticipantSort.values,
                         valueLabel: _sortLabel,
+                        includeNullOption: false,
                         enabled: !isLoading,
                         onChanged: onSortChanged,
                       );
@@ -594,6 +601,7 @@ class _ParticipantDropdown<T> extends StatelessWidget {
     required this.value,
     required this.values,
     required this.valueLabel,
+    this.includeNullOption = true,
     required this.enabled,
     required this.onChanged,
     super.key,
@@ -604,6 +612,7 @@ class _ParticipantDropdown<T> extends StatelessWidget {
   final T? value;
   final List<T> values;
   final String Function(T value) valueLabel;
+  final bool includeNullOption;
   final bool enabled;
   final ValueChanged<T?> onChanged;
 
@@ -618,7 +627,8 @@ class _ParticipantDropdown<T> extends StatelessWidget {
           isExpanded: true,
           hint: Text(allLabel),
           items: [
-            DropdownMenuItem<T>(value: null, child: Text(allLabel)),
+            if (includeNullOption)
+              DropdownMenuItem<T>(value: null, child: Text(allLabel)),
             for (final item in values)
               DropdownMenuItem<T>(value: item, child: Text(valueLabel(item))),
           ],

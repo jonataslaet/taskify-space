@@ -72,9 +72,11 @@ Em espaços com participação aprovada, o chip com a quantidade de participante
 abre uma tela própria por meio de `GET /spaces/{spaceId}/participants`. A lista
 exibe nome, papel, categorias consideradas e pontuação, com paginação e filtros
 opcionais por `name`, `spaceUserRole` e `taskCategories`. Também é possível
-ordenar por identificador, nome, papel ou pontuação; sem ordenação explícita, o
-backend usa nome crescente. As categorias selecionadas determinam quais
-execuções compõem a pontuação e não removem participantes sem execução nelas.
+ordenar por identificador, nome, papel ou pontuação; por padrão, o aplicativo
+solicita a maior pontuação primeiro com `sort=score,desc`. Em caso de empate, o
+backend usa o identificador crescente. As categorias selecionadas determinam
+quais execuções compõem a pontuação e não removem participantes sem execução
+nelas.
 
 O botão **Novo espaço** chama `POST /spaces` com o mesmo access token e envia
 somente o campo `name`, normalizado e validado com o limite de 255 caracteres.
