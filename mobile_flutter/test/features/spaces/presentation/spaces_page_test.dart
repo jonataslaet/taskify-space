@@ -264,26 +264,205 @@ void main() {
     expect(appliedFilters.status, isNull);
   });
 
-  testWidgets('aceita espaço sem vínculo e sem responsável', (tester) async {
-    const availableSpace = SpaceSummary(
-      id: 2,
-      name: 'Espaço disponível',
-      spaceAdminName: null,
-      active: true,
-      spaceUserRole: null,
-      spaceMembershipStatus: null,
-      activeParticipationsCount: 2,
-    );
+  testWidgets(
+    'solicita participação pelo espaço disponível e atualiza para pendente',
+    (tester) async {
+      const availableSpace = SpaceSummary(
+        id: 2,
+        name: 'Espaço disponível',
+        spaceAdminName: null,
+        active: true,
+        spaceUserRole: null,
+        spaceMembershipStatus: null,
+        activeParticipationsCount: 2,
+      );
+      const pendingSpace = SpaceSummary(
+        id: 2,
+        name: 'Espaço disponível',
+        spaceAdminName: null,
+        active: true,
+        spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+        spaceMembershipStatus: 'PENDING',
+        activeParticipationsCount: 2,
+      );
+      final requestCompleter = Completer<void>();
+      var fetchCalls = 0;
+      final repository = FakeSpacesRepository((_) async {
+        fetchCalls += 1;
+        return makeSpacePage(
+          content: [fetchCalls == 1 ? availableSpace : pendingSpace],
+        );
+      }, requestSpaceParticipationHandler: (_, _) => requestCompleter.future);
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Espaço disponível'), findsOneWidget);
+      expect(find.text('Solicitar participação'), findsOneWidget);
+      expect(find.textContaining('Responsável:'), findsNothing);
+      final requestButton = find.byKey(
+        const ValueKey('space-participation-request-button-2'),
+      );
+      expect(requestButton, findsOneWidget);
+      expect(
+        tester.getSemantics(requestButton),
+        matchesSemantics(
+          label: 'Solicitar participação em Espaço disponível',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      final requestTarget = find.descendant(
+        of: requestButton,
+        matching: find.byType(InkWell),
+      );
+      expect(tester.getSize(requestTarget).height, greaterThanOrEqualTo(48));
+
+      await tester.tap(requestButton);
+      await tester.pump();
+
+      expect(repository.requestSpaceParticipationCalls, 1);
+      expect(repository.receivedRequestSpaceParticipationAccessTokens, [
+        testSession.accessToken,
+      ]);
+      expect(repository.receivedRequestSpaceParticipationSpaceIds, [2]);
+      expect(
+        find.byKey(const ValueKey('space-participation-request-progress')),
+        findsOneWidget,
+      );
+      expect(find.text('Solicitando participação...'), findsOneWidget);
+
+      await tester.tap(requestButton);
+      await tester.pump();
+      expect(repository.requestSpaceParticipationCalls, 1);
+
+      requestCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(repository.fetchSpacesCalls, 2);
+      expect(repository.receivedPages, [0, 0]);
+      expect(repository.receivedPageSizes, [10, 10]);
+      expect(requestButton, findsNothing);
+      expect(find.text('Participação pendente'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('space-participation-requested-message')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Solicitação enviada para "Espaço disponível".'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('401 ao solicitar participação expira a sessão', (tester) async {
+    var sessionExpiredCalls = 0;
     final repository = FakeSpacesRepository(
-      (_) async => makeSpacePage(content: const [availableSpace]),
+      (_) async => makeSpacePage(content: [_availableSpace(3)]),
+      requestSpaceParticipationHandler: (_, _) async =>
+          throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
+    );
+
+    await tester.pumpWidget(
+      _testApp(repository, onSessionExpired: () => sessionExpiredCalls += 1),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('space-participation-request-button-3')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestSpaceParticipationCalls, 1);
+    expect(sessionExpiredCalls, 1);
+    expect(
+      find.byKey(const ValueKey('space-participation-request-error')),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'erro ao solicitar participação informa e permite tentar de novo',
+    (tester) async {
+      final repository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: [_availableSpace(4)]),
+        requestSpaceParticipationHandler: (_, _) async =>
+            throw const ApiFailure(ApiFailureKind.forbidden, statusCode: 403),
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+      final requestButton = find.byKey(
+        const ValueKey('space-participation-request-button-4'),
+      );
+
+      await tester.tap(requestButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.requestSpaceParticipationCalls, 1);
+      expect(
+        find.byKey(const ValueKey('space-participation-request-error')),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Seu acesso não permite solicitar participação neste espaço.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(requestButton);
+      await tester.pumpAndSettle();
+      expect(repository.requestSpaceParticipationCalls, 2);
+    },
+  );
+
+  testWidgets('409 recarrega a lista sem repetir a solicitação', (
+    tester,
+  ) async {
+    var fetchCalls = 0;
+    final repository = FakeSpacesRepository(
+      (_) async {
+        fetchCalls += 1;
+        return makeSpacePage(
+          content: fetchCalls == 1
+              ? [_availableSpace(5)]
+              : [
+                  const SpaceSummary(
+                    id: 5,
+                    name: 'Espaço 5',
+                    spaceAdminName: null,
+                    active: true,
+                    spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+                    spaceMembershipStatus: 'PENDING',
+                    activeParticipationsCount: 0,
+                  ),
+                ],
+        );
+      },
+      requestSpaceParticipationHandler: (_, _) async =>
+          throw const ApiFailure(ApiFailureKind.unknown, statusCode: 409),
     );
 
     await tester.pumpWidget(_testApp(repository));
     await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('space-participation-request-button-5')),
+    );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Espaço disponível'), findsOneWidget);
-    expect(find.text('Disponível'), findsOneWidget);
-    expect(find.textContaining('Responsável:'), findsNothing);
+    expect(repository.requestSpaceParticipationCalls, 1);
+    expect(repository.fetchSpacesCalls, 2);
+    expect(
+      find.byKey(const ValueKey('space-participation-request-button-5')),
+      findsNothing,
+    );
+    expect(find.text('Participação pendente'), findsOneWidget);
+    expect(
+      find.text('A solicitação já existe. Atualizando a lista.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -815,12 +994,14 @@ void main() {
 Widget _testApp(
   FakeSpacesRepository repository, {
   FakeTasksRepository? tasksRepository,
+  VoidCallback? onSessionExpired,
 }) {
   return MaterialApp(
     home: SpacesPage(
       session: testSession,
       spacesRepository: repository,
       tasksRepository: tasksRepository ?? FakeTasksRepository(),
+      onSessionExpired: onSessionExpired,
     ),
   );
 }
@@ -839,6 +1020,18 @@ SpaceSummary _makeSpace(int id) {
     spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
     spaceMembershipStatus: 'APPROVED',
     activeParticipationsCount: 1,
+  );
+}
+
+SpaceSummary _availableSpace(int id) {
+  return SpaceSummary(
+    id: id,
+    name: 'Espaço $id',
+    spaceAdminName: null,
+    active: true,
+    spaceUserRole: null,
+    spaceMembershipStatus: null,
+    activeParticipationsCount: 0,
   );
 }
 

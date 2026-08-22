@@ -26,6 +26,11 @@ abstract interface class SpacesRepository {
     int size = 10,
   });
 
+  Future<void> requestSpaceParticipation({
+    required String accessToken,
+    required int spaceId,
+  });
+
   Future<List<SpaceParticipantSummary>> searchSpaceParticipants({
     required String accessToken,
     required int spaceId,

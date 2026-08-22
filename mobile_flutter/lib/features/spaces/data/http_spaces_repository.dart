@@ -193,6 +193,41 @@ final class HttpSpacesRepository implements SpacesRepository {
   }
 
   @override
+  Future<void> requestSpaceParticipation({
+    required String accessToken,
+    required int spaceId,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .post(
+            _config.endpoint('/spaces/$spaceId/participations/request'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 204) {
+        throw _mapFailure(response);
+      }
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<List<SpaceParticipantSummary>> searchSpaceParticipants({
     required String accessToken,
     required int spaceId,

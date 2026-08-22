@@ -78,6 +78,11 @@ backend usa o identificador crescente. As categorias selecionadas determinam
 quais execuções compõem a pontuação e não removem participantes sem execução
 nelas.
 
+Nos espaços em que o usuário ainda não possui vínculo, o botão **Solicitar
+participação** chama `POST /spaces/{spaceId}/participations/request`, sem corpo.
+Após o sucesso `204 No Content`, a página é atualizada e passa a exibir a
+participação como pendente.
+
 O botão **Novo espaço** chama `POST /spaces` com o mesmo access token e envia
 somente o campo `name`, normalizado e validado com o limite de 255 caracteres.
 O backend cria esse espaço como inativo e registra o usuário autenticado como

@@ -48,8 +48,12 @@ class _SpacesPageState extends State<SpacesPage> {
   bool _isLoading = false;
   bool _areFiltersExpanded = false;
   int _requestGeneration = 0;
+  int _participationRequestGeneration = 0;
+  int? _requestingParticipationSpaceId;
   int _requestedPage = 0;
   int _pageSize = 10;
+
+  bool get _isBusy => _isLoading || _requestingParticipationSpaceId != null;
 
   @override
   void initState() {
@@ -70,12 +74,14 @@ class _SpacesPageState extends State<SpacesPage> {
     }
 
     _requestGeneration += 1;
+    _participationRequestGeneration += 1;
     _result = null;
     _failure = null;
     _selectedRole = null;
     _selectedStatus = null;
     _appliedFilters = const SpaceFilters();
     _isLoading = false;
+    _requestingParticipationSpaceId = null;
     _areFiltersExpanded = false;
     _requestedPage = 0;
     _pageSize = 10;
@@ -87,6 +93,7 @@ class _SpacesPageState extends State<SpacesPage> {
 
   @override
   void dispose() {
+    _participationRequestGeneration += 1;
     _scrollController.dispose();
     _nameFilterController.dispose();
     super.dispose();
@@ -97,7 +104,7 @@ class _SpacesPageState extends State<SpacesPage> {
     int? page,
     int? size,
   }) async {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
 
@@ -171,7 +178,7 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   void _applyFilters() {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
     unawaited(
@@ -187,7 +194,7 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   void _clearFilters() {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
     _nameFilterController.clear();
@@ -206,7 +213,7 @@ class _SpacesPageState extends State<SpacesPage> {
 
   void _goToPage(int page) {
     final result = _result;
-    if (_isLoading ||
+    if (_isBusy ||
         result == null ||
         page < 0 ||
         page >= result.totalPages ||
@@ -217,7 +224,7 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   void _changePageSize(int? size) {
-    if (_isLoading ||
+    if (_isBusy ||
         size == null ||
         size == _pageSize ||
         !_pageSizeOptions.contains(size)) {
@@ -227,6 +234,9 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   void _openTasks(SpaceSummary space) {
+    if (_isBusy) {
+      return;
+    }
     unawaited(
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -246,6 +256,9 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   void _openParticipants(SpaceSummary space) {
+    if (_isBusy) {
+      return;
+    }
     unawaited(
       Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -263,6 +276,9 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   Future<void> _openCreateSpaceDialog() async {
+    if (_isBusy) {
+      return;
+    }
     final createdSpace = await showDialog<CreatedSpace>(
       context: context,
       barrierDismissible: false,
@@ -294,6 +310,78 @@ class _SpacesPageState extends State<SpacesPage> {
     }
   }
 
+  Future<void> _requestParticipation(SpaceSummary space) async {
+    if (_isBusy ||
+        space.spaceMembershipStatus != null ||
+        space.spaceUserRole != null) {
+      return;
+    }
+
+    final requestGeneration = ++_participationRequestGeneration;
+    setState(() => _requestingParticipationSpaceId = space.id);
+
+    try {
+      await widget.spacesRepository.requestSpaceParticipation(
+        accessToken: widget.session.accessToken,
+        spaceId: space.id,
+      );
+      if (!mounted || requestGeneration != _participationRequestGeneration) {
+        return;
+      }
+
+      setState(() => _requestingParticipationSpaceId = null);
+      _showParticipationMessage(
+        key: const ValueKey('space-participation-requested-message'),
+        message: 'Solicitação enviada para "${space.name}".',
+      );
+      await _loadSpaces(
+        page: _result?.number ?? _requestedPage,
+        size: _pageSize,
+      );
+    } on ApiFailure catch (failure) {
+      if (!mounted || requestGeneration != _participationRequestGeneration) {
+        return;
+      }
+      setState(() => _requestingParticipationSpaceId = null);
+      if (failure.kind == ApiFailureKind.unauthorized &&
+          widget.onSessionExpired != null) {
+        widget.onSessionExpired!.call();
+        return;
+      }
+      _showParticipationMessage(
+        key: const ValueKey('space-participation-request-error'),
+        message: _participationRequestFailureMessage(failure),
+      );
+      if (_shouldReloadAfterParticipationFailure(failure)) {
+        await _loadSpaces(
+          page: _result?.number ?? _requestedPage,
+          size: _pageSize,
+        );
+      }
+    } on Object {
+      if (!mounted || requestGeneration != _participationRequestGeneration) {
+        return;
+      }
+      setState(() => _requestingParticipationSpaceId = null);
+      _showParticipationMessage(
+        key: const ValueKey('space-participation-request-error'),
+        message: _participationRequestFailureMessage(
+          const ApiFailure(ApiFailureKind.unknown),
+        ),
+      );
+      await _loadSpaces(
+        page: _result?.number ?? _requestedPage,
+        size: _pageSize,
+      );
+    }
+  }
+
+  void _showParticipationMessage({required Key key, required String message}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(key: key, content: Text(message)));
+  }
+
   bool get _hasActiveFilters {
     return (_appliedFilters.name?.trim().isNotEmpty ?? false) ||
         _appliedFilters.role != null ||
@@ -312,7 +400,7 @@ class _SpacesPageState extends State<SpacesPage> {
       body: SafeArea(child: _buildBody(context)),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('create-space-button'),
-        onPressed: _openCreateSpaceDialog,
+        onPressed: _isBusy ? null : _openCreateSpaceDialog,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Novo espaço'),
       ),
@@ -342,7 +430,11 @@ class _SpacesPageState extends State<SpacesPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: () => _loadSpaces(page: result.number),
+      onRefresh: () async {
+        if (!_isBusy) {
+          await _loadSpaces(page: result.number);
+        }
+      },
       child: ListView(
         controller: _scrollController,
         key: const ValueKey('spaces-list'),
@@ -355,7 +447,7 @@ class _SpacesPageState extends State<SpacesPage> {
             nameController: _nameFilterController,
             selectedRole: _selectedRole,
             selectedStatus: _selectedStatus,
-            isLoading: _isLoading,
+            isLoading: _isBusy,
             isExpanded: _areFiltersExpanded,
             hasActiveFilters: _hasActiveFilters,
             onRoleChanged: (role) => setState(() => _selectedRole = role),
@@ -389,6 +481,15 @@ class _SpacesPageState extends State<SpacesPage> {
               for (final space in result.content) ...[
                 _SpaceCard(
                   space: space,
+                  isRequestingParticipation:
+                      _requestingParticipationSpaceId == space.id,
+                  areActionsBusy: _isBusy,
+                  onRequestParticipation:
+                      space.spaceMembershipStatus == null &&
+                          space.spaceUserRole == null &&
+                          !_isBusy
+                      ? () => unawaited(_requestParticipation(space))
+                      : null,
                   onViewParticipants: space.spaceMembershipStatus == 'APPROVED'
                       ? () => _openParticipants(space)
                       : null,
@@ -399,16 +500,23 @@ class _SpacesPageState extends State<SpacesPage> {
                 const SizedBox(height: 12),
               ],
             const SizedBox(height: 8),
-            PagedListPaginationBar(
-              keyPrefix: 'spaces',
-              currentPage: result.number,
-              pageItemCount: result.content.length,
-              totalElements: result.totalElements,
-              totalPages: result.totalPages,
-              pageSize: _pageSize,
-              pageSizeOptions: _pageSizeOptions,
-              onPageSelected: _goToPage,
-              onPageSizeChanged: _changePageSize,
+            IgnorePointer(
+              ignoring: _isBusy,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: _isBusy ? 0.55 : 1,
+                child: PagedListPaginationBar(
+                  keyPrefix: 'spaces',
+                  currentPage: result.number,
+                  pageItemCount: result.content.length,
+                  totalElements: result.totalElements,
+                  totalPages: result.totalPages,
+                  pageSize: _pageSize,
+                  pageSizeOptions: _pageSizeOptions,
+                  onPageSelected: _goToPage,
+                  onPageSizeChanged: _changePageSize,
+                ),
+              ),
             ),
           ],
         ],
@@ -678,11 +786,17 @@ class _FilterDropdown<T> extends StatelessWidget {
 class _SpaceCard extends StatelessWidget {
   const _SpaceCard({
     required this.space,
+    required this.isRequestingParticipation,
+    required this.areActionsBusy,
+    required this.onRequestParticipation,
     required this.onViewParticipants,
     required this.onViewTasks,
   });
 
   final SpaceSummary space;
+  final bool isRequestingParticipation;
+  final bool areActionsBusy;
+  final VoidCallback? onRequestParticipation;
   final VoidCallback? onViewParticipants;
   final VoidCallback? onViewTasks;
 
@@ -752,11 +866,23 @@ class _SpaceCard extends StatelessWidget {
                   key: ValueKey('space-participants-button-${space.id}'),
                   label: _participantsLabel(space.activeParticipationsCount),
                   onPressed: onViewParticipants,
+                  isBusy: areActionsBusy,
                 ),
-                _InfoChip(
-                  icon: _membershipIcon(space.spaceMembershipStatus),
-                  label: _membershipLabel(space),
-                ),
+                if (space.spaceMembershipStatus == null &&
+                    space.spaceUserRole == null)
+                  _RequestParticipationChip(
+                    key: ValueKey(
+                      'space-participation-request-button-${space.id}',
+                    ),
+                    spaceName: space.name,
+                    isLoading: isRequestingParticipation,
+                    onPressed: onRequestParticipation,
+                  )
+                else
+                  _InfoChip(
+                    icon: _membershipIcon(space.spaceMembershipStatus),
+                    label: _membershipLabel(space),
+                  ),
               ],
             ),
             const SizedBox(height: 14),
@@ -765,10 +891,12 @@ class _SpaceCard extends StatelessWidget {
               child: Tooltip(
                 message: onViewTasks == null
                     ? 'Participação aprovada necessária'
+                    : areActionsBusy
+                    ? 'Aguarde a solicitação em andamento'
                     : 'Ver tarefas deste espaço',
                 child: OutlinedButton.icon(
                   key: ValueKey('space-tasks-button-${space.id}'),
-                  onPressed: onViewTasks,
+                  onPressed: areActionsBusy ? null : onViewTasks,
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 40),
                     padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -789,23 +917,27 @@ class _ParticipantsChip extends StatelessWidget {
   const _ParticipantsChip({
     required this.label,
     required this.onPressed,
+    required this.isBusy,
     super.key,
   });
 
   final String label;
   final VoidCallback? onPressed;
+  final bool isBusy;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    final tooltip = enabled
-        ? 'Ver participantes ativos'
-        : 'Participação aprovada necessária';
+    final enabled = onPressed != null && !isBusy;
+    final tooltip = onPressed == null
+        ? 'Participação aprovada necessária'
+        : isBusy
+        ? 'Aguarde a solicitação em andamento'
+        : 'Ver participantes ativos';
     return Semantics(
       button: true,
       enabled: enabled,
       label: '$label. $tooltip',
-      onTap: onPressed,
+      onTap: enabled ? onPressed : null,
       child: ExcludeSemantics(
         child: Tooltip(
           message: tooltip,
@@ -813,7 +945,7 @@ class _ParticipantsChip extends StatelessWidget {
             color: const Color(0xFFF1F6F5),
             borderRadius: BorderRadius.circular(999),
             child: InkWell(
-              onTap: onPressed,
+              onTap: enabled ? onPressed : null,
               borderRadius: BorderRadius.circular(999),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -875,6 +1007,83 @@ class _InfoChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RequestParticipationChip extends StatelessWidget {
+  const _RequestParticipationChip({
+    required this.spaceName,
+    required this.isLoading,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String spaceName;
+  final bool isLoading;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isLoading
+        ? 'Solicitando participação...'
+        : 'Solicitar participação';
+    final semanticLabel = isLoading
+        ? 'Solicitando participação em $spaceName'
+        : 'Solicitar participação em $spaceName';
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: onPressed != null,
+      liveRegion: isLoading,
+      label: semanticLabel,
+      onTap: onPressed,
+      child: ExcludeSemantics(
+        child: Tooltip(
+          message: semanticLabel,
+          child: Material(
+            color: const Color(0xFFF1F6F5),
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(999),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isLoading)
+                        const SizedBox.square(
+                          key: ValueKey('space-participation-request-progress'),
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        const Icon(
+                          Icons.person_add_alt_1_outlined,
+                          size: 17,
+                          color: Color(0xFF37615E),
+                        ),
+                      const SizedBox(width: 7),
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: const Color(0xFF37615E),
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1016,7 +1225,48 @@ String _membershipLabel(SpaceSummary space) {
       _ => 'Participação aprovada',
     },
     'PENDING' => 'Participação pendente',
-    _ => 'Disponível',
+    _ => 'Participação indisponível',
+  };
+}
+
+String _participationRequestFailureMessage(ApiFailure failure) {
+  if (failure.statusCode == 404) {
+    return 'O espaço não foi encontrado. Atualizando a lista.';
+  }
+  if (failure.statusCode == 409) {
+    return 'A solicitação já existe. Atualizando a lista.';
+  }
+  return switch (failure.kind) {
+    ApiFailureKind.validation =>
+      'Não foi possível enviar a solicitação com os dados informados.',
+    ApiFailureKind.unauthorized =>
+      'Sua sessão expirou. Entre novamente para continuar.',
+    ApiFailureKind.forbidden =>
+      'Seu acesso não permite solicitar participação neste espaço.',
+    ApiFailureKind.rateLimited =>
+      'Muitas solicitações foram feitas. Aguarde e tente novamente.',
+    ApiFailureKind.timeout ||
+    ApiFailureKind.network ||
+    ApiFailureKind.server ||
+    ApiFailureKind.malformedResponse ||
+    ApiFailureKind.unknown =>
+      'Não foi possível confirmar a solicitação. Atualizando a lista para '
+          'conferir o estado.',
+    _ => 'Não foi possível solicitar participação agora.',
+  };
+}
+
+bool _shouldReloadAfterParticipationFailure(ApiFailure failure) {
+  if (failure.statusCode == 404 || failure.statusCode == 409) {
+    return true;
+  }
+  return switch (failure.kind) {
+    ApiFailureKind.timeout ||
+    ApiFailureKind.network ||
+    ApiFailureKind.server ||
+    ApiFailureKind.malformedResponse ||
+    ApiFailureKind.unknown => true,
+    _ => false,
   };
 }
 

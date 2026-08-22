@@ -172,6 +172,8 @@ typedef SearchSpaceParticipantsHandler =
       int spaceId,
       String name,
     );
+typedef RequestSpaceParticipationHandler =
+    Future<void> Function(String accessToken, int spaceId);
 
 final class FakeSpacesRepository implements SpacesRepository {
   FakeSpacesRepository(
@@ -180,6 +182,7 @@ final class FakeSpacesRepository implements SpacesRepository {
     this.createHandler,
     this.fetchParticipantsHandler,
     this.searchParticipantsHandler,
+    this.requestSpaceParticipationHandler,
   });
 
   final FetchSpacesHandler _handler;
@@ -187,10 +190,12 @@ final class FakeSpacesRepository implements SpacesRepository {
   final CreateSpaceHandler? createHandler;
   final FetchSpaceParticipantsHandler? fetchParticipantsHandler;
   final SearchSpaceParticipantsHandler? searchParticipantsHandler;
+  final RequestSpaceParticipationHandler? requestSpaceParticipationHandler;
   int fetchSpacesCalls = 0;
   int createSpaceCalls = 0;
   int fetchSpaceParticipantsCalls = 0;
   int searchSpaceParticipantsCalls = 0;
+  int requestSpaceParticipationCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
@@ -205,6 +210,8 @@ final class FakeSpacesRepository implements SpacesRepository {
   final receivedParticipantSearchAccessTokens = <String>[];
   final receivedParticipantSearchSpaceIds = <int>[];
   final receivedParticipantSearchNames = <String>[];
+  final receivedRequestSpaceParticipationAccessTokens = <String>[];
+  final receivedRequestSpaceParticipationSpaceIds = <int>[];
 
   @override
   Future<CreatedSpace> createSpace({
@@ -282,6 +289,23 @@ final class FakeSpacesRepository implements SpacesRepository {
     return Future<List<SpaceParticipantSummary>>.value(
       const <SpaceParticipantSummary>[],
     );
+  }
+
+  @override
+  Future<void> requestSpaceParticipation({
+    required String accessToken,
+    required int spaceId,
+  }) {
+    requestSpaceParticipationCalls += 1;
+    receivedRequestSpaceParticipationAccessTokens.add(accessToken);
+    receivedRequestSpaceParticipationSpaceIds.add(spaceId);
+    final handler = requestSpaceParticipationHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de solicitacao de participacao nao configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId);
   }
 }
 
