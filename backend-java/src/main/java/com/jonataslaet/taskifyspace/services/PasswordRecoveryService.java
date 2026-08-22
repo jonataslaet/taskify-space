@@ -15,24 +15,37 @@ import java.util.Objects;
 @Service
 public class PasswordRecoveryService {
 
+    private static final String RECOVERY_TOKEN_PATTERN = "\\d{6}";
+
     private final PasswordRecoveryRepository passwordRecoveryRepository;
 
     public PasswordRecoveryService(PasswordRecoveryRepository passwordRecoveryRepository) {
         this.passwordRecoveryRepository = passwordRecoveryRepository;
     }
 
-
-    public List<PasswordRecovery> getValidPasswordRecoveries(String uuidToken, Instant now) {
-        String tokenHash = TokenUtils.sha256(uuidToken);
+    public List<PasswordRecovery> getValidPasswordRecoveries(String rawToken, Instant now) {
+        validateRecoveryTokenFormat(rawToken);
+        String tokenHash = TokenUtils.sha256(rawToken);
         List<PasswordRecovery> passwordRecoveries =
             passwordRecoveryRepository.findValidPasswordRecoveries(tokenHash, now);
         validPasswordRecoveries(passwordRecoveries);
         return passwordRecoveries;
     }
 
+    public boolean hasValidPasswordRecovery(String rawToken, Instant now) {
+        validateRecoveryTokenFormat(rawToken);
+        return passwordRecoveryRepository.existsByTokenHashAndExpirationAfter(TokenUtils.sha256(rawToken), now);
+    }
+
+    private void validateRecoveryTokenFormat(String rawToken) {
+        if (Objects.isNull(rawToken) || !rawToken.matches(RECOVERY_TOKEN_PATTERN)) {
+            throw new TokenExpirationException("O token de recuperacao e invalido. Por favor, tente novamente.");
+        }
+    }
+
     private void validPasswordRecoveries(List<PasswordRecovery> passwordRecoveries) {
         if (Objects.isNull(passwordRecoveries) || passwordRecoveries.isEmpty()) {
-            throw new TokenExpirationException("O token de recuperação é inválido. Por favor, tente novamente.");
+            throw new TokenExpirationException("O token de recuperacao e invalido. Por favor, tente novamente.");
         }
     }
 
@@ -41,7 +54,7 @@ public class PasswordRecoveryService {
         try {
             return passwordRecoveryRepository.save(passwordRecovery);
         } catch (Exception e) {
-            throw new ResourceStorageException("Problema desconhecido ao salvar recuperação de senha");
+            throw new ResourceStorageException("Problema desconhecido ao salvar recuperacao de senha");
         }
     }
 

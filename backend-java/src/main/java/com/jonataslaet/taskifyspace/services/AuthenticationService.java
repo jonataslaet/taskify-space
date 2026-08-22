@@ -143,10 +143,10 @@ public class AuthenticationService {
     }
 
     @Transactional
-    public void resetPassword(String uuidToken, PasswordResetDTO passwordRenovationDTO) {
+    public void resetPassword(String rawToken, PasswordResetDTO passwordRenovationDTO) {
         validPasswordRenovation(passwordRenovationDTO);
         List<PasswordRecovery> passwordRecoveries =
-            passwordRecoveryService.getValidPasswordRecoveries(uuidToken, Instant.now());
+            passwordRecoveryService.getValidPasswordRecoveries(rawToken, Instant.now());
         PasswordRecovery validPasswordRecovery = passwordRecoveries.getFirst();
         User user = userRepository.findByEmail(EmailUtils.normalize(validPasswordRecovery.getEmail())).orElseThrow(() ->
             new ResourceNotFoundException("Usuário não encontrado"));

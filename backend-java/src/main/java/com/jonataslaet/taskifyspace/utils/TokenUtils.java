@@ -27,6 +27,15 @@ public class TokenUtils {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    public static String generateNumericToken(int digits) {
+        if (digits <= 0 || digits > 9) {
+            throw new IllegalArgumentException("digits must be between 1 and 9");
+        }
+
+        int bound = (int) Math.pow(10, digits);
+        return String.format("%0" + digits + "d", RNG.nextInt(bound));
+    }
+
     public static boolean isBearerAuthorizationHeader(String headerValue) {
         if (Objects.isNull(headerValue) || headerValue.isBlank()) {
             return false;

@@ -301,11 +301,11 @@ public class DatabaseService {
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO2.id());
 
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
-        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
+//        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userBellaLaet);
 
         Set<Long> usersToBeApproved = new HashSet<>();
-        usersToBeApproved.add(userRalphLaet.getId());
+//        usersToBeApproved.add(userRalphLaet.getId());
         usersToBeApproved.add(userBellaLaet.getId());
         usersToBeApproved.add(adminJonatasLaet.getId());
 

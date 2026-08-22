@@ -14,12 +14,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class PasswordRecoveryTokenService {
 
-    @Value("${security.email.password-recover.token.minutes}")
+    private static final int TOKEN_DIGITS = 6;
+    private static final int MAX_TOKEN_GENERATION_ATTEMPTS = 10;
+
+    @Value("${security.email.password-recover.token.minutes:10}")
     private Long tokenMinutes;
 
     private final UserRepository userRepository;
@@ -46,12 +48,23 @@ public class PasswordRecoveryTokenService {
         Instant now = Instant.now(clock);
         passwordRecoveryService.expireValidPasswordRecoveriesByEmail(user.getEmail(), now);
 
-        String rawToken = UUID.randomUUID().toString();
+        String rawToken = generateUniqueRecoveryToken(now);
         PasswordRecovery passwordRecovery = new PasswordRecovery(TokenUtils.sha256(rawToken),
             user.getEmail(), now.plusSeconds(60 * tokenMinutes)
         );
         passwordRecoveryService.savePasswordRecovery(passwordRecovery);
 
         return Optional.of(new PasswordRecoveryEmail(user.getEmail(), rawToken));
+    }
+
+    private String generateUniqueRecoveryToken(Instant now) {
+        for (int attempt = 0; attempt < MAX_TOKEN_GENERATION_ATTEMPTS; attempt++) {
+            String rawToken = TokenUtils.generateNumericToken(TOKEN_DIGITS);
+            if (!passwordRecoveryService.hasValidPasswordRecovery(rawToken, now)) {
+                return rawToken;
+            }
+        }
+
+        throw new IllegalStateException("Unable to generate a unique password recovery token");
     }
 }

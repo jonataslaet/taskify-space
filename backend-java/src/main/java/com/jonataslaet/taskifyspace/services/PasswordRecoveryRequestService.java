@@ -36,8 +36,9 @@ public class PasswordRecoveryRequestService {
     }
 
     private void sendRecoveryEmail(PasswordRecoveryEmail recoveryEmail) {
-        String emailBody = "Clique no seguinte link para resetar sua senha: \n"
-            + passwordRecoveryUri + recoveryEmail.token()  + "\n\n Esse link expirara daqui a 30 minutos. "
+        String emailBody = "Use o seguinte codigo para resetar sua senha: " + recoveryEmail.token() + "\n"
+            + "Ou acesse o link: " + passwordRecoveryUri + recoveryEmail.token() + "\n"
+            + "Esse codigo expirara daqui a 10 minutos. "
             + "Portanto, se esse email nao foi solicitado por voce, apenas o ignore.";
 
         emailService.sendEmail(new SendingEmailDTO( recoveryEmail.address(),

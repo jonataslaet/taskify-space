@@ -23,6 +23,8 @@ public interface PasswordRecoveryRepository extends JpaRepository<@NonNull Passw
         @Param("tokenHash") String tokenHash,
         @Param("now") Instant now);
 
+    boolean existsByTokenHashAndExpirationAfter(String tokenHash, Instant now);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE PasswordRecovery passRecovery

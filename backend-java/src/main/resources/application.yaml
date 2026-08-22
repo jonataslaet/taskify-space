@@ -29,7 +29,7 @@ security:
     password-recover:
       uri: ${PASSWORD_RECOVER_URI:http://localhost:5173/new-password/}
       token:
-        minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES}
+        minutes: ${PASSWORD_RECOVER_TOKEN_MINUTES:10}
     registration-confirmation:
       uri: ${REGISTRATION_CONFIRMATION_URI:http://localhost:5173/confirm-registration?token=}
       token:
