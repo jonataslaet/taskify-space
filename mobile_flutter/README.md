@@ -156,3 +156,40 @@ dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 ```
+
+## Recuperação de senha e códigos
+
+Ao solicitar a recuperação, o aplicativo chama `POST /auth/recovery-token` com
+`{"address":"usuario@exemplo.com"}`. O `200 OK` é uma confirmação genérica e
+não devolve o código: se a conta existir, ele será enviado por e-mail.
+
+Depois do `200`, a tela de redefinição solicita o código, a nova senha e sua
+confirmação. O código tem exatamente seis dígitos ASCII, pode começar com zero
+e, na configuração padrão do backend, expira em 10 minutos. O envio chama
+`POST /auth/new-password/{codigo}` com `newPassword` e
+`newPasswordConfirmation`; o sucesso é `204 No Content`.
+
+O e-mail também traz um link como alternativa à digitação manual. Esse link
+abre `/new-password/{codigo}` sem exigir sessão e preenche o mesmo fluxo de
+redefinição. Depois do sucesso, qualquer sessão local é removida e a pilha de
+navegação volta ao login com a confirmação da troca.
+
+O backend monta o link concatenando o código ao valor de `PASSWORD_RECOVER_URI`.
+Esse valor precisa terminar com `/` e apontar para a entrada adequada ao alvo:
+
+- Web: `PASSWORD_RECOVER_URI=https://app.exemplo.com/new-password/`. O servidor
+  que hospeda o Flutter Web precisa reescrever acessos diretos a
+  `/new-password/*` para `index.html`; o aplicativo usa URLs sem `#`.
+- Android/iOS com esquema customizado:
+  `PASSWORD_RECOVER_URI=taskifyspace://new-password/`.
+
+O manifest Android registra `http` e `https` somente para os hosts locais
+`localhost` e `10.0.2.2`, no prefixo `/new-password/`, além do esquema
+`taskifyspace`. Ele não reivindica links de outros domínios. No iOS, por falta de
+um domínio de produção definido, apenas o esquema customizado está registrado.
+
+O esquema customizado não comprova a identidade do aplicativo. Para links
+verificados em produção, é necessário escolher o domínio final, adicioná-lo ao
+manifest/entitlements e publicar `assetlinks.json` no Android e o arquivo AASA
+(`apple-app-site-association`) no iOS. Um único link HTTPS verificado pode então
+abrir o aplicativo instalado e manter a página web como fallback.

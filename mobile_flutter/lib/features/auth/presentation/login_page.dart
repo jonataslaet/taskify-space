@@ -5,16 +5,19 @@ import 'package:flutter/services.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
+import 'package:mobile_flutter/features/auth/presentation/forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
     required this.authenticationRepository,
     required this.onAuthenticated,
+    this.passwordResetSucceeded = false,
     super.key,
   });
 
   final AuthenticationRepository authenticationRepository;
   final ValueChanged<AuthSession> onAuthenticated;
+  final bool passwordResetSucceeded;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -34,6 +37,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   bool _isSubmitting = false;
   bool _isRegistering = false;
   bool _isPasswordVisible = false;
+  late bool _showPasswordResetSuccess;
   ApiFailure? _failure;
   String? _successMessage;
   int _retrySeconds = 0;
@@ -63,6 +67,17 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _showPasswordResetSuccess = widget.passwordResetSucceeded;
+  }
+
+  @override
+  void didUpdateWidget(covariant LoginPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.passwordResetSucceeded && widget.passwordResetSucceeded) {
+      _showPasswordResetSuccess = true;
+      _failure = null;
+      _successMessage = null;
+    }
   }
 
   @override
@@ -163,6 +178,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       _isSubmitting = true;
       _failure = null;
       _successMessage = null;
+      _showPasswordResetSuccess = false;
     });
 
     try {
@@ -319,6 +335,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       _isRegistering = !_isRegistering;
       _failure = null;
       _successMessage = null;
+      _showPasswordResetSuccess = false;
       _retryTimer?.cancel();
       _retryEndsAt = null;
       _retrySeconds = 0;
@@ -328,10 +345,37 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _openForgotPassword() async {
+    if (_isBlocked || _isRegistering) {
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final passwordReset = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => ForgotPasswordPage(
+          authenticationRepository: widget.authenticationRepository,
+          initialEmail: _emailController.text,
+        ),
+      ),
+    );
+    if (!mounted || passwordReset != true) {
+      return;
+    }
+    setState(() {
+      _failure = null;
+      _successMessage = null;
+      _showPasswordResetSuccess = true;
+      _isPasswordVisible = false;
+      _passwordController.clear();
+      _passwordConfirmationController.clear();
+    });
+  }
+
   Widget _buildLoginCard({required bool showBrandMark}) {
     final theme = Theme.of(context);
     final failure = _failure;
     final successMessage = _successMessage;
+    final passwordResetSucceeded = _showPasswordResetSuccess;
     return Card(
       elevation: 0,
       color: Colors.white.withValues(alpha: 0.96),
@@ -452,6 +496,17 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                     }
                   },
                 ),
+                if (!_isRegistering) ...[
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      key: const Key('forgot-password-button'),
+                      onPressed: _isBlocked ? null : _openForgotPassword,
+                      child: const Text('Esqueci minha senha'),
+                    ),
+                  ),
+                ],
                 if (_isRegistering) ...[
                   const SizedBox(height: 18),
                   TextFormField(
@@ -475,7 +530,10 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                 ],
                 AnimatedSize(
                   duration: const Duration(milliseconds: 180),
-                  child: failure == null && successMessage == null
+                  child:
+                      failure == null &&
+                          successMessage == null &&
+                          !passwordResetSucceeded
                       ? const SizedBox(height: 24)
                       : Padding(
                           padding: const EdgeInsets.only(top: 18, bottom: 6),
@@ -483,9 +541,11 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                             liveRegion: true,
                             child: Container(
                               key: Key(
-                                failure == null
-                                    ? 'registration-success'
-                                    : 'login-error',
+                                failure != null
+                                    ? 'login-error'
+                                    : passwordResetSucceeded
+                                    ? 'password-reset-success'
+                                    : 'registration-success',
                               ),
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
@@ -508,10 +568,11 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      failure?.userMessage(
-                                            retrySeconds: _retrySeconds,
-                                          ) ??
-                                          successMessage!,
+                                      failure?.userMessage() ??
+                                          (passwordResetSucceeded
+                                              ? 'Senha redefinida com sucesso. '
+                                                    'Entre com sua nova senha.'
+                                              : successMessage!),
                                       style: TextStyle(
                                         color: failure == null
                                             ? theme

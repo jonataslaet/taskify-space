@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/auth/presentation/forgot_password_page.dart';
 import 'package:mobile_flutter/features/auth/presentation/login_page.dart';
 
 import '../../../helpers/fakes.dart';
@@ -108,12 +109,23 @@ void main() {
     await tester.pump();
 
     expect(find.text('Tente novamente em 2s'), findsOneWidget);
+    expect(
+      find.text('Muitas tentativas. Aguarde um pouco e tente novamente.'),
+      findsOneWidget,
+    );
     final button = tester.widget<FilledButton>(
       find.byKey(const Key('login-button')),
     );
     expect(button.onPressed, isNull);
 
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Tente novamente em 1s'), findsOneWidget);
+    expect(
+      find.text('Muitas tentativas. Aguarde um pouco e tente novamente.'),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 1));
     expect(find.text('Entrar'), findsOneWidget);
     expect(find.byKey(const Key('login-error')), findsNothing);
   });
@@ -189,16 +201,178 @@ void main() {
     );
     expect(find.text('Entrar'), findsWidgets);
   });
+
+  testWidgets('abre recuperação com o e-mail atual pré-preenchido', (
+    tester,
+  ) async {
+    final repository = FakeAuthenticationRepository(
+      (_, _) async => testSession,
+    );
+    await tester.pumpWidget(_testApp(repository));
+    await tester.enterText(
+      find.byKey(const Key('email-field')),
+      'user@example.com',
+    );
+
+    await tester.tap(find.byKey(const Key('forgot-password-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ForgotPasswordPage), findsOneWidget);
+    expect(find.byKey(const ValueKey('forgot-password-page')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('forgot-password-email-field')),
+          )
+          .controller
+          ?.text,
+      'user@example.com',
+    );
+  });
+
+  testWidgets(
+    'propaga redefinição por código, limpa senha e confirma no login',
+    (tester) async {
+      final repository = FakeAuthenticationRepository(
+        (_, _) async => testSession,
+        requestPasswordRecoveryHandler: (email) async {
+          expect(email, 'user@example.com');
+        },
+        resetPasswordHandler: (token, password, confirmation) async {
+          expect(token, '123456');
+          expect(password, 'NewSecret1!');
+          expect(confirmation, 'NewSecret1!');
+        },
+      );
+      await tester.binding.setSurfaceSize(const Size(800, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_testApp(repository));
+      await tester.enterText(
+        find.byKey(const Key('email-field')),
+        'user@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const Key('password-field')),
+        'OldSecret1!',
+      );
+
+      await tester.tap(find.byKey(const Key('forgot-password-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('forgot-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('new-password-code-field')),
+        findsOneWidget,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('new-password-code-field')),
+        '123456',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('new-password-field')),
+        'NewSecret1!',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('new-password-confirmation-field')),
+        'NewSecret1!',
+      );
+      final resetButton = find.byKey(
+        const ValueKey('new-password-submit-button'),
+      );
+      await tester.ensureVisible(resetButton);
+      await tester.tap(resetButton);
+      await tester.pumpAndSettle();
+
+      expect(repository.requestPasswordRecoveryCalls, 1);
+      expect(repository.resetPasswordCalls, 1);
+      expect(find.byType(ForgotPasswordPage), findsNothing);
+      expect(find.byKey(const Key('password-reset-success')), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('email-field')))
+            .controller
+            ?.text,
+        'user@example.com',
+      );
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('password-field')))
+            .controller
+            ?.text,
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets('não oferece recuperação no modo de cadastro', (tester) async {
+    final repository = FakeAuthenticationRepository(
+      (_, _) async => testSession,
+    );
+    await tester.pumpWidget(_testApp(repository));
+
+    expect(find.byKey(const Key('forgot-password-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('toggle-auth-mode-button')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('forgot-password-button')), findsNothing);
+  });
+
+  testWidgets('anuncia a senha redefinida recebida na primeira construção', (
+    tester,
+  ) async {
+    final repository = FakeAuthenticationRepository(
+      (_, _) async => testSession,
+    );
+    await tester.pumpWidget(_testApp(repository, passwordResetSucceeded: true));
+
+    expect(find.byKey(const Key('password-reset-success')), findsOneWidget);
+    expect(
+      find.text('Senha redefinida com sucesso. Entre com sua nova senha.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.liveRegion == true,
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('reage quando o resultado de redefinição muda para sucesso', (
+    tester,
+  ) async {
+    final repository = FakeAuthenticationRepository(
+      (_, _) async => testSession,
+    );
+    const pageKey = ValueKey('stable-login-page');
+
+    await tester.pumpWidget(_testApp(repository, loginPageKey: pageKey));
+    expect(find.byKey(const Key('password-reset-success')), findsNothing);
+
+    await tester.pumpWidget(
+      _testApp(repository, loginPageKey: pageKey, passwordResetSucceeded: true),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('password-reset-success')), findsOneWidget);
+  });
 }
 
 Widget _testApp(
   FakeAuthenticationRepository repository, {
   ValueChanged<AuthSession>? onAuthenticated,
+  bool passwordResetSucceeded = false,
+  Key? loginPageKey,
 }) {
   return MaterialApp(
     home: LoginPage(
+      key: loginPageKey,
       authenticationRepository: repository,
       onAuthenticated: onAuthenticated ?? (_) {},
+      passwordResetSucceeded: passwordResetSucceeded,
     ),
   );
 }

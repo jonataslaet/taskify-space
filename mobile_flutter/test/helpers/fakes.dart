@@ -102,21 +102,38 @@ typedef RegisterHandler =
       String passwordConfirmation,
     );
 typedef LogoutHandler = Future<void> Function(String refreshToken);
+typedef RequestPasswordRecoveryHandler = Future<void> Function(String email);
+typedef ResetPasswordHandler =
+    Future<void> Function(
+      String token,
+      String newPassword,
+      String newPasswordConfirmation,
+    );
 
 final class FakeAuthenticationRepository implements AuthenticationRepository {
   FakeAuthenticationRepository(
     this._handler, {
     this.registerHandler,
     this.logoutHandler,
+    this.requestPasswordRecoveryHandler,
+    this.resetPasswordHandler,
   });
 
   final LoginHandler _handler;
   final RegisterHandler? registerHandler;
   final LogoutHandler? logoutHandler;
+  final RequestPasswordRecoveryHandler? requestPasswordRecoveryHandler;
+  final ResetPasswordHandler? resetPasswordHandler;
   int loginCalls = 0;
   int registerCalls = 0;
   int logoutCalls = 0;
+  int requestPasswordRecoveryCalls = 0;
+  int resetPasswordCalls = 0;
   final receivedRefreshTokens = <String>[];
+  final receivedPasswordRecoveryEmails = <String>[];
+  final receivedPasswordResetTokens = <String>[];
+  final receivedNewPasswords = <String>[];
+  final receivedNewPasswordConfirmations = <String>[];
 
   @override
   Future<AuthSession> login({required String email, required String password}) {
@@ -138,6 +155,19 @@ final class FakeAuthenticationRepository implements AuthenticationRepository {
   }
 
   @override
+  Future<void> requestPasswordRecovery({required String email}) {
+    requestPasswordRecoveryCalls += 1;
+    receivedPasswordRecoveryEmails.add(email);
+    final handler = requestPasswordRecoveryHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de recuperação de senha não configurado.'),
+      );
+    }
+    return handler(email);
+  }
+
+  @override
   Future<void> register({
     required String name,
     required String email,
@@ -152,6 +182,25 @@ final class FakeAuthenticationRepository implements AuthenticationRepository {
       );
     }
     return handler(name, email, password, passwordConfirmation);
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) {
+    resetPasswordCalls += 1;
+    receivedPasswordResetTokens.add(token);
+    receivedNewPasswords.add(newPassword);
+    receivedNewPasswordConfirmations.add(newPasswordConfirmation);
+    final handler = resetPasswordHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de redefinição de senha não configurado.'),
+      );
+    }
+    return handler(token, newPassword, newPasswordConfirmation);
   }
 }
 

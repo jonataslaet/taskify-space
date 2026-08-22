@@ -5,10 +5,18 @@ abstract interface class AuthenticationRepository {
 
   Future<void> logout({required String refreshToken});
 
+  Future<void> requestPasswordRecovery({required String email});
+
   Future<void> register({
     required String name,
     required String email,
     required String password,
     required String passwordConfirmation,
+  });
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+    required String newPasswordConfirmation,
   });
 }

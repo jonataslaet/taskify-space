@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_flutter/app/taskify_app.dart';
@@ -12,6 +13,7 @@ import 'package:mobile_flutter/features/tasks/data/http_tasks_repository.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
 
   const secureStorage = FlutterSecureStorage();
   final storageGateway = FlutterSecureStorageGateway(secureStorage);

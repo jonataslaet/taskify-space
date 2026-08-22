@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/app/taskify_app.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
+import 'package:mobile_flutter/features/auth/presentation/new_password_page.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
@@ -15,7 +16,197 @@ import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 
 import '../helpers/fakes.dart';
 
+const _passwordRecoveryToken = '030447';
+
 void main() {
+  for (final initialRoute in <String>[
+    '/new-password/$_passwordRecoveryToken',
+    'https://app.example.com/new-password/$_passwordRecoveryToken',
+    'taskifyspace://new-password/$_passwordRecoveryToken',
+  ]) {
+    testWidgets('abre a redefinição no cold start para $initialRoute', (
+      tester,
+    ) async {
+      final authenticationRepository = FakeAuthenticationRepository(
+        (_, _) async => testSession,
+      );
+
+      await tester.pumpWidget(
+        TaskifyApp(
+          authenticationRepository: authenticationRepository,
+          spacesRepository: FakeSpacesRepository((_) async => makeSpacePage()),
+          tasksRepository: _FakeTasksRepository(),
+          initialRoute: initialRoute,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NewPasswordPage), findsOneWidget);
+      expect(
+        tester.widget<NewPasswordPage>(find.byType(NewPasswordPage)).token,
+        _passwordRecoveryToken,
+      );
+      expect(find.text(_passwordRecoveryToken), findsNothing);
+      expect(
+        Navigator.of(tester.element(find.byType(NewPasswordPage))).canPop(),
+        isTrue,
+      );
+    });
+  }
+
+  testWidgets('ignora um recovery link malformado no cold start', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TaskifyApp(
+        authenticationRepository: FakeAuthenticationRepository(
+          (_, _) async => testSession,
+        ),
+        spacesRepository: FakeSpacesRepository((_) async => makeSpacePage()),
+        tasksRepository: _FakeTasksRepository(),
+        initialRoute: '/new-password/token%20invalido',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NewPasswordPage), findsNothing);
+    expect(find.byKey(const ValueKey('login-page')), findsOneWidget);
+  });
+
+  testWidgets('abre um recovery link absoluto com o aplicativo ativo', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TaskifyApp(
+        authenticationRepository: FakeAuthenticationRepository(
+          (_, _) async => testSession,
+        ),
+        spacesRepository: FakeSpacesRepository((_) async => makeSpacePage()),
+        tasksRepository: _FakeTasksRepository(),
+      ),
+    );
+
+    tester
+        .state<NavigatorState>(find.byType(Navigator).first)
+        .pushNamed('taskifyspace://new-password/$_passwordRecoveryToken');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NewPasswordPage), findsOneWidget);
+    expect(find.text(_passwordRecoveryToken), findsNothing);
+  });
+
+  testWidgets(
+    'warm link malformado preserva a tela sem buscar espacos novamente',
+    (tester) async {
+      final authenticationRepository = FakeAuthenticationRepository(
+        (_, _) async => testSession,
+      );
+      final spacesRepository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+      );
+      await tester.pumpWidget(
+        TaskifyApp(
+          authenticationRepository: authenticationRepository,
+          spacesRepository: spacesRepository,
+          tasksRepository: _FakeTasksRepository(),
+        ),
+      );
+      await _fillValidCredentials(tester);
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pumpAndSettle();
+      expect(spacesRepository.fetchSpacesCalls, 1);
+
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed('taskifyspace://new-password/token%20invalido');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('unknown-route-page')), findsOneWidget);
+      expect(find.text('Link inválido'), findsWidgets);
+      expect(
+        find.byKey(const ValueKey('spaces-page'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(spacesRepository.fetchSpacesCalls, 1);
+
+      await tester.tap(find.byKey(const ValueKey('unknown-route-back-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('unknown-route-page')), findsNothing);
+      expect(find.byKey(const ValueKey('spaces-page')), findsOneWidget);
+      expect(spacesRepository.fetchSpacesCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'redefinir a senha limpa sessão e rotas e confirma o sucesso no login',
+    (tester) async {
+      final authenticationRepository = FakeAuthenticationRepository(
+        (_, _) async => testSession,
+        resetPasswordHandler: (_, _, _) async {},
+      );
+      final sessionStore = FakeSessionStore()..savedSession = testSession;
+      final spacesRepository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+      );
+      await tester.pumpWidget(
+        TaskifyApp(
+          authenticationRepository: authenticationRepository,
+          spacesRepository: spacesRepository,
+          tasksRepository: _FakeTasksRepository(),
+          sessionStore: sessionStore,
+        ),
+      );
+      await _fillValidCredentials(tester);
+      await tester.tap(find.byKey(const Key('login-button')));
+      await tester.pumpAndSettle();
+
+      tester
+          .state<NavigatorState>(find.byType(Navigator).first)
+          .pushNamed('/new-password/$_passwordRecoveryToken');
+      await tester.pumpAndSettle();
+      expect(find.byType(NewPasswordPage), findsOneWidget);
+      expect(find.text(_passwordRecoveryToken), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('new-password-field')),
+        'NovaSenha1!',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('new-password-confirmation-field')),
+        'NovaSenha1!',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('new-password-submit-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(authenticationRepository.resetPasswordCalls, 1);
+      expect(authenticationRepository.receivedPasswordResetTokens, [
+        _passwordRecoveryToken,
+      ]);
+      expect(authenticationRepository.receivedNewPasswords, ['NovaSenha1!']);
+      expect(authenticationRepository.receivedNewPasswordConfirmations, [
+        'NovaSenha1!',
+      ]);
+      expect(sessionStore.clearCalls, 1);
+      expect(sessionStore.savedSession, isNull);
+      expect(find.byType(NewPasswordPage), findsNothing);
+      expect(find.byKey(const ValueKey('spaces-page')), findsNothing);
+      expect(find.byKey(const ValueKey('login-page')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('password-reset-success')),
+        findsOneWidget,
+      );
+      expect(
+        Navigator.of(
+          tester.element(find.byKey(const ValueKey('login-page'))),
+        ).canPop(),
+        isFalse,
+      );
+    },
+  );
+
   testWidgets('busca os espaços após o login sem exibir tokens', (
     tester,
   ) async {
