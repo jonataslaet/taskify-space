@@ -78,6 +78,18 @@ backend usa o identificador crescente. As categorias selecionadas determinam
 quais execuções compõem a pontuação e não removem participantes sem execução
 nelas.
 
+O botão **Ver participações**, exibido ao lado de **Ver tarefas**, abre a
+listagem paginada de `GET /spaces/{spaceId}/participations`. A tela mostra nome,
+papel e situação de cada vínculo e permite filtrar opcionalmente por `username`
+e por um ou mais valores de `statuses`. Sem esses filtros, todas as participações
+do espaço são consultadas; as páginas usam ordenação estável por identificador.
+
+Administradores e gerentes podem editar participações pelo ícone de lápis.
+A atualização usa `PATCH /spaces/{spaceId}/participations/{membershipId}` e
+envia somente os campos alterados em `status` e `spaceUserRole`. Administradores
+podem alterar papel e situação; conforme a autorização do backend, gerentes
+alteram apenas a situação de vínculos com papel de participante.
+
 Nos espaços em que o usuário ainda não possui vínculo, o botão **Solicitar
 participação** chama `POST /spaces/{spaceId}/participations/request`, sem corpo.
 Após o sucesso `204 No Content`, a página é atualizada e passa a exibir a

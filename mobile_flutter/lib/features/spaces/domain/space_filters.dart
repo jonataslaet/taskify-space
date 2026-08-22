@@ -6,6 +6,20 @@ enum SpaceUserRole {
   const SpaceUserRole(this.apiValue);
 
   final String apiValue;
+
+  static SpaceUserRole fromApiValue(Object? value) {
+    if (value is! String) {
+      throw const FormatException('Campo spaceUserRole ausente ou inválido.');
+    }
+
+    final normalizedValue = value.trim();
+    for (final role in values) {
+      if (role.apiValue == normalizedValue) {
+        return role;
+      }
+    }
+    throw const FormatException('Campo spaceUserRole inválido.');
+  }
 }
 
 enum SpaceMembershipStatus {
@@ -19,6 +33,22 @@ enum SpaceMembershipStatus {
   const SpaceMembershipStatus(this.apiValue);
 
   final String apiValue;
+
+  static SpaceMembershipStatus fromApiValue(Object? value) {
+    if (value is! String) {
+      throw const FormatException(
+        'Campo spaceMembershipStatus ausente ou inválido.',
+      );
+    }
+
+    final normalizedValue = value.trim();
+    for (final status in values) {
+      if (status.apiValue == normalizedValue) {
+        return status;
+      }
+    }
+    throw const FormatException('Campo spaceMembershipStatus inválido.');
+  }
 }
 
 final class SpaceFilters {

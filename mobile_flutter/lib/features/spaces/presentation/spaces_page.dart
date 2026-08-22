@@ -8,10 +8,12 @@ import 'package:mobile_flutter/features/auth/presentation/logout_button.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/spaces/presentation/create_space_dialog.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
+import 'package:mobile_flutter/features/spaces/presentation/space_participations_page.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/presentation/tasks_page.dart';
 
@@ -275,6 +277,45 @@ class _SpacesPageState extends State<SpacesPage> {
     );
   }
 
+  Future<void> _openParticipations(SpaceSummary space) async {
+    if (_isBusy) {
+      return;
+    }
+    final updatedParticipation = await Navigator.of(context)
+        .push<SpaceParticipation>(
+          MaterialPageRoute<SpaceParticipation>(
+            builder: (context) => SpaceParticipationsPage(
+              session: widget.session,
+              spaceId: space.id,
+              spaceName: space.name,
+              canEditParticipations: space.canEditParticipations,
+              canEditParticipationRoles: space.canEditParticipationRoles,
+              spacesRepository: widget.spacesRepository,
+              onSessionExpired: widget.onSessionExpired,
+              onLogout: widget.onLogout,
+            ),
+          ),
+        );
+    if (!mounted || updatedParticipation == null) {
+      return;
+    }
+    await _loadSpaces(page: _result?.number ?? _requestedPage, size: _pageSize);
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('space-participation-updated-message'),
+          content: Text(
+            'Participação de "${updatedParticipation.name}" atualizada.',
+          ),
+        ),
+      );
+  }
+
   Future<void> _openCreateSpaceDialog() async {
     if (_isBusy) {
       return;
@@ -492,6 +533,10 @@ class _SpacesPageState extends State<SpacesPage> {
                       : null,
                   onViewParticipants: space.spaceMembershipStatus == 'APPROVED'
                       ? () => _openParticipants(space)
+                      : null,
+                  onViewParticipations:
+                      space.spaceMembershipStatus == 'APPROVED'
+                      ? () => unawaited(_openParticipations(space))
                       : null,
                   onViewTasks: space.spaceMembershipStatus == 'APPROVED'
                       ? () => _openTasks(space)
@@ -790,6 +835,7 @@ class _SpaceCard extends StatelessWidget {
     required this.areActionsBusy,
     required this.onRequestParticipation,
     required this.onViewParticipants,
+    required this.onViewParticipations,
     required this.onViewTasks,
   });
 
@@ -798,6 +844,7 @@ class _SpaceCard extends StatelessWidget {
   final bool areActionsBusy;
   final VoidCallback? onRequestParticipation;
   final VoidCallback? onViewParticipants;
+  final VoidCallback? onViewParticipations;
   final VoidCallback? onViewTasks;
 
   @override
@@ -888,22 +935,49 @@ class _SpaceCard extends StatelessWidget {
             const SizedBox(height: 14),
             Align(
               alignment: Alignment.centerRight,
-              child: Tooltip(
-                message: onViewTasks == null
-                    ? 'Participação aprovada necessária'
-                    : areActionsBusy
-                    ? 'Aguarde a solicitação em andamento'
-                    : 'Ver tarefas deste espaço',
-                child: OutlinedButton.icon(
-                  key: ValueKey('space-tasks-button-${space.id}'),
-                  onPressed: areActionsBusy ? null : onViewTasks,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Tooltip(
+                    message: onViewParticipations == null
+                        ? 'Participação aprovada necessária'
+                        : areActionsBusy
+                        ? 'Aguarde a solicitação em andamento'
+                        : 'Ver participações deste espaço',
+                    child: OutlinedButton.icon(
+                      key: ValueKey('space-participations-button-${space.id}'),
+                      onPressed: areActionsBusy ? null : onViewParticipations,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      icon: const Icon(
+                        Icons.manage_accounts_outlined,
+                        size: 20,
+                      ),
+                      label: const Text('Ver participações'),
+                    ),
                   ),
-                  icon: const Icon(Icons.checklist_rounded, size: 20),
-                  label: const Text('Ver tarefas'),
-                ),
+                  Tooltip(
+                    message: onViewTasks == null
+                        ? 'Participação aprovada necessária'
+                        : areActionsBusy
+                        ? 'Aguarde a solicitação em andamento'
+                        : 'Ver tarefas deste espaço',
+                    child: OutlinedButton.icon(
+                      key: ValueKey('space-tasks-button-${space.id}'),
+                      onPressed: areActionsBusy ? null : onViewTasks,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      icon: const Icon(Icons.checklist_rounded, size: 20),
+                      label: const Text('Ver tarefas'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

@@ -4,6 +4,9 @@ import 'package:mobile_flutter/core/storage/session_store.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/domain/authentication_repository.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation_filters.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_summary.dart';
@@ -166,6 +169,14 @@ typedef FetchSpaceParticipantsHandler =
       int page,
       int size,
     );
+typedef FetchSpaceParticipationsHandler =
+    Future<SpaceParticipationPageResult> Function(
+      String accessToken,
+      int spaceId,
+      SpaceParticipationFilters filters,
+      int page,
+      int size,
+    );
 typedef SearchSpaceParticipantsHandler =
     Future<List<SpaceParticipantSummary>> Function(
       String accessToken,
@@ -174,6 +185,14 @@ typedef SearchSpaceParticipantsHandler =
     );
 typedef RequestSpaceParticipationHandler =
     Future<void> Function(String accessToken, int spaceId);
+typedef UpdateSpaceParticipationHandler =
+    Future<SpaceParticipation> Function(
+      String accessToken,
+      int spaceId,
+      int membershipId,
+      SpaceMembershipStatus? status,
+      SpaceUserRole? spaceUserRole,
+    );
 
 final class FakeSpacesRepository implements SpacesRepository {
   FakeSpacesRepository(
@@ -181,21 +200,27 @@ final class FakeSpacesRepository implements SpacesRepository {
     this.fetchPageHandler,
     this.createHandler,
     this.fetchParticipantsHandler,
+    this.fetchParticipationsHandler,
     this.searchParticipantsHandler,
     this.requestSpaceParticipationHandler,
+    this.updateSpaceParticipationHandler,
   });
 
   final FetchSpacesHandler _handler;
   final FetchSpacesPageHandler? fetchPageHandler;
   final CreateSpaceHandler? createHandler;
   final FetchSpaceParticipantsHandler? fetchParticipantsHandler;
+  final FetchSpaceParticipationsHandler? fetchParticipationsHandler;
   final SearchSpaceParticipantsHandler? searchParticipantsHandler;
   final RequestSpaceParticipationHandler? requestSpaceParticipationHandler;
+  final UpdateSpaceParticipationHandler? updateSpaceParticipationHandler;
   int fetchSpacesCalls = 0;
   int createSpaceCalls = 0;
   int fetchSpaceParticipantsCalls = 0;
+  int fetchSpaceParticipationsCalls = 0;
   int searchSpaceParticipantsCalls = 0;
   int requestSpaceParticipationCalls = 0;
+  int updateSpaceParticipationCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedPages = <int>[];
   final receivedPageSizes = <int>[];
@@ -207,11 +232,21 @@ final class FakeSpacesRepository implements SpacesRepository {
   final receivedParticipantFilters = <SpaceParticipantFilters>[];
   final receivedParticipantPages = <int>[];
   final receivedParticipantPageSizes = <int>[];
+  final receivedParticipationAccessTokens = <String>[];
+  final receivedParticipationSpaceIds = <int>[];
+  final receivedParticipationFilters = <SpaceParticipationFilters>[];
+  final receivedParticipationPages = <int>[];
+  final receivedParticipationPageSizes = <int>[];
   final receivedParticipantSearchAccessTokens = <String>[];
   final receivedParticipantSearchSpaceIds = <int>[];
   final receivedParticipantSearchNames = <String>[];
   final receivedRequestSpaceParticipationAccessTokens = <String>[];
   final receivedRequestSpaceParticipationSpaceIds = <int>[];
+  final receivedUpdateSpaceParticipationAccessTokens = <String>[];
+  final receivedUpdateSpaceParticipationSpaceIds = <int>[];
+  final receivedUpdateSpaceParticipationMembershipIds = <int>[];
+  final receivedUpdateSpaceParticipationStatuses = <SpaceMembershipStatus?>[];
+  final receivedUpdateSpaceParticipationSpaceUserRoles = <SpaceUserRole?>[];
 
   @override
   Future<CreatedSpace> createSpace({
@@ -273,6 +308,29 @@ final class FakeSpacesRepository implements SpacesRepository {
   }
 
   @override
+  Future<SpaceParticipationPageResult> fetchSpaceParticipations({
+    required String accessToken,
+    required int spaceId,
+    SpaceParticipationFilters filters = const SpaceParticipationFilters(),
+    int page = 0,
+    int size = 10,
+  }) {
+    fetchSpaceParticipationsCalls += 1;
+    receivedParticipationAccessTokens.add(accessToken);
+    receivedParticipationSpaceIds.add(spaceId);
+    receivedParticipationFilters.add(filters);
+    receivedParticipationPages.add(page);
+    receivedParticipationPageSizes.add(size);
+    final handler = fetchParticipationsHandler;
+    if (handler == null) {
+      return Future<SpaceParticipationPageResult>.error(
+        StateError('Handler de participacoes nao configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId, filters, page, size);
+  }
+
+  @override
   Future<List<SpaceParticipantSummary>> searchSpaceParticipants({
     required String accessToken,
     required int spaceId,
@@ -306,6 +364,29 @@ final class FakeSpacesRepository implements SpacesRepository {
       );
     }
     return handler(accessToken, spaceId);
+  }
+
+  @override
+  Future<SpaceParticipation> updateSpaceParticipation({
+    required String accessToken,
+    required int spaceId,
+    required int membershipId,
+    SpaceMembershipStatus? status,
+    SpaceUserRole? spaceUserRole,
+  }) {
+    updateSpaceParticipationCalls += 1;
+    receivedUpdateSpaceParticipationAccessTokens.add(accessToken);
+    receivedUpdateSpaceParticipationSpaceIds.add(spaceId);
+    receivedUpdateSpaceParticipationMembershipIds.add(membershipId);
+    receivedUpdateSpaceParticipationStatuses.add(status);
+    receivedUpdateSpaceParticipationSpaceUserRoles.add(spaceUserRole);
+    final handler = updateSpaceParticipationHandler;
+    if (handler == null) {
+      return Future<SpaceParticipation>.error(
+        StateError('Handler de atualizacao de participacao nao configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId, membershipId, status, spaceUserRole);
   }
 }
 
@@ -563,6 +644,22 @@ SpaceParticipantPageResult makeSpaceParticipantPage({
   int? totalPages,
 }) {
   return SpaceParticipantPageResult(
+    content: content,
+    size: size,
+    number: number,
+    totalElements: totalElements ?? content.length,
+    totalPages: totalPages ?? (content.isEmpty ? 0 : 1),
+  );
+}
+
+SpaceParticipationPageResult makeSpaceParticipationPage({
+  List<SpaceParticipation> content = const [],
+  int size = 10,
+  int number = 0,
+  int? totalElements,
+  int? totalPages,
+}) {
+  return SpaceParticipationPageResult(
     content: content,
     size: size,
     number: number,

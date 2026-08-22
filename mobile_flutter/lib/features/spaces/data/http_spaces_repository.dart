@@ -7,6 +7,9 @@ import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation_filters.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_summary.dart';
@@ -193,6 +196,125 @@ final class HttpSpacesRepository implements SpacesRepository {
   }
 
   @override
+  Future<SpaceParticipationPageResult> fetchSpaceParticipations({
+    required String accessToken,
+    required int spaceId,
+    SpaceParticipationFilters filters = const SpaceParticipationFilters(),
+    int page = 0,
+    int size = 10,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0 || page < 0 || size <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .get(
+            _spaceParticipationsEndpoint(
+              spaceId,
+              filters,
+              page: page,
+              size: size,
+            ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de participações não é um objeto JSON.',
+        );
+      }
+      final result = SpaceParticipationPageResult.fromJson(decodedBody);
+      if (result.number != page) {
+        throw FormatException(
+          'A API retornou a página ${result.number}, mas a página $page foi '
+          'solicitada.',
+        );
+      }
+      return result;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
+  Future<SpaceParticipation> updateSpaceParticipation({
+    required String accessToken,
+    required int spaceId,
+    required int membershipId,
+    SpaceMembershipStatus? status,
+    SpaceUserRole? spaceUserRole,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0 || membershipId <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .patch(
+            _spaceParticipationUpdateEndpoint(
+              spaceId,
+              membershipId,
+              status: status,
+              spaceUserRole: spaceUserRole,
+            ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de atualização de participação não é um objeto JSON.',
+        );
+      }
+      final updatedParticipation = SpaceParticipation.fromJson(decodedBody);
+      if (updatedParticipation.id != membershipId) {
+        throw const FormatException(
+          'A API retornou uma participação diferente da atualizada.',
+        );
+      }
+      return updatedParticipation;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<void> requestSpaceParticipation({
     required String accessToken,
     required int spaceId,
@@ -331,6 +453,49 @@ final class HttpSpacesRepository implements SpacesRepository {
     return _config
         .endpoint('/spaces/$spaceId/participants')
         .replace(queryParameters: queryParameters);
+  }
+
+  Uri _spaceParticipationsEndpoint(
+    int spaceId,
+    SpaceParticipationFilters filters, {
+    required int page,
+    required int size,
+  }) {
+    final normalizedUsername = filters.username?.trim();
+    final selectedStatuses = <String>[
+      for (final status in SpaceMembershipStatus.values)
+        if (filters.statuses.contains(status)) status.apiValue,
+    ];
+    final queryParameters = <String, String>{
+      'page': page.toString(),
+      'size': size.toString(),
+      'sort': 'id,asc',
+      if (normalizedUsername != null && normalizedUsername.isNotEmpty)
+        'username': normalizedUsername,
+      if (selectedStatuses.isNotEmpty) 'statuses': selectedStatuses.join(','),
+    };
+
+    return _config
+        .endpoint('/spaces/$spaceId/participations')
+        .replace(queryParameters: queryParameters);
+  }
+
+  Uri _spaceParticipationUpdateEndpoint(
+    int spaceId,
+    int membershipId, {
+    SpaceMembershipStatus? status,
+    SpaceUserRole? spaceUserRole,
+  }) {
+    final endpoint = _config.endpoint(
+      '/spaces/$spaceId/participations/$membershipId',
+    );
+    final queryParameters = <String, String>{
+      if (status case final value?) 'status': value.apiValue,
+      if (spaceUserRole case final value?) 'spaceUserRole': value.apiValue,
+    };
+    return queryParameters.isEmpty
+        ? endpoint
+        : endpoint.replace(queryParameters: queryParameters);
   }
 
   Map<String, dynamic> _stringKeyedMap(Object? value, {required String field}) {

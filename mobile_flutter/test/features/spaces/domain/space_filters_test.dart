@@ -36,5 +36,35 @@ void main() {
         ],
       );
     });
+
+    test('interpreta papéis da API e normaliza espaços', () {
+      for (final role in SpaceUserRole.values) {
+        expect(SpaceUserRole.fromApiValue(' ${role.apiValue} '), role);
+      }
+    });
+
+    test('interpreta situações da API e normaliza espaços', () {
+      for (final status in SpaceMembershipStatus.values) {
+        expect(
+          SpaceMembershipStatus.fromApiValue(' ${status.apiValue} '),
+          status,
+        );
+      }
+    });
+
+    test('rejeita papéis ausentes, incompatíveis ou desconhecidos', () {
+      for (final value in <Object?>[null, 1, '', 'ROLE_UNKNOWN']) {
+        expect(() => SpaceUserRole.fromApiValue(value), throwsFormatException);
+      }
+    });
+
+    test('rejeita situações ausentes, incompatíveis ou desconhecidas', () {
+      for (final value in <Object?>[null, 1, '', 'UNKNOWN']) {
+        expect(
+          () => SpaceMembershipStatus.fromApiValue(value),
+          throwsFormatException,
+        );
+      }
+    });
   });
 }

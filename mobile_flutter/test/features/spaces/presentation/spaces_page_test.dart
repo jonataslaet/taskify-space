@@ -7,7 +7,9 @@ import 'package:mobile_flutter/features/spaces/domain/created_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_participation.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
+import 'package:mobile_flutter/features/spaces/presentation/space_participations_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
@@ -463,6 +465,278 @@ void main() {
       find.text('A solicitação já existe. Atualizando a lista.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+    'posiciona participacoes imediatamente antes das tarefas no mesmo Wrap',
+    (tester) async {
+      final repository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      const participationsKey = ValueKey('space-participations-button-1');
+      const tasksKey = ValueKey('space-tasks-button-1');
+      final participationsButton = find.byKey(participationsKey);
+      expect(participationsButton, findsOneWidget);
+      expect(find.byKey(tasksKey), findsOneWidget);
+
+      final actionsWrap = tester
+          .element(participationsButton)
+          .findAncestorWidgetOfExactType<Wrap>();
+      expect(actionsWrap, isNotNull);
+      final actionKeys = actionsWrap!.children
+          .map((child) => child is Tooltip ? child.child?.key : child.key)
+          .toList();
+      final participationsIndex = actionKeys.indexOf(participationsKey);
+      final tasksIndex = actionKeys.indexOf(tasksKey);
+      expect(participationsIndex, isNonNegative);
+      expect(tasksIndex, participationsIndex + 1);
+    },
+  );
+
+  testWidgets(
+    'abre participações e não recarrega espaços ao voltar sem edição',
+    (tester) async {
+      final repository = FakeSpacesRepository(
+        (_) async => makeSpacePage(content: const [testSpace]),
+        fetchParticipationsHandler: (_, _, _, page, size) async =>
+            makeSpaceParticipationPage(number: page, size: size),
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      final participationsButton = find.byKey(
+        const ValueKey('space-participations-button-1'),
+      );
+      expect(participationsButton, findsOneWidget);
+      expect(
+        tester.widget<OutlinedButton>(participationsButton).onPressed,
+        isNotNull,
+      );
+      expect(repository.fetchSpaceParticipationsCalls, 0);
+
+      await tester.tap(participationsButton);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SpaceParticipationsPage), findsOneWidget);
+      final participationsPage = tester.widget<SpaceParticipationsPage>(
+        find.byType(SpaceParticipationsPage),
+      );
+      expect(participationsPage.session, testSession);
+      expect(participationsPage.spaceId, testSpace.id);
+      expect(participationsPage.spaceName, testSpace.name);
+      expect(participationsPage.canEditParticipations, isFalse);
+      expect(participationsPage.canEditParticipationRoles, isFalse);
+      expect(
+        identical(participationsPage.spacesRepository, repository),
+        isTrue,
+      );
+      expect(repository.fetchSpaceParticipationsCalls, 1);
+      expect(repository.receivedParticipationAccessTokens, [
+        testSession.accessToken,
+      ]);
+      expect(repository.receivedParticipationSpaceIds, [testSpace.id]);
+      expect(repository.receivedParticipationPages, [0]);
+      expect(repository.receivedParticipationPageSizes, [10]);
+      expect(repository.receivedParticipationFilters, hasLength(1));
+      expect(repository.receivedParticipationFilters.single.username, isNull);
+      expect(repository.receivedParticipationFilters.single.statuses, isEmpty);
+
+      Navigator.of(tester.element(find.byType(SpaceParticipationsPage))).pop();
+      await tester.pumpAndSettle();
+
+      expect(repository.fetchSpacesCalls, 1);
+      expect(
+        find.byKey(const ValueKey('space-participation-updated-message')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'recarrega o contexto e confirma a edição preservando página e filtros',
+    (tester) async {
+      const adminSpace = SpaceSummary(
+        id: 81,
+        name: 'Espaço gerenciado',
+        spaceAdminName: 'Usuário de Teste',
+        active: true,
+        spaceUserRole: 'ROLE_SPACE_ADMIN',
+        spaceMembershipStatus: 'APPROVED',
+        activeParticipationsCount: 3,
+      );
+      const demotedSpace = SpaceSummary(
+        id: 81,
+        name: 'Espaço gerenciado',
+        spaceAdminName: 'Outra administradora',
+        active: true,
+        spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+        spaceMembershipStatus: 'APPROVED',
+        activeParticipationsCount: 3,
+      );
+      var returnDemotedSpace = false;
+      final repository = FakeSpacesRepository(
+        (_) async => throw StateError('Handler paginado esperado.'),
+        fetchPageHandler: (_, page, size) async => _makePagedSpacePage(
+          content: [returnDemotedSpace ? demotedSpace : adminSpace],
+          number: page,
+          size: size,
+          totalElements: 40,
+          totalPages: 2,
+        ),
+        fetchParticipationsHandler: (_, _, _, page, size) async =>
+            makeSpaceParticipationPage(number: page, size: size),
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+
+      tester
+          .widget<DropdownButton<int>>(
+            find.byKey(const ValueKey('spaces-page-size')),
+          )
+          .onChanged!(20);
+      await tester.pumpAndSettle();
+      await _toggleFilters(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('spaces-name-filter')),
+        'gerenciado',
+      );
+      await tester.tap(find.byKey(const ValueKey('spaces-apply-filters')));
+      await tester.pumpAndSettle();
+      await _toggleFilters(tester);
+      await tester.tap(find.byKey(const ValueKey('spaces-page-1')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('space-participations-button-81')),
+      );
+      await tester.pumpAndSettle();
+      final pageBeforeUpdate = tester.widget<SpaceParticipationsPage>(
+        find.byType(SpaceParticipationsPage),
+      );
+      expect(pageBeforeUpdate.canEditParticipations, isTrue);
+      expect(pageBeforeUpdate.canEditParticipationRoles, isTrue);
+
+      returnDemotedSpace = true;
+      Navigator.of(tester.element(find.byType(SpaceParticipationsPage))).pop(
+        const SpaceParticipation(
+          id: 91,
+          name: 'Usuário de Teste',
+          spaceUserRole: SpaceUserRole.participant,
+          spaceMembershipStatus: SpaceMembershipStatus.approved,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.fetchSpacesCalls, 5);
+      expect(repository.receivedPages, [0, 0, 0, 1, 1]);
+      expect(repository.receivedPageSizes, [10, 20, 20, 20, 20]);
+      expect(repository.receivedFilters.last.name, 'gerenciado');
+      expect(
+        find.byKey(const ValueKey('space-participation-updated-message')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Participação de "Usuário de Teste" atualizada.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('space-participations-button-81')),
+      );
+      await tester.pumpAndSettle();
+      final pageAfterUpdate = tester.widget<SpaceParticipationsPage>(
+        find.byType(SpaceParticipationsPage),
+      );
+      expect(pageAfterUpdate.canEditParticipations, isFalse);
+      expect(pageAfterUpdate.canEditParticipationRoles, isFalse);
+
+      final fetchCallsBeforeBack = repository.fetchSpacesCalls;
+      Navigator.of(tester.element(find.byType(SpaceParticipationsPage))).pop();
+      await tester.pumpAndSettle();
+      expect(repository.fetchSpacesCalls, fetchCallsBeforeBack);
+    },
+  );
+
+  testWidgets('propaga permissao de gerente sem liberar alteracao de papel', (
+    tester,
+  ) async {
+    const managerSpace = SpaceSummary(
+      id: 18,
+      name: 'Espaco gerenciado',
+      spaceAdminName: 'Administradora',
+      active: true,
+      spaceUserRole: 'ROLE_SPACE_MANAGER',
+      spaceMembershipStatus: 'APPROVED',
+      activeParticipationsCount: 3,
+    );
+    final repository = FakeSpacesRepository(
+      (_) async => makeSpacePage(content: const [managerSpace]),
+      fetchParticipationsHandler: (_, _, _, page, size) async =>
+          makeSpaceParticipationPage(number: page, size: size),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('space-participations-button-18')),
+    );
+    await tester.pumpAndSettle();
+
+    final page = tester.widget<SpaceParticipationsPage>(
+      find.byType(SpaceParticipationsPage),
+    );
+    expect(page.canEditParticipations, isTrue);
+    expect(page.canEditParticipationRoles, isFalse);
+  });
+
+  testWidgets('desabilita participacoes para espacos disponivel e pendente', (
+    tester,
+  ) async {
+    const availableSpace = SpaceSummary(
+      id: 22,
+      name: 'Espaco disponivel',
+      spaceAdminName: 'Responsavel',
+      active: true,
+      spaceUserRole: null,
+      spaceMembershipStatus: null,
+      activeParticipationsCount: 1,
+    );
+    const pendingSpace = SpaceSummary(
+      id: 23,
+      name: 'Espaco pendente',
+      spaceAdminName: 'Responsavel',
+      active: true,
+      spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+      spaceMembershipStatus: 'PENDING',
+      activeParticipationsCount: 2,
+    );
+    final repository = FakeSpacesRepository(
+      (_) async => makeSpacePage(content: const [availableSpace, pendingSpace]),
+      fetchParticipationsHandler: (_, _, _, page, size) async =>
+          makeSpaceParticipationPage(number: page, size: size),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    for (final id in <int>[availableSpace.id, pendingSpace.id]) {
+      final participationsButton = find.byKey(
+        ValueKey('space-participations-button-$id'),
+      );
+      expect(participationsButton, findsOneWidget);
+      expect(
+        tester.widget<OutlinedButton>(participationsButton).onPressed,
+        isNull,
+      );
+    }
+    expect(repository.fetchSpaceParticipationsCalls, 0);
+    expect(find.byType(SpaceParticipationsPage), findsNothing);
   });
 
   testWidgets(

@@ -34,10 +34,17 @@ final class SpaceSummary {
   final String? spaceMembershipStatus;
   final int activeParticipationsCount;
 
-  bool get canEditTasks {
+  bool get canEditTasks => canEditParticipations;
+
+  bool get canEditParticipations {
     return spaceMembershipStatus == SpaceMembershipStatus.approved.apiValue &&
         (spaceUserRole == SpaceUserRole.admin.apiValue ||
             spaceUserRole == SpaceUserRole.manager.apiValue);
+  }
+
+  bool get canEditParticipationRoles {
+    return spaceMembershipStatus == SpaceMembershipStatus.approved.apiValue &&
+        spaceUserRole == SpaceUserRole.admin.apiValue;
   }
 
   static int _requiredPositiveInt(Map<String, dynamic> json, String key) {

@@ -14,7 +14,7 @@ final class SpaceParticipant {
     return SpaceParticipant(
       id: _requiredPositiveInt(json, 'id'),
       name: _requiredString(json, 'name'),
-      spaceUserRole: _requiredSpaceUserRole(json['spaceUserRole']),
+      spaceUserRole: SpaceUserRole.fromApiValue(json['spaceUserRole']),
       taskCategories: _taskCategories(json['taskCategories']),
       score: _requiredNonNegativeNumber(json, 'score'),
     );
@@ -40,20 +40,6 @@ final class SpaceParticipant {
       throw FormatException('Campo $key ausente ou inválido.');
     }
     return value.trim();
-  }
-
-  static SpaceUserRole _requiredSpaceUserRole(Object? value) {
-    if (value is! String) {
-      throw const FormatException('Campo spaceUserRole ausente ou inválido.');
-    }
-
-    final normalizedValue = value.trim();
-    for (final role in SpaceUserRole.values) {
-      if (role.apiValue == normalizedValue) {
-        return role;
-      }
-    }
-    throw const FormatException('Campo spaceUserRole inválido.');
   }
 
   static List<TaskCategory> _taskCategories(Object? value) {

@@ -68,6 +68,32 @@ void main() {
         space(role: 'ROLE_SPACE_ADMIN', status: 'PENDING').canEditTasks,
         isFalse,
       );
+
+      expect(space(role: 'ROLE_SPACE_ADMIN').canEditParticipations, isTrue);
+      expect(space(role: 'ROLE_SPACE_MANAGER').canEditParticipations, isTrue);
+      expect(
+        space(role: 'ROLE_SPACE_PARTICIPANT').canEditParticipations,
+        isFalse,
+      );
+      expect(space(role: 'ROLE_SPACE_ADMIN').canEditParticipationRoles, isTrue);
+      expect(
+        space(role: 'ROLE_SPACE_MANAGER').canEditParticipationRoles,
+        isFalse,
+      );
+      expect(
+        space(
+          role: 'ROLE_SPACE_ADMIN',
+          status: 'PENDING',
+        ).canEditParticipations,
+        isFalse,
+      );
+      expect(
+        space(
+          role: 'ROLE_SPACE_ADMIN',
+          status: 'PENDING',
+        ).canEditParticipationRoles,
+        isFalse,
+      );
     });
 
     test('mantém a lista de resultados imutável', () {
