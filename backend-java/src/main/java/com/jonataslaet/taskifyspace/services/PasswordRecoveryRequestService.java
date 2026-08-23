@@ -16,6 +16,9 @@ public class PasswordRecoveryRequestService {
     @Value("${security.email.password-recover.uri}")
     private String passwordRecoveryUri;
 
+    @Value("${security.email.password-recover.token.minutes:10}")
+    private Long tokenMinutes;
+
     private final PasswordRecoveryTokenService passwordRecoveryTokenService;
     private final EmailService emailService;
 
@@ -36,9 +39,9 @@ public class PasswordRecoveryRequestService {
     }
 
     private void sendRecoveryEmail(PasswordRecoveryEmail recoveryEmail) {
-        String emailBody = "Use o seguinte codigo para resetar sua senha: " + recoveryEmail.token() + "\n"
-            + "Ou acesse o link: " + passwordRecoveryUri + recoveryEmail.token() + "\n"
-            + "Esse codigo expirara daqui a 10 minutos. "
+        String emailBody = "Use o seguinte codigo para resetar sua senha: " + recoveryEmail.code() + "\n"
+            + "Acesse o link: " + passwordRecoveryUri + recoveryEmail.requestToken() + "\n"
+            + "Esse codigo expirara daqui a " + tokenMinutes + " minutos. "
             + "Portanto, se esse email nao foi solicitado por voce, apenas o ignore.";
 
         emailService.sendEmail(new SendingEmailDTO( recoveryEmail.address(),

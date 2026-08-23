@@ -48,23 +48,26 @@ public class PasswordRecoveryTokenService {
         Instant now = Instant.now(clock);
         passwordRecoveryService.expireValidPasswordRecoveriesByEmail(user.getEmail(), now);
 
-        String rawToken = generateUniqueRecoveryToken(now);
-        PasswordRecovery passwordRecovery = new PasswordRecovery(TokenUtils.sha256(rawToken),
+        String rawCode = generateUniqueRecoveryCode(now);
+        String requestToken = TokenUtils.generateRandomToken();
+        PasswordRecovery passwordRecovery = new PasswordRecovery(
+            TokenUtils.sha256(rawCode),
+            TokenUtils.sha256(requestToken),
             user.getEmail(), now.plusSeconds(60 * tokenMinutes)
         );
         passwordRecoveryService.savePasswordRecovery(passwordRecovery);
 
-        return Optional.of(new PasswordRecoveryEmail(user.getEmail(), rawToken));
+        return Optional.of(new PasswordRecoveryEmail(user.getEmail(), rawCode, requestToken));
     }
 
-    private String generateUniqueRecoveryToken(Instant now) {
+    private String generateUniqueRecoveryCode(Instant now) {
         for (int attempt = 0; attempt < MAX_TOKEN_GENERATION_ATTEMPTS; attempt++) {
-            String rawToken = TokenUtils.generateNumericToken(TOKEN_DIGITS);
-            if (!passwordRecoveryService.hasValidPasswordRecovery(rawToken, now)) {
-                return rawToken;
+            String rawCode = TokenUtils.generateNumericToken(TOKEN_DIGITS);
+            if (!passwordRecoveryService.hasValidPasswordRecovery(rawCode, now)) {
+                return rawCode;
             }
         }
 
-        throw new IllegalStateException("Unable to generate a unique password recovery token");
+        throw new IllegalStateException("Unable to generate a unique password recovery code");
     }
 }

@@ -72,10 +72,12 @@ class CaffeineAuthRateLimiterTests {
     }
 
     @Test
-    void recoveryBlocksEmailAfterHourlyLimit() {
+    void recoveryBlocksEmailAfterRecoveryWindowLimit() {
         for (int i = 0; i < CaffeineAuthRateLimiter.RECOVERY_EMAIL_LIMIT; i++) {
             rateLimiter.checkPasswordRecovery("127.0.0." + i, "user@example.com", "device-" + i);
-            clock.advance(CaffeineAuthRateLimiter.RECOVERY_EMAIL_SEND_WINDOW.plusSeconds(1));
+            if (i < CaffeineAuthRateLimiter.RECOVERY_EMAIL_LIMIT - 1) {
+                clock.advance(CaffeineAuthRateLimiter.RECOVERY_EMAIL_SEND_WINDOW.plusSeconds(1));
+            }
         }
 
         assertThatThrownBy(() -> rateLimiter.checkPasswordRecovery("127.0.0.9", "user@example.com", "device-next"))

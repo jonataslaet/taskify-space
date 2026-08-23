@@ -38,6 +38,7 @@ class PasswordRecoveryRequestServiceTests {
             passwordRecoveryRequestService,
             "passwordRecoveryUri",
             "http://localhost/new-password/");
+        ReflectionTestUtils.setField(passwordRecoveryRequestService, "tokenMinutes", 10L);
     }
 
     @Test
@@ -53,9 +54,10 @@ class PasswordRecoveryRequestServiceTests {
     @Test
     void requestRecoveryTokenSendsEmailAfterTokenIsCreated() {
         String email = "user@example.com";
-        String token = "raw-token";
+        String code = "123456";
+        String requestToken = "request-token";
         when(passwordRecoveryTokenService.createRecoveryToken(email))
-            .thenReturn(Optional.of(new PasswordRecoveryEmail(email, token)));
+            .thenReturn(Optional.of(new PasswordRecoveryEmail(email, code, requestToken)));
 
         passwordRecoveryRequestService.requestRecoveryToken(email);
 
@@ -65,6 +67,7 @@ class PasswordRecoveryRequestServiceTests {
 
         assertThat(sendingEmailDTO.to()).isEqualTo(email);
         assertThat(sendingEmailDTO.subject()).isEqualTo("Resetamento de senha");
-        assertThat(sendingEmailDTO.body()).contains("http://localhost/new-password/" + token);
+        assertThat(sendingEmailDTO.body()).contains(code);
+        assertThat(sendingEmailDTO.body()).contains("http://localhost/new-password/" + requestToken);
     }
 }

@@ -61,6 +61,13 @@ public class AuthenticationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/recovery-session/{token}")
+    public ResponseEntity<@NonNull PasswordResetSessionDTO> recoverySession(
+        @PathVariable String token,
+        @RequestBody @Valid PasswordRecoveryCodeDTO passwordRecoveryCodeDTO) {
+        return ResponseEntity.ok(authenticationService.createPasswordResetSession(token, passwordRecoveryCodeDTO));
+    }
+
     private String refreshTokenOrNull(RefreshTokenRecordDTO request) {
         return request == null ? null : request.refreshToken();
     }

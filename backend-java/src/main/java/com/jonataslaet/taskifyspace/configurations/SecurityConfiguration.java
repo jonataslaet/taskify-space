@@ -37,8 +37,8 @@ public class SecurityConfiguration {
         "/public/**", "/privacy-policy"
     };
     public static final String[] POST_PUBLIC = {
-        "/auth/login", "/auth/refresh", "/auth/logout", "/auth/recovery-token", "/auth/new-password/*", "/users",
-        "/users/confirm-registration"
+        "/auth/login", "/auth/refresh", "/auth/logout", "/auth/recovery-token", "/auth/recovery-session/*",
+        "/auth/new-password/*", "/users", "/users/confirm-registration"
     };
 
     public SecurityConfiguration(TokenConfiguration tokenConfiguration, CorsConfigurationSource corsConfigurationSource,

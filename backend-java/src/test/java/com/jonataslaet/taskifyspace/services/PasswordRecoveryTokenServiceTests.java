@@ -71,7 +71,8 @@ class PasswordRecoveryTokenServiceTests {
 
         assertThat(result).isPresent();
         assertThat(result.get().address()).isEqualTo(user.getEmail());
-        assertThat(result.get().token()).isNotBlank();
+        assertThat(result.get().code()).matches("\\d{6}");
+        assertThat(result.get().requestToken()).isNotBlank();
         verify(passwordRecoveryService).expireValidPasswordRecoveriesByEmail(user.getEmail(), NOW);
 
         ArgumentCaptor<PasswordRecovery> passwordRecoveryCaptor = ArgumentCaptor.forClass(PasswordRecovery.class);
@@ -79,9 +80,9 @@ class PasswordRecoveryTokenServiceTests {
         PasswordRecovery passwordRecovery = passwordRecoveryCaptor.getValue();
 
         assertThat(passwordRecovery.getEmail()).isEqualTo(user.getEmail());
-        assertThat(ReflectionTestUtils.getField(passwordRecovery, "expiration")).isEqualTo(NOW.plusSeconds(1800));
-        assertThat(ReflectionTestUtils.getField(passwordRecovery, "tokenHash"))
-            .isEqualTo(TokenUtils.sha256(result.get().token()));
+        assertThat(passwordRecovery.getExpiration()).isEqualTo(NOW.plusSeconds(1800));
+        assertThat(passwordRecovery.getTokenHash()).isEqualTo(TokenUtils.sha256(result.get().code()));
+        assertThat(passwordRecovery.getRequestTokenHash()).isEqualTo(TokenUtils.sha256(result.get().requestToken()));
     }
 
     private User createUser() {

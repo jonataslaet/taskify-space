@@ -16,8 +16,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -114,12 +112,6 @@ public class AuthenticationService {
         return Objects.isNull(value) || value.isBlank();
     }
 
-    @Transactional
-    private void saveUserAndPasswordRecovery(PasswordRecovery passwordRecovery, User user) {
-        userRepository.save(user);
-        passwordRecoveryService.savePasswordRecovery(passwordRecovery);
-    }
-
     public void recoveryToken(EmailDTO emailDTO) {
         recoveryToken(emailDTO, null, null);
     }
@@ -143,16 +135,27 @@ public class AuthenticationService {
     }
 
     @Transactional
+    public PasswordResetSessionDTO createPasswordResetSession(
+        String requestToken,
+        PasswordRecoveryCodeDTO passwordRecoveryCodeDTO) {
+        if (Objects.isNull(passwordRecoveryCodeDTO) || isBlank(passwordRecoveryCodeDTO.code())) {
+            throw new InvalidAuthenticationException("Codigo de recuperacao obrigatorio");
+        }
+
+        String resetSessionToken = passwordRecoveryService.createResetSession(
+            requestToken,
+            passwordRecoveryCodeDTO.code());
+        return new PasswordResetSessionDTO(resetSessionToken);
+    }
+
+    @Transactional
     public void resetPassword(String rawToken, PasswordResetDTO passwordRenovationDTO) {
         validPasswordRenovation(passwordRenovationDTO);
-        List<PasswordRecovery> passwordRecoveries =
-            passwordRecoveryService.getValidPasswordRecoveries(rawToken, Instant.now());
-        PasswordRecovery validPasswordRecovery = passwordRecoveries.getFirst();
+        PasswordRecovery validPasswordRecovery = passwordRecoveryService.consumeResetSession(rawToken);
         User user = userRepository.findByEmail(EmailUtils.normalize(validPasswordRecovery.getEmail())).orElseThrow(() ->
             new ResourceNotFoundException("Usuário não encontrado"));
-        validPasswordRecovery.setExpiration(Instant.now());
         user.setPassword(passwordEncoder.encode(passwordRenovationDTO.newPassword()));
-        saveUserAndPasswordRecovery(validPasswordRecovery, user);
+        userRepository.save(user);
         refreshTokenService.revokeAllByUserId(user.getId());
     }
 

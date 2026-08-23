@@ -3,6 +3,8 @@ package com.jonataslaet.taskifyspace.controllers;
 import com.jonataslaet.taskifyspace.controllers.dtos.AuthenticationResponseRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.CredentialsRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.EmailDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordRecoveryCodeDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordResetSessionDTO;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.services.AuthenticationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +82,19 @@ class AuthenticationControllerTests {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(authenticationService).recoveryToken(emailDTO, "203.0.113.10", "device");
+    }
+
+    @Test
+    void recoverySessionDelegatesRequestTokenAndCodeToService() {
+        PasswordRecoveryCodeDTO codeDTO = new PasswordRecoveryCodeDTO("123456");
+        PasswordResetSessionDTO sessionDTO = new PasswordResetSessionDTO("reset-session");
+        when(authenticationService.createPasswordResetSession("request-token", codeDTO)).thenReturn(sessionDTO);
+
+        var response = authenticationController.recoverySession("request-token", codeDTO);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(sessionDTO);
+        verify(authenticationService).createPasswordResetSession("request-token", codeDTO);
     }
 
     @Test

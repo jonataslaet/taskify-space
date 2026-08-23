@@ -29,15 +29,15 @@ public class CaffeineAuthRateLimiter implements AuthRateLimiter {
     static final Duration MAX_LOGIN_BACKOFF = Duration.ofMinutes(15);
 
     static final int RECOVERY_IP_LIMIT = 10;
-    static final Duration RECOVERY_IP_WINDOW = Duration.ofHours(1);
+    static final Duration RECOVERY_IP_WINDOW = Duration.ofMinutes(15);
     static final int RECOVERY_EMAIL_LIMIT = 3;
-    static final Duration RECOVERY_EMAIL_WINDOW = Duration.ofHours(1);
+    static final Duration RECOVERY_EMAIL_WINDOW = Duration.ofMinutes(15);
     static final int RECOVERY_EMAIL_SEND_LIMIT = 1;
     static final Duration RECOVERY_EMAIL_SEND_WINDOW = Duration.ofMinutes(5);
     static final int RECOVERY_IP_EMAIL_LIMIT = 3;
-    static final Duration RECOVERY_IP_EMAIL_WINDOW = Duration.ofHours(1);
+    static final Duration RECOVERY_IP_EMAIL_WINDOW = Duration.ofMinutes(15);
     static final int RECOVERY_DEVICE_LIMIT = 10;
-    static final Duration RECOVERY_DEVICE_WINDOW = Duration.ofHours(1);
+    static final Duration RECOVERY_DEVICE_WINDOW = Duration.ofMinutes(15);
 
     private static final int MAX_CACHE_SIZE = 100_000;
     private static final Duration CACHE_RETENTION = Duration.ofHours(24);
@@ -192,11 +192,11 @@ public class CaffeineAuthRateLimiter implements AuthRateLimiter {
     }
 
     private String recoveryIpKey(String ipKey) {
-        return KEY_PREFIX + ":recovery:ip:" + ipKey + ":1h";
+        return KEY_PREFIX + ":recovery:ip:" + ipKey + ":15m";
     }
 
     private String recoveryEmailKey(String emailKey) {
-        return KEY_PREFIX + ":recovery:email:" + emailKey + ":1h";
+        return KEY_PREFIX + ":recovery:email:" + emailKey + ":15m";
     }
 
     private String recoveryEmailSendKey(String emailKey) {
@@ -204,11 +204,11 @@ public class CaffeineAuthRateLimiter implements AuthRateLimiter {
     }
 
     private String recoveryIpEmailKey(String ipKey, String emailKey) {
-        return KEY_PREFIX + ":recovery:ip-email:" + ipKey + ":" + emailKey + ":1h";
+        return KEY_PREFIX + ":recovery:ip-email:" + ipKey + ":" + emailKey + ":15m";
     }
 
     private String recoveryDeviceKey(String deviceKey) {
-        return KEY_PREFIX + ":recovery:device:" + deviceKey + ":1h";
+        return KEY_PREFIX + ":recovery:device:" + deviceKey + ":15m";
     }
 
     private String emailIdentity(String email) {

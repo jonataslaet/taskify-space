@@ -3,7 +3,9 @@ package com.jonataslaet.taskifyspace.services;
 import com.jonataslaet.taskifyspace.configurations.TokenConfiguration;
 import com.jonataslaet.taskifyspace.controllers.dtos.CredentialsRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.EmailDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordRecoveryCodeDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.PasswordResetDTO;
+import com.jonataslaet.taskifyspace.controllers.dtos.PasswordResetSessionDTO;
 import com.jonataslaet.taskifyspace.entities.PasswordRecovery;
 import com.jonataslaet.taskifyspace.entities.RefreshToken;
 import com.jonataslaet.taskifyspace.entities.User;
@@ -25,9 +27,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -185,7 +187,7 @@ class AuthenticationServiceTests {
         assertThatThrownBy(() -> authenticationService.resetPassword("token", passwordResetDTO))
             .isInstanceOf(InvalidAuthenticationException.class);
 
-        verify(passwordRecoveryService, never()).getValidPasswordRecoveries(anyString(), any(Instant.class));
+        verify(passwordRecoveryService, never()).consumeResetSession(anyString());
     }
 
     @Test
@@ -195,7 +197,7 @@ class AuthenticationServiceTests {
         assertThatThrownBy(() -> authenticationService.resetPassword("token", passwordResetDTO))
             .isInstanceOf(InvalidAuthenticationException.class);
 
-        verify(passwordRecoveryService, never()).getValidPasswordRecoveries(anyString(), any(Instant.class));
+        verify(passwordRecoveryService, never()).consumeResetSession(anyString());
     }
 
     @Test
@@ -203,21 +205,33 @@ class AuthenticationServiceTests {
         User user = createUser(UserStatusEnum.ACTIVE);
         PasswordRecovery passwordRecovery = new PasswordRecovery(
             "token-hash",
+            "request-token-hash",
             user.getEmail(),
             Instant.now().plusSeconds(300));
         ReflectionTestUtils.setField(passwordRecovery, "email", " User@Example.COM ");
         PasswordResetDTO passwordResetDTO = new PasswordResetDTO("Strong1!", "Strong1!");
 
-        when(passwordRecoveryService.getValidPasswordRecoveries(anyString(), any(Instant.class)))
-            .thenReturn(List.of(passwordRecovery));
+        when(passwordRecoveryService.consumeResetSession("reset-session")).thenReturn(passwordRecovery);
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         when(passwordEncoder.encode(passwordResetDTO.newPassword())).thenReturn("encoded-new-password");
 
-        authenticationService.resetPassword("raw-token", passwordResetDTO);
+        authenticationService.resetPassword("reset-session", passwordResetDTO);
 
+        verify(passwordRecoveryService).consumeResetSession("reset-session");
         verify(userRepository).save(user);
-        verify(passwordRecoveryService).savePasswordRecovery(passwordRecovery);
         verify(refreshTokenService).revokeAllByUserId(user.getId());
+    }
+
+    @Test
+    void createPasswordResetSessionDelegatesCodeValidationToRecoveryService() {
+        PasswordRecoveryCodeDTO codeDTO = new PasswordRecoveryCodeDTO("123456");
+        when(passwordRecoveryService.createResetSession("request-token", "123456"))
+            .thenReturn("reset-session");
+
+        PasswordResetSessionDTO result = authenticationService.createPasswordResetSession("request-token", codeDTO);
+
+        assertThat(result.token()).isEqualTo("reset-session");
+        verify(passwordRecoveryService).createResetSession("request-token", "123456");
     }
 
     @Test
