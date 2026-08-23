@@ -11,12 +11,14 @@ class LoginPage extends StatefulWidget {
   const LoginPage({
     required this.authenticationRepository,
     required this.onAuthenticated,
+    required this.onPasswordReset,
     this.passwordResetSucceeded = false,
     super.key,
   });
 
   final AuthenticationRepository authenticationRepository;
   final ValueChanged<AuthSession> onAuthenticated;
+  final Future<void> Function() onPasswordReset;
   final bool passwordResetSucceeded;
 
   @override
@@ -350,6 +352,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
+    TextInput.finishAutofillContext(shouldSave: false);
     final passwordReset = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (context) => ForgotPasswordPage(
@@ -369,6 +372,12 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
       _passwordController.clear();
       _passwordConfirmationController.clear();
     });
+    try {
+      await widget.onPasswordReset();
+    } on Object {
+      // A senha já foi alterada. O login continua limpo e com a confirmação
+      // visível mesmo se a limpeza de estado externo não puder ser concluída.
+    }
   }
 
   Widget _buildLoginCard({required bool showBrandMark}) {

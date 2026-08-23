@@ -205,18 +205,26 @@ void main() {
   testWidgets('abre recuperação com o e-mail atual pré-preenchido', (
     tester,
   ) async {
+    var passwordResetCallbacks = 0;
     final repository = FakeAuthenticationRepository(
       (_, _) async => testSession,
     );
-    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpWidget(
+      _testApp(
+        repository,
+        onPasswordReset: () async => passwordResetCallbacks += 1,
+      ),
+    );
     await tester.enterText(
       find.byKey(const Key('email-field')),
       'user@example.com',
     );
+    tester.testTextInput.log.clear();
 
     await tester.tap(find.byKey(const Key('forgot-password-button')));
     await tester.pumpAndSettle();
 
+    expect(_savedAutofillContexts(tester), [false]);
     expect(find.byType(ForgotPasswordPage), findsOneWidget);
     expect(find.byKey(const ValueKey('forgot-password-page')), findsOneWidget);
     expect(
@@ -228,6 +236,11 @@ void main() {
           ?.text,
       'user@example.com',
     );
+
+    await tester.tap(find.byKey(const ValueKey('forgot-password-back-button')));
+    await tester.pumpAndSettle();
+
+    expect(passwordResetCallbacks, 0);
   });
 
   testWidgets(
@@ -244,9 +257,15 @@ void main() {
           expect(confirmation, 'NewSecret1!');
         },
       );
+      var passwordResetCallbacks = 0;
       await tester.binding.setSurfaceSize(const Size(800, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpWidget(
+        _testApp(
+          repository,
+          onPasswordReset: () async => passwordResetCallbacks += 1,
+        ),
+      );
       await tester.enterText(
         find.byKey(const Key('email-field')),
         'user@example.com',
@@ -288,6 +307,7 @@ void main() {
 
       expect(repository.requestPasswordRecoveryCalls, 1);
       expect(repository.resetPasswordCalls, 1);
+      expect(passwordResetCallbacks, 1);
       expect(find.byType(ForgotPasswordPage), findsNothing);
       expect(find.byKey(const Key('password-reset-success')), findsOneWidget);
       expect(
@@ -364,6 +384,7 @@ void main() {
 Widget _testApp(
   FakeAuthenticationRepository repository, {
   ValueChanged<AuthSession>? onAuthenticated,
+  Future<void> Function()? onPasswordReset,
   bool passwordResetSucceeded = false,
   Key? loginPageKey,
 }) {
@@ -372,9 +393,17 @@ Widget _testApp(
       key: loginPageKey,
       authenticationRepository: repository,
       onAuthenticated: onAuthenticated ?? (_) {},
+      onPasswordReset: onPasswordReset ?? () async {},
       passwordResetSucceeded: passwordResetSucceeded,
     ),
   );
+}
+
+List<bool> _savedAutofillContexts(WidgetTester tester) {
+  return tester.testTextInput.log
+      .where((call) => call.method == 'TextInput.finishAutofillContext')
+      .map((call) => call.arguments as bool)
+      .toList();
 }
 
 Future<void> _fillValidCredentials(WidgetTester tester) async {

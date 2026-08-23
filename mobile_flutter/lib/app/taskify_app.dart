@@ -157,6 +157,7 @@ class _TaskifyAppState extends State<TaskifyApp> {
           ? LoginPage(
               key: const ValueKey('login-page'),
               authenticationRepository: widget.authenticationRepository,
+              onPasswordReset: _handlePasswordReset,
               passwordResetSucceeded: _passwordResetSucceeded,
               onAuthenticated: (session) {
                 setState(() {
