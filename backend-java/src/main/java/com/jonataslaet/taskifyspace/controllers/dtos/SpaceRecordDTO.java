@@ -28,6 +28,9 @@ public record SpaceRecordDTO(
     @JsonView({SpaceView.ReadSpace.class})
     Boolean active,
 
+    @JsonView({SpaceView.CreateSpace.class, SpaceView.ReadSpace.class, SpaceView.UpdateSpace.class})
+    Boolean available,
+
     @JsonView({SpaceView.ReadSpace.class})
     SpaceUserRoleEnum spaceUserRole,
 

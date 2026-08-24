@@ -30,6 +30,51 @@ class SpaceMapperTests {
         assertThat(spaceRecordDTO.spaceAdminName()).isEqualTo(creator.getName());
     }
 
+    @Test
+    void toDTOIncludesAvailableFlag() {
+        Space space = new Space("Public space");
+        space.setAvailable(true);
+
+        SpaceRecordDTO spaceRecordDTO = SpaceMapper.toDTO(space);
+
+        assertThat(spaceRecordDTO.available()).isTrue();
+    }
+
+    @Test
+    void toEntityCopiesAvailableWhenProvided() {
+        SpaceRecordDTO spaceRecordDTO = new SpaceRecordDTO(
+            null,
+            "Public space",
+            null,
+            null,
+            true,
+            null,
+            null,
+            null);
+
+        Space space = SpaceMapper.toEntity(spaceRecordDTO);
+
+        assertThat(space.getName()).isEqualTo("Public space");
+        assertThat(space.getAvailable()).isTrue();
+    }
+
+    @Test
+    void toEntityDefaultsAvailableToFalseWhenMissing() {
+        SpaceRecordDTO spaceRecordDTO = new SpaceRecordDTO(
+            null,
+            "Private space",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        Space space = SpaceMapper.toEntity(spaceRecordDTO);
+
+        assertThat(space.getAvailable()).isFalse();
+    }
+
     private User createUser(Long id, String name) {
         User user = new User();
         user.setId(id);

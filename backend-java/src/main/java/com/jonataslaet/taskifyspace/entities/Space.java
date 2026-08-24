@@ -20,6 +20,9 @@ public class Space {
     @Column(nullable = false)
     private Boolean active = Boolean.FALSE;
 
+    @Column(nullable = false)
+    private Boolean available = Boolean.FALSE;
+
     private Instant createdAt;
 
     @ManyToOne(optional = false)
@@ -60,6 +63,14 @@ public class Space {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public Boolean getAvailable() {
+        return Boolean.TRUE.equals(available);
+    }
+
+    public void setAvailable(Boolean available) {
+        this.available = available;
     }
 
     public void setId(Long id) {

@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
-import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.PENDING;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
 
@@ -70,7 +69,7 @@ public class SpaceService {
 
     public SpaceRecordDTO getSpaceById(User authenticatedUser, Long SpaceId) {
         Space Space = getSpaceEntity(SpaceId);
-        validateApprovedParticipation(authenticatedUser, Space);
+        validateAvailableOrApprovedParticipation(authenticatedUser, Space);
         return SpaceMapper.toDTO(Space);
     }
 
@@ -82,8 +81,12 @@ public class SpaceService {
     @Transactional
     public SpaceRecordDTO updateSpace(User authenticatedUser, Long spaceId, SpaceRecordDTO spaceRecordDTO) {
         Space spaceEntity = getSpaceEntity(spaceId);
-        validateActiveParticipation(authenticatedUser, spaceEntity, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
+        Set<SpaceUserRoleEnum> allowedRoles = Objects.nonNull(spaceRecordDTO.available())
+            ? Set.of(ROLE_SPACE_ADMIN)
+            : Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER);
+        validateActiveParticipation(authenticatedUser, spaceEntity, allowedRoles);
         if (Objects.nonNull(spaceRecordDTO.name())) spaceEntity.setName(spaceRecordDTO.name());
+        if (Objects.nonNull(spaceRecordDTO.available())) spaceEntity.setAvailable(spaceRecordDTO.available());
         return SpaceMapper.toDTO(spaceRepository.save(spaceEntity));
     }
 
@@ -114,8 +117,8 @@ public class SpaceService {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(criteriaBuilder.equal(root.get("active"), true));
             predicates.add(criteriaBuilder.or(
-                criteriaBuilder.isNull(spaceMembershipJoin.get("id")),
-                spaceMembershipJoin.get("spaceMembershipStatusEnum").in(PENDING, APPROVED)
+                criteriaBuilder.isTrue(root.get("available")),
+                criteriaBuilder.equal(spaceMembershipJoin.get("spaceMembershipStatusEnum"), APPROVED)
             ));
 
             if (Objects.nonNull(spaceUserRole)) {
@@ -215,6 +218,11 @@ public class SpaceService {
         if (!currentUserParticipatesInThisSpace) {
             throw new ForbiddenException("Esse usuario nao participa desse espaco");
         }
+    }
+
+    private void validateAvailableOrApprovedParticipation(User authenticatedUser, Space space) {
+        if (space.getAvailable()) return;
+        validateApprovedParticipation(authenticatedUser, space);
     }
 
     public void validActiveSpace(Space space) {

@@ -22,6 +22,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +70,21 @@ class SpaceServiceTests {
     }
 
     @Test
+    void getSpaceByIdAllowsAvailableSpaceWithoutApprovedParticipation() {
+        User user = createUser(1L);
+        Space space = createSpace(10L);
+        space.setAvailable(true);
+        addMembership(space, user, SpaceMembershipStatusEnum.PENDING);
+
+        when(spaceRepository.findById(space.getId())).thenReturn(Optional.of(space));
+
+        SpaceRecordDTO foundSpace = spaceService.getSpaceById(user, space.getId());
+
+        assertThat(foundSpace.id()).isEqualTo(space.getId());
+        assertThat(foundSpace.available()).isTrue();
+    }
+
+    @Test
     void getSpaceByIdPreventsUserWithoutApprovedParticipation() {
         User user = createUser(1L);
         Space space = createSpace(10L);
@@ -85,6 +102,7 @@ class SpaceServiceTests {
         Space space = createSpace(10L);
         space.setName("Original space");
         space.setActive(true);
+        space.setAvailable(true);
         addMembership(
             space,
             user,
@@ -93,6 +111,7 @@ class SpaceServiceTests {
         SpaceRecordDTO partialUpdate = new SpaceRecordDTO(
             null,
             "Updated space",
+            null,
             null,
             null,
             null,
@@ -106,6 +125,61 @@ class SpaceServiceTests {
 
         assertThat(updatedSpace.name()).isEqualTo("Updated space");
         assertThat(updatedSpace.active()).isTrue();
+        assertThat(updatedSpace.available()).isTrue();
+    }
+
+    @Test
+    void updateSpaceUpdatesAvailableWhenProvided() {
+        User user = createUser(1L);
+        Space space = createSpace(10L);
+        space.setAvailable(false);
+        addMembership(
+            space,
+            user,
+            SpaceMembershipStatusEnum.APPROVED,
+            SpaceUserRoleEnum.ROLE_SPACE_ADMIN);
+        SpaceRecordDTO partialUpdate = new SpaceRecordDTO(
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            null,
+            null);
+
+        when(spaceRepository.findById(space.getId())).thenReturn(Optional.of(space));
+        when(spaceRepository.save(space)).thenReturn(space);
+
+        SpaceRecordDTO updatedSpace = spaceService.updateSpace(user, space.getId(), partialUpdate);
+
+        assertThat(updatedSpace.available()).isTrue();
+    }
+
+    @Test
+    void updateSpacePreventsManagerFromUpdatingAvailable() {
+        User user = createUser(1L);
+        Space space = createSpace(10L);
+        addMembership(
+            space,
+            user,
+            SpaceMembershipStatusEnum.APPROVED,
+            SpaceUserRoleEnum.ROLE_SPACE_MANAGER);
+        SpaceRecordDTO partialUpdate = new SpaceRecordDTO(
+            null,
+            null,
+            null,
+            null,
+            true,
+            null,
+            null,
+            null);
+
+        when(spaceRepository.findById(space.getId())).thenReturn(Optional.of(space));
+
+        assertThatThrownBy(() -> spaceService.updateSpace(user, space.getId(), partialUpdate))
+            .isInstanceOf(ForbiddenException.class);
+        verify(spaceRepository, never()).save(space);
     }
 
     private User createUser(Long id) {

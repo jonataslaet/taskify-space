@@ -5,7 +5,6 @@ import com.jonataslaet.taskifyspace.entities.Space;
 import com.jonataslaet.taskifyspace.entities.SpaceMembership;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
-import org.springframework.beans.BeanUtils;
 
 import java.util.List;
 import java.util.Objects;
@@ -15,13 +14,22 @@ import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusE
 public class SpaceMapper {
 
     public static Space toEntity(SpaceRecordDTO spaceRecordDTO) {
-        Space Space = new Space();
-        BeanUtils.copyProperties(spaceRecordDTO, Space);
-        return Space;
+        Space space = new Space();
+        space.setName(spaceRecordDTO.name());
+        if (Objects.nonNull(spaceRecordDTO.available())) space.setAvailable(spaceRecordDTO.available());
+        return space;
     }
 
     public static SpaceRecordDTO toDTO(Space space) {
-        return new SpaceRecordDTO(space.getId(), space.getName(), getSpaceOwnerName(space), space.getActive(), null, null, null);
+        return new SpaceRecordDTO(
+            space.getId(),
+            space.getName(),
+            getSpaceOwnerName(space),
+            space.getActive(),
+            space.getAvailable(),
+            null,
+            null,
+            null);
     }
 
     public static SpaceRecordDTO toDTO(Space space, User authenticatedUser) {
@@ -31,6 +39,7 @@ public class SpaceMapper {
             space.getName(),
             getSpaceOwnerName(space),
             space.getActive(),
+            space.getAvailable(),
             Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceUserRole() : null,
             Objects.nonNull(authenticatedUserMembership) ? authenticatedUserMembership.getSpaceMembershipStatusEnum() : null,
             countActiveParticipations(space)

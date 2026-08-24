@@ -141,7 +141,7 @@ class TaskAndSpaceRecordDTOValidationTests {
 
     @Test
     void spaceCreateRejectsMissingAndInvalidFields() {
-        SpaceRecordDTO space = new SpaceRecordDTO(null, " ", null, null, null, null, null);
+        SpaceRecordDTO space = new SpaceRecordDTO(null, " ", null, null, null, null, null, null);
 
         Set<String> fields = violatedFields(
             validator.validate(space, SpaceRecordDTO.SpaceView.CreateSpace.class));
@@ -151,8 +151,8 @@ class TaskAndSpaceRecordDTOValidationTests {
 
     @Test
     void spaceUpdateAllowsPartialPayloadButRejectsInvalidProvidedFields() {
-        SpaceRecordDTO partialSpace = new SpaceRecordDTO(null, null, null, null, null, null, null);
-        SpaceRecordDTO invalidSpace = new SpaceRecordDTO(-1L, "", null, null, null, null, null);
+        SpaceRecordDTO partialSpace = new SpaceRecordDTO(null, null, null, null, null, null, null, null);
+        SpaceRecordDTO invalidSpace = new SpaceRecordDTO(-1L, "", null, null, null, null, null, null);
 
         assertThat(validator.validate(partialSpace, SpaceRecordDTO.SpaceView.UpdateSpace.class)).isEmpty();
 
