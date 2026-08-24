@@ -14,7 +14,9 @@ import 'package:mobile_flutter/features/spaces/domain/space_participant.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_update.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/spaces/domain/updated_space.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_summary.dart';
@@ -210,6 +212,12 @@ typedef FetchSpacesPageHandler =
     Future<SpacePageResult> Function(String accessToken, int page, int size);
 typedef CreateSpaceHandler =
     Future<CreatedSpace> Function(String accessToken, String name);
+typedef UpdateSpaceHandler =
+    Future<UpdatedSpace> Function(
+      String accessToken,
+      int spaceId,
+      SpaceUpdate update,
+    );
 typedef FetchSpaceParticipantsHandler =
     Future<SpaceParticipantPageResult> Function(
       String accessToken,
@@ -248,6 +256,7 @@ final class FakeSpacesRepository implements SpacesRepository {
     this._handler, {
     this.fetchPageHandler,
     this.createHandler,
+    this.updateSpaceHandler,
     this.fetchParticipantsHandler,
     this.fetchParticipationsHandler,
     this.searchParticipantsHandler,
@@ -258,6 +267,7 @@ final class FakeSpacesRepository implements SpacesRepository {
   final FetchSpacesHandler _handler;
   final FetchSpacesPageHandler? fetchPageHandler;
   final CreateSpaceHandler? createHandler;
+  final UpdateSpaceHandler? updateSpaceHandler;
   final FetchSpaceParticipantsHandler? fetchParticipantsHandler;
   final FetchSpaceParticipationsHandler? fetchParticipationsHandler;
   final SearchSpaceParticipantsHandler? searchParticipantsHandler;
@@ -265,6 +275,7 @@ final class FakeSpacesRepository implements SpacesRepository {
   final UpdateSpaceParticipationHandler? updateSpaceParticipationHandler;
   int fetchSpacesCalls = 0;
   int createSpaceCalls = 0;
+  int updateSpaceCalls = 0;
   int fetchSpaceParticipantsCalls = 0;
   int fetchSpaceParticipationsCalls = 0;
   int searchSpaceParticipantsCalls = 0;
@@ -275,6 +286,9 @@ final class FakeSpacesRepository implements SpacesRepository {
   final receivedPageSizes = <int>[];
   final receivedCreateAccessTokens = <String>[];
   final receivedSpaceNames = <String>[];
+  final receivedUpdateSpaceAccessTokens = <String>[];
+  final receivedUpdateSpaceIds = <int>[];
+  final receivedSpaceUpdates = <SpaceUpdate>[];
   final receivedFilters = <SpaceFilters>[];
   final receivedParticipantAccessTokens = <String>[];
   final receivedParticipantSpaceIds = <int>[];
@@ -331,6 +345,25 @@ final class FakeSpacesRepository implements SpacesRepository {
       return pageHandler(accessToken, page, size);
     }
     return _handler(accessToken);
+  }
+
+  @override
+  Future<UpdatedSpace> updateSpace({
+    required String accessToken,
+    required int spaceId,
+    required SpaceUpdate update,
+  }) {
+    updateSpaceCalls += 1;
+    receivedUpdateSpaceAccessTokens.add(accessToken);
+    receivedUpdateSpaceIds.add(spaceId);
+    receivedSpaceUpdates.add(update);
+    final handler = updateSpaceHandler;
+    if (handler == null) {
+      return Future<UpdatedSpace>.error(
+        StateError('Handler de atualização de espaço não configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId, update);
   }
 
   @override
@@ -670,6 +703,7 @@ const testSpace = SpaceSummary(
   name: 'Residência do Casal Laet',
   spaceAdminName: 'Joice Laet',
   active: true,
+  available: true,
   spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
   spaceMembershipStatus: 'APPROVED',
   activeParticipationsCount: 4,

@@ -7,6 +7,8 @@ import 'package:mobile_flutter/features/spaces/domain/space_participation_page_r
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_summary.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_update.dart';
+import 'package:mobile_flutter/features/spaces/domain/updated_space.dart';
 
 abstract interface class SpacesRepository {
   Future<CreatedSpace> createSpace({
@@ -19,6 +21,12 @@ abstract interface class SpacesRepository {
     SpaceFilters filters = const SpaceFilters(),
     int page = 0,
     int size = 10,
+  });
+
+  Future<UpdatedSpace> updateSpace({
+    required String accessToken,
+    required int spaceId,
+    required SpaceUpdate update,
   });
 
   Future<SpaceParticipantPageResult> fetchSpaceParticipants({

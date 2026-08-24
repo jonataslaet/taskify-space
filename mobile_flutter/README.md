@@ -102,6 +102,13 @@ administrador. Como `GET /spaces` lista somente espaços ativos, a interface
 confirma a criação sem inserir o novo espaço na listagem atual; ele só poderá
 aparecer depois de ser ativado.
 
+Em espaços nos quais a participação aprovada é de administrador ou gerente, o
+ícone de lápis abre a edição por meio de `PUT /spaces/{spaceId}`. Administradores
+podem alterar `name` e `available`; gerentes podem alterar `name`, enquanto a
+disponibilidade permanece somente para leitura conforme a autorização do
+backend. Depois do retorno `200 OK`, a página atual da listagem é consultada
+novamente para refletir os dados confirmados pelo servidor.
+
 Em espaços com participação aprovada, o botão **Ver tarefas** abre uma listagem
 que chama `GET /spaces/{spaceId}/tasks` com `page`, `size` e `sort=id,asc`. O
 espaço é definido pelo caminho para que `totalElements` e `totalPages` representem

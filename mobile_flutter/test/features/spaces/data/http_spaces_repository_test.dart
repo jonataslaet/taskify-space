@@ -7,6 +7,7 @@ import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/spaces/data/http_spaces_repository.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_update.dart';
 
 void main() {
   group('HttpSpacesRepository', () {
@@ -215,6 +216,335 @@ void main() {
           ),
         ),
       );
+    });
+
+    group('updateSpace', () {
+      test(
+        'faz PUT /spaces/{id} com JSON UTF-8 e interpreta a resposta',
+        () async {
+          final client = MockClient((request) async {
+            expect(request.method, 'PUT');
+            expect(
+              request.url.toString(),
+              'http://localhost:8080/api/spaces/7',
+            );
+            expect(request.url.query, isEmpty);
+            expect(request.headers['Accept'], 'application/json');
+            expect(
+              request.headers['Authorization'],
+              'Bearer access-token-test-only',
+            );
+            expect(
+              request.headers['Content-Type'],
+              'application/json; charset=utf-8',
+            );
+            expect(
+              jsonDecode(utf8.decode(request.bodyBytes)),
+              <String, dynamic>{
+                'name': 'Residência do Casal Laet atualizado',
+                'available': true,
+              },
+            );
+            return _jsonResponse(_validUpdatedBody());
+          });
+
+          final result = await _repository(client).updateSpace(
+            accessToken: ' access-token-test-only ',
+            spaceId: 7,
+            update: const SpaceUpdate(
+              name: '  Residência do Casal Laet atualizado  ',
+              available: true,
+            ),
+          );
+
+          expect(result.id, 7);
+          expect(result.name, 'Residência do Casal Laet atualizado');
+          expect(result.spaceAdminName, 'Jonatas Laet');
+          expect(result.active, isTrue);
+          expect(result.available, isTrue);
+        },
+      );
+
+      test('permite atualizar somente o nome e omite available', () async {
+        final client = MockClient((request) async {
+          expect(jsonDecode(request.body), <String, dynamic>{
+            'name': 'Nome permitido ao gerente',
+          });
+          return _jsonResponse(
+            _validUpdatedBody()..['name'] = 'Nome permitido ao gerente',
+          );
+        });
+
+        final result = await _repository(client).updateSpace(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+          update: const SpaceUpdate(name: ' Nome permitido ao gerente '),
+        );
+
+        expect(result.name, 'Nome permitido ao gerente');
+      });
+
+      test('permite atualizar somente available e omite name', () async {
+        final client = MockClient((request) async {
+          expect(jsonDecode(request.body), <String, dynamic>{
+            'available': false,
+          });
+          return _jsonResponse(_validUpdatedBody()..['available'] = false);
+        });
+
+        final result = await _repository(client).updateSpace(
+          accessToken: 'access-token-test-only',
+          spaceId: 7,
+          update: const SpaceUpdate(available: false),
+        );
+
+        expect(result.available, isFalse);
+      });
+
+      test('rejeita argumentos inválidos antes da rede', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            return _jsonResponse(_validUpdatedBody());
+          }),
+        );
+
+        final requests = <Future<Object?>>[
+          repository.updateSpace(
+            accessToken: '   ',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          repository.updateSpace(
+            accessToken: 'token',
+            spaceId: 0,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          repository.updateSpace(
+            accessToken: 'token',
+            spaceId: -1,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          repository.updateSpace(
+            accessToken: 'token',
+            spaceId: 7,
+            update: const SpaceUpdate(),
+          ),
+          repository.updateSpace(
+            accessToken: 'token',
+            spaceId: 7,
+            update: const SpaceUpdate(name: '   '),
+          ),
+          repository.updateSpace(
+            accessToken: 'token',
+            spaceId: 7,
+            update: SpaceUpdate(name: 'a' * 256),
+          ),
+        ];
+
+        for (final request in requests) {
+          await expectLater(
+            request,
+            throwsA(
+              isA<ApiFailure>().having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              ),
+            ),
+          );
+        }
+        expect(calls, 0);
+      });
+
+      for (final errorCase in <(int, ApiFailureKind)>[
+        (400, ApiFailureKind.validation),
+        (401, ApiFailureKind.unauthorized),
+        (403, ApiFailureKind.forbidden),
+        (404, ApiFailureKind.unknown),
+        (409, ApiFailureKind.unknown),
+        (503, ApiFailureKind.server),
+      ]) {
+        test('mapeia ${errorCase.$1} para ${errorCase.$2.name}', () async {
+          final repository = _repository(
+            MockClient((_) async => http.Response('{}', errorCase.$1)),
+          );
+
+          await expectLater(
+            repository.updateSpace(
+              accessToken: 'access-token-test-only',
+              spaceId: 7,
+              update: const SpaceUpdate(name: 'Casa'),
+            ),
+            throwsA(
+              isA<ApiFailure>()
+                  .having((failure) => failure.kind, 'kind', errorCase.$2)
+                  .having(
+                    (failure) => failure.statusCode,
+                    'statusCode',
+                    errorCase.$1,
+                  ),
+            ),
+          );
+        });
+      }
+
+      test('aceita somente status 200 como sucesso', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async => _jsonResponse(_validUpdatedBody(), statusCode: 201),
+          ),
+        );
+
+        await expectLater(
+          repository.updateSpace(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.unknown,
+                )
+                .having((failure) => failure.statusCode, 'statusCode', 201),
+          ),
+        );
+      });
+
+      test('lê Retry-After no 429', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async => http.Response(
+              '{}',
+              429,
+              headers: const <String, String>{'Retry-After': '12'},
+            ),
+          ),
+        );
+
+        await expectLater(
+          repository.updateSpace(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.rateLimited,
+                )
+                .having(
+                  (failure) => failure.retryAfter,
+                  'retryAfter',
+                  const Duration(seconds: 12),
+                ),
+          ),
+        );
+      });
+
+      test('rejeita resposta com id diferente do solicitado', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async => _jsonResponse(_validUpdatedBody()..['id'] = 8),
+          ),
+        );
+
+        await expectLater(
+          repository.updateSpace(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.malformedResponse,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia resposta incompatível para malformedResponse', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async =>
+                _jsonResponse(_validUpdatedBody()..remove('available')),
+          ),
+        );
+
+        await expectLater(
+          repository.updateSpace(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.malformedResponse,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia falha do cliente para network', () async {
+        final repository = _repository(
+          MockClient((request) async {
+            throw http.ClientException('Falha simulada.', request.url);
+          }),
+        );
+
+        await expectLater(
+          repository.updateSpace(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.network,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia timeout sem repetir o PUT', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            return _jsonResponse(_validUpdatedBody());
+          }),
+          timeout: const Duration(milliseconds: 1),
+        );
+
+        await expectLater(
+          repository.updateSpace(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            update: const SpaceUpdate(name: 'Casa'),
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.timeout,
+            ),
+          ),
+        );
+        expect(calls, 1);
+      });
     });
 
     group('requestSpaceParticipation', () {
@@ -710,6 +1040,16 @@ Map<String, dynamic> _validCreatedBody() {
   };
 }
 
+Map<String, dynamic> _validUpdatedBody() {
+  return <String, dynamic>{
+    'id': 7,
+    'name': 'Residência do Casal Laet atualizado',
+    'spaceAdminName': 'Jonatas Laet',
+    'active': true,
+    'available': true,
+  };
+}
+
 Map<String, dynamic> _validBody() {
   return <String, dynamic>{
     'content': <dynamic>[
@@ -718,6 +1058,7 @@ Map<String, dynamic> _validBody() {
         'name': 'Residência do Casal Laet',
         'spaceAdminName': 'Joice Laet',
         'active': true,
+        'available': false,
         'spaceUserRole': 'ROLE_SPACE_PARTICIPANT',
         'spaceMembershipStatus': 'APPROVED',
         'activeParticipationsCount': 4,
@@ -727,6 +1068,7 @@ Map<String, dynamic> _validBody() {
         'name': 'Residência do Marido da Bella',
         'spaceAdminName': 'Bella Laet',
         'active': true,
+        'available': true,
         'activeParticipationsCount': 2,
       },
     ],

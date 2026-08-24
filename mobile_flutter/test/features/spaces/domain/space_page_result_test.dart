@@ -12,6 +12,7 @@ void main() {
             'name': ' Residência do Casal Laet ',
             'spaceAdminName': ' Joice Laet ',
             'active': true,
+            'available': false,
             'spaceUserRole': ' ROLE_SPACE_PARTICIPANT ',
             'spaceMembershipStatus': ' APPROVED ',
             'activeParticipationsCount': 4,
@@ -20,6 +21,7 @@ void main() {
             'id': 2,
             'name': 'Residência do Marido da Bella',
             'active': true,
+            'available': true,
             'activeParticipationsCount': 2,
           },
         ],
@@ -35,6 +37,7 @@ void main() {
       expect(result.content.first.name, 'Residência do Casal Laet');
       expect(result.content.first.spaceUserRole, 'ROLE_SPACE_PARTICIPANT');
       expect(result.content.first.spaceMembershipStatus, 'APPROVED');
+      expect(result.content.first.available, isFalse);
       expect(result.content.first.canEditTasks, isFalse);
       expect(result.content.last.spaceUserRole, isNull);
       expect(result.content.last.spaceMembershipStatus, isNull);
@@ -54,6 +57,7 @@ void main() {
           name: 'Casa',
           spaceAdminName: null,
           active: true,
+          available: true,
           spaceUserRole: role,
           spaceMembershipStatus: status,
           activeParticipationsCount: 1,
@@ -76,6 +80,10 @@ void main() {
         isFalse,
       );
       expect(space(role: 'ROLE_SPACE_ADMIN').canEditParticipationRoles, isTrue);
+      expect(space(role: 'ROLE_SPACE_ADMIN').canEditSpace, isTrue);
+      expect(space(role: 'ROLE_SPACE_MANAGER').canEditSpace, isTrue);
+      expect(space(role: 'ROLE_SPACE_ADMIN').canEditAvailability, isTrue);
+      expect(space(role: 'ROLE_SPACE_MANAGER').canEditAvailability, isFalse);
       expect(
         space(role: 'ROLE_SPACE_MANAGER').canEditParticipationRoles,
         isFalse,
@@ -115,6 +123,7 @@ void main() {
             name: 'Casa',
             spaceAdminName: 'Admin',
             active: true,
+            available: true,
             spaceUserRole: null,
             spaceMembershipStatus: null,
             activeParticipationsCount: 0,
@@ -162,6 +171,28 @@ void main() {
               'name': 'Casa',
               'spaceAdminName': 'Admin',
               'active': 'true',
+              'available': true,
+              'activeParticipationsCount': 1,
+            },
+          ],
+          'page': <String, dynamic>{
+            'size': 10,
+            'number': 0,
+            'totalElements': 1,
+            'totalPages': 1,
+          },
+        }),
+        throwsFormatException,
+      );
+
+      expect(
+        () => SpacePageResult.fromJson(<String, dynamic>{
+          'content': <dynamic>[
+            <String, dynamic>{
+              'id': 1,
+              'name': 'Casa',
+              'spaceAdminName': 'Admin',
+              'active': true,
               'activeParticipationsCount': 1,
             },
           ],

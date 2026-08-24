@@ -56,9 +56,10 @@ class _CreateSpaceDialogState extends State<CreateSpaceDialog> {
       if (!mounted) {
         return;
       }
-      if (failure.kind == ApiFailureKind.unauthorized ||
-          failure.kind == ApiFailureKind.forbidden) {
-        widget.onSessionExpired?.call();
+      if (failure.kind == ApiFailureKind.unauthorized &&
+          widget.onSessionExpired != null) {
+        setState(() => _isSubmitting = false);
+        widget.onSessionExpired!.call();
         return;
       }
       setState(() {

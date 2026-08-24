@@ -1,30 +1,19 @@
-import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
-
-final class SpaceSummary {
-  const SpaceSummary({
+final class UpdatedSpace {
+  const UpdatedSpace({
     required this.id,
     required this.name,
     required this.spaceAdminName,
     required this.active,
     required this.available,
-    required this.spaceUserRole,
-    required this.spaceMembershipStatus,
-    required this.activeParticipationsCount,
   });
 
-  factory SpaceSummary.fromJson(Map<String, dynamic> json) {
-    return SpaceSummary(
+  factory UpdatedSpace.fromJson(Map<String, dynamic> json) {
+    return UpdatedSpace(
       id: _requiredPositiveInt(json, 'id'),
       name: _requiredString(json, 'name'),
       spaceAdminName: _optionalString(json, 'spaceAdminName'),
       active: _requiredBool(json, 'active'),
       available: _requiredBool(json, 'available'),
-      spaceUserRole: _optionalString(json, 'spaceUserRole'),
-      spaceMembershipStatus: _optionalString(json, 'spaceMembershipStatus'),
-      activeParticipationsCount: _requiredNonNegativeInt(
-        json,
-        'activeParticipationsCount',
-      ),
     );
   }
 
@@ -33,38 +22,10 @@ final class SpaceSummary {
   final String? spaceAdminName;
   final bool active;
   final bool available;
-  final String? spaceUserRole;
-  final String? spaceMembershipStatus;
-  final int activeParticipationsCount;
-
-  bool get canEditTasks => canEditSpace;
-
-  bool get canEditParticipations => canEditSpace;
-
-  bool get canEditSpace {
-    return spaceMembershipStatus == SpaceMembershipStatus.approved.apiValue &&
-        (spaceUserRole == SpaceUserRole.admin.apiValue ||
-            spaceUserRole == SpaceUserRole.manager.apiValue);
-  }
-
-  bool get canEditAvailability {
-    return spaceMembershipStatus == SpaceMembershipStatus.approved.apiValue &&
-        spaceUserRole == SpaceUserRole.admin.apiValue;
-  }
-
-  bool get canEditParticipationRoles => canEditAvailability;
 
   static int _requiredPositiveInt(Map<String, dynamic> json, String key) {
     final value = json[key];
     if (value is! int || value <= 0) {
-      throw FormatException('Campo $key ausente ou inválido.');
-    }
-    return value;
-  }
-
-  static int _requiredNonNegativeInt(Map<String, dynamic> json, String key) {
-    final value = json[key];
-    if (value is! int || value < 0) {
       throw FormatException('Campo $key ausente ou inválido.');
     }
     return value;

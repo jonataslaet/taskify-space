@@ -13,7 +13,9 @@ import 'package:mobile_flutter/features/spaces/domain/space_participation_page_r
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_summary.dart';
+import 'package:mobile_flutter/features/spaces/domain/space_update.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
+import 'package:mobile_flutter/features/spaces/domain/updated_space.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 
 final class HttpSpacesRepository implements SpacesRepository {
@@ -122,6 +124,60 @@ final class HttpSpacesRepository implements SpacesRepository {
         );
       }
       return result;
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
+  Future<UpdatedSpace> updateSpace({
+    required String accessToken,
+    required int spaceId,
+    required SpaceUpdate update,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0 || !_isValidUpdate(update)) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .put(
+            _config.endpoint('/spaces/$spaceId'),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode(update.toJson()),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Resposta de atualização de espaço não é um objeto JSON.',
+        );
+      }
+      final updatedSpace = UpdatedSpace.fromJson(decodedBody);
+      if (updatedSpace.id != spaceId) {
+        throw const FormatException(
+          'A API retornou um espaço diferente do atualizado.',
+        );
+      }
+      return updatedSpace;
     } on ApiFailure {
       rethrow;
     } on TimeoutException {
@@ -426,6 +482,19 @@ final class HttpSpacesRepository implements SpacesRepository {
 
     final endpoint = _config.endpoint('/spaces');
     return endpoint.replace(queryParameters: queryParameters);
+  }
+
+  bool _isValidUpdate(SpaceUpdate update) {
+    if (update.name == null && update.available == null) {
+      return false;
+    }
+    if (update.name case final name?) {
+      final normalizedName = name.trim();
+      if (normalizedName.isEmpty || normalizedName.length > 255) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Uri _spaceParticipantsEndpoint(

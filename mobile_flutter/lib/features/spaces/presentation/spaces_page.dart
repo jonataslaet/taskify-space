@@ -10,8 +10,10 @@ import 'package:mobile_flutter/features/spaces/domain/space_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participation.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
+import 'package:mobile_flutter/features/spaces/domain/updated_space.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/spaces/presentation/create_space_dialog.dart';
+import 'package:mobile_flutter/features/spaces/presentation/edit_space_dialog.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participations_page.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
@@ -351,6 +353,40 @@ class _SpacesPageState extends State<SpacesPage> {
     }
   }
 
+  Future<void> _openEditSpaceDialog(SpaceSummary space) async {
+    if (_isBusy || !space.canEditSpace) {
+      return;
+    }
+
+    final updatedSpace = await showDialog<UpdatedSpace>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => EditSpaceDialog(
+        space: space,
+        accessToken: widget.session.accessToken,
+        spacesRepository: widget.spacesRepository,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || updatedSpace == null) {
+      return;
+    }
+
+    await _loadSpaces(page: _result?.number ?? _requestedPage, size: _pageSize);
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('space-updated-message'),
+          content: Text('Espaço "${updatedSpace.name}" atualizado.'),
+        ),
+      );
+  }
+
   Future<void> _requestParticipation(SpaceSummary space) async {
     if (_isBusy ||
         space.spaceMembershipStatus != null ||
@@ -525,6 +561,9 @@ class _SpacesPageState extends State<SpacesPage> {
                   isRequestingParticipation:
                       _requestingParticipationSpaceId == space.id,
                   areActionsBusy: _isBusy,
+                  onEdit: space.canEditSpace
+                      ? () => unawaited(_openEditSpaceDialog(space))
+                      : null,
                   onRequestParticipation:
                       space.spaceMembershipStatus == null &&
                           space.spaceUserRole == null &&
@@ -833,6 +872,7 @@ class _SpaceCard extends StatelessWidget {
     required this.space,
     required this.isRequestingParticipation,
     required this.areActionsBusy,
+    required this.onEdit,
     required this.onRequestParticipation,
     required this.onViewParticipants,
     required this.onViewParticipations,
@@ -842,6 +882,7 @@ class _SpaceCard extends StatelessWidget {
   final SpaceSummary space;
   final bool isRequestingParticipation;
   final bool areActionsBusy;
+  final VoidCallback? onEdit;
   final VoidCallback? onRequestParticipation;
   final VoidCallback? onViewParticipants;
   final VoidCallback? onViewParticipations;
@@ -902,6 +943,19 @@ class _SpaceCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onEdit != null) ...[
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: areActionsBusy
+                        ? 'Aguarde a operação em andamento'
+                        : 'Editar este espaço',
+                    child: IconButton(
+                      key: ValueKey('space-edit-button-${space.id}'),
+                      onPressed: areActionsBusy ? null : onEdit,
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),

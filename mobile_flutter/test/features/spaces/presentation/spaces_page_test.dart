@@ -9,6 +9,8 @@ import 'package:mobile_flutter/features/spaces/domain/space_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_participation.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
+import 'package:mobile_flutter/features/spaces/domain/updated_space.dart';
+import 'package:mobile_flutter/features/spaces/presentation/edit_space_dialog.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participations_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
 import 'package:mobile_flutter/features/spaces/presentation/spaces_page.dart';
@@ -46,6 +48,162 @@ void main() {
 
     await tester.pump();
     expect(repository.fetchSpacesCalls, 1);
+  });
+
+  testWidgets('mostra edição somente para administrador ou gerente aprovados', (
+    tester,
+  ) async {
+    const spaces = <SpaceSummary>[
+      SpaceSummary(
+        id: 51,
+        name: 'Espaço administrado',
+        spaceAdminName: 'Administrador',
+        active: true,
+        available: true,
+        spaceUserRole: 'ROLE_SPACE_ADMIN',
+        spaceMembershipStatus: 'APPROVED',
+        activeParticipationsCount: 1,
+      ),
+      SpaceSummary(
+        id: 52,
+        name: 'Espaço gerenciado',
+        spaceAdminName: 'Administrador',
+        active: true,
+        available: true,
+        spaceUserRole: 'ROLE_SPACE_MANAGER',
+        spaceMembershipStatus: 'APPROVED',
+        activeParticipationsCount: 1,
+      ),
+      SpaceSummary(
+        id: 53,
+        name: 'Espaço participado',
+        spaceAdminName: 'Administrador',
+        active: true,
+        available: true,
+        spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
+        spaceMembershipStatus: 'APPROVED',
+        activeParticipationsCount: 1,
+      ),
+      SpaceSummary(
+        id: 54,
+        name: 'Espaço pendente',
+        spaceAdminName: 'Administrador',
+        active: true,
+        available: true,
+        spaceUserRole: 'ROLE_SPACE_ADMIN',
+        spaceMembershipStatus: 'PENDING',
+        activeParticipationsCount: 1,
+      ),
+      SpaceSummary(
+        id: 55,
+        name: 'Espaço sem vínculo',
+        spaceAdminName: 'Administrador',
+        active: true,
+        available: true,
+        spaceUserRole: null,
+        spaceMembershipStatus: null,
+        activeParticipationsCount: 1,
+      ),
+    ];
+    final repository = FakeSpacesRepository(
+      (_) async => makeSpacePage(content: spaces),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    for (final id in <int>[51, 52]) {
+      expect(find.byKey(ValueKey('space-edit-button-$id')), findsOneWidget);
+    }
+    for (final id in <int>[53, 54, 55]) {
+      expect(find.byKey(ValueKey('space-edit-button-$id')), findsNothing);
+    }
+  });
+
+  testWidgets('abre edição e recarrega a página atual após confirmar', (
+    tester,
+  ) async {
+    const originalSpace = SpaceSummary(
+      id: 81,
+      name: 'Espaço original',
+      spaceAdminName: 'Usuário de Teste',
+      active: true,
+      available: true,
+      spaceUserRole: 'ROLE_SPACE_ADMIN',
+      spaceMembershipStatus: 'APPROVED',
+      activeParticipationsCount: 3,
+    );
+    const refreshedSpace = SpaceSummary(
+      id: 81,
+      name: 'Espaço revisado',
+      spaceAdminName: 'Usuário de Teste',
+      active: true,
+      available: false,
+      spaceUserRole: 'ROLE_SPACE_ADMIN',
+      spaceMembershipStatus: 'APPROVED',
+      activeParticipationsCount: 3,
+    );
+    var fetchCalls = 0;
+    final repository = FakeSpacesRepository(
+      (_) async => throw StateError('Handler paginado esperado.'),
+      fetchPageHandler: (_, page, size) async {
+        fetchCalls += 1;
+        return _makePagedSpacePage(
+          content: [fetchCalls >= 3 ? refreshedSpace : originalSpace],
+          number: page,
+          size: size,
+          totalElements: 20,
+          totalPages: 2,
+        );
+      },
+      updateSpaceHandler: (_, spaceId, update) async => UpdatedSpace(
+        id: spaceId,
+        name: update.name ?? originalSpace.name,
+        spaceAdminName: originalSpace.spaceAdminName,
+        active: originalSpace.active,
+        available: update.available ?? originalSpace.available,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    final secondPageButton = find.byKey(const ValueKey('spaces-page-1'));
+    await tester.ensureVisible(secondPageButton);
+    await tester.tap(secondPageButton);
+    await tester.pumpAndSettle();
+
+    final editButton = find.byKey(const ValueKey('space-edit-button-81'));
+    await tester.ensureVisible(editButton);
+    await tester.tap(editButton);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EditSpaceDialog), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('edit-space-name-field')),
+      '  Espaço revisado  ',
+    );
+    await tester.tap(find.byKey(const ValueKey('edit-space-available-field')));
+    await tester.pump();
+    final submitButton = find.byKey(const ValueKey('edit-space-submit-button'));
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    expect(repository.updateSpaceCalls, 1);
+    expect(repository.receivedUpdateSpaceAccessTokens, [
+      testSession.accessToken,
+    ]);
+    expect(repository.receivedUpdateSpaceIds, [originalSpace.id]);
+    final update = repository.receivedSpaceUpdates.single;
+    expect(update.name, 'Espaço revisado');
+    expect(update.available, isFalse);
+    expect(repository.fetchSpacesCalls, 3);
+    expect(repository.receivedPages, [0, 1, 1]);
+    expect(repository.receivedPageSizes, [10, 10, 10]);
+    expect(find.byKey(const ValueKey('space-updated-message')), findsOneWidget);
+    expect(find.text('Espaço original'), findsNothing);
+    expect(find.text('Espaço revisado'), findsOneWidget);
   });
 
   testWidgets('ignora resposta antiga quando o repositório da sessão muda', (
@@ -274,6 +432,7 @@ void main() {
         name: 'Espaço disponível',
         spaceAdminName: null,
         active: true,
+        available: true,
         spaceUserRole: null,
         spaceMembershipStatus: null,
         activeParticipationsCount: 2,
@@ -283,6 +442,7 @@ void main() {
         name: 'Espaço disponível',
         spaceAdminName: null,
         active: true,
+        available: true,
         spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
         spaceMembershipStatus: 'PENDING',
         activeParticipationsCount: 2,
@@ -436,6 +596,7 @@ void main() {
                     name: 'Espaço 5',
                     spaceAdminName: null,
                     active: true,
+                    available: true,
                     spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
                     spaceMembershipStatus: 'PENDING',
                     activeParticipationsCount: 0,
@@ -565,6 +726,7 @@ void main() {
         name: 'Espaço gerenciado',
         spaceAdminName: 'Usuário de Teste',
         active: true,
+        available: true,
         spaceUserRole: 'ROLE_SPACE_ADMIN',
         spaceMembershipStatus: 'APPROVED',
         activeParticipationsCount: 3,
@@ -574,6 +736,7 @@ void main() {
         name: 'Espaço gerenciado',
         spaceAdminName: 'Outra administradora',
         active: true,
+        available: true,
         spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
         spaceMembershipStatus: 'APPROVED',
         activeParticipationsCount: 3,
@@ -671,6 +834,7 @@ void main() {
       name: 'Espaco gerenciado',
       spaceAdminName: 'Administradora',
       active: true,
+      available: true,
       spaceUserRole: 'ROLE_SPACE_MANAGER',
       spaceMembershipStatus: 'APPROVED',
       activeParticipationsCount: 3,
@@ -703,6 +867,7 @@ void main() {
       name: 'Espaco disponivel',
       spaceAdminName: 'Responsavel',
       active: true,
+      available: true,
       spaceUserRole: null,
       spaceMembershipStatus: null,
       activeParticipationsCount: 1,
@@ -712,6 +877,7 @@ void main() {
       name: 'Espaco pendente',
       spaceAdminName: 'Responsavel',
       active: true,
+      available: true,
       spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
       spaceMembershipStatus: 'PENDING',
       activeParticipationsCount: 2,
@@ -833,6 +999,7 @@ void main() {
         name: 'Espaço sem vínculo',
         spaceAdminName: 'Responsável',
         active: true,
+        available: true,
         spaceUserRole: null,
         spaceMembershipStatus: null,
         activeParticipationsCount: 1,
@@ -842,6 +1009,7 @@ void main() {
         name: 'Espaço pendente',
         spaceAdminName: 'Responsável',
         active: true,
+        available: true,
         spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
         spaceMembershipStatus: 'PENDING',
         activeParticipationsCount: 2,
@@ -899,6 +1067,7 @@ void main() {
           name: 'Espaço por papel',
           spaceAdminName: 'Responsável',
           active: true,
+          available: true,
           spaceUserRole: roleCase.role,
           spaceMembershipStatus: 'APPROVED',
           activeParticipationsCount: 1,
@@ -943,6 +1112,7 @@ void main() {
         name: 'Espaço sem vínculo',
         spaceAdminName: 'Responsável',
         active: true,
+        available: true,
         spaceUserRole: null,
         spaceMembershipStatus: null,
         activeParticipationsCount: 1,
@@ -952,6 +1122,7 @@ void main() {
         name: 'Espaço pendente',
         spaceAdminName: 'Responsável',
         active: true,
+        available: true,
         spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
         spaceMembershipStatus: 'PENDING',
         activeParticipationsCount: 1,
@@ -1291,6 +1462,7 @@ SpaceSummary _makeSpace(int id) {
     name: 'Espaço $id',
     spaceAdminName: 'Responsável $id',
     active: true,
+    available: true,
     spaceUserRole: 'ROLE_SPACE_PARTICIPANT',
     spaceMembershipStatus: 'APPROVED',
     activeParticipationsCount: 1,
@@ -1303,6 +1475,7 @@ SpaceSummary _availableSpace(int id) {
     name: 'Espaço $id',
     spaceAdminName: null,
     active: true,
+    available: true,
     spaceUserRole: null,
     spaceMembershipStatus: null,
     activeParticipationsCount: 0,
