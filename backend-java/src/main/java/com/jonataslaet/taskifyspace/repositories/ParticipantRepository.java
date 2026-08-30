@@ -13,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -79,8 +80,11 @@ public class ParticipantRepository {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();
 
+        BigDecimal totalScore = rows.stream().map(
+            row -> toBigDecimal(row[4])).reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<@NonNull ParticipantDTO> participants = rows.stream()
-            .map(row -> toParticipantDTO(row, resolvedTaskCategories))
+            .map(row -> toParticipantDTO(row, resolvedTaskCategories, totalScore))
             .toList();
 
         Long total = ((Number) bindFilters(
@@ -171,13 +175,12 @@ public class ParticipantRepository {
         return column + " " + order.getDirection().name();
     }
 
-    private ParticipantDTO toParticipantDTO(Object[] row, List<TaskCategoryEnum> taskCategories) {
-        return new ParticipantDTO(
-            ((Number) row[0]).longValue(),
-            (String) row[1],
-            SpaceUserRoleEnum.valueOf(row[2].toString()),
-            toTaskCategories(row[3], taskCategories),
-            toBigDecimal(row[4]));
+    private ParticipantDTO toParticipantDTO(Object[] row, List<TaskCategoryEnum> taskCategories, BigDecimal totalScore) {
+        BigDecimal participantScore = toBigDecimal(row[4]);
+        return new ParticipantDTO(((Number) row[0]).longValue(), (String) row[1],
+            SpaceUserRoleEnum.valueOf(row[2].toString()), toTaskCategories(row[3], taskCategories),
+            participantScore, totalScore.compareTo(BigDecimal.ZERO) == 0 ?
+            BigDecimal.ZERO : participantScore.divide(totalScore, RoundingMode.FLOOR));
     }
 
     private List<TaskCategoryEnum> toTaskCategories(Object value, List<TaskCategoryEnum> selectedTaskCategories) {

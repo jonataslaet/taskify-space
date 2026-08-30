@@ -62,7 +62,7 @@ public class FeatureAccessService {
 
     public void requireFeature(User user, FeatureEnum feature, Space space) {
         if (!hasFeature(user, feature, space)) {
-            throw new ForbiddenException("Plano atual nao libera a funcionalidade " + feature);
+            throw new ForbiddenException("O plano atual ultrapassou o limite de " + feature.getDescription());
         }
     }
 

@@ -18,6 +18,8 @@ public record ParticipantDTO(
 
     List<TaskCategoryEnum> taskCategories,
 
-    BigDecimal score
+    BigDecimal score,
+
+    BigDecimal contributionPercentual
 ) {
 }
