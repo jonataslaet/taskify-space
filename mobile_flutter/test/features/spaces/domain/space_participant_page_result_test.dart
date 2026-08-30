@@ -8,6 +8,7 @@ void main() {
 
       expect(result.content, hasLength(1));
       expect(result.content.single.name, 'Joice Laet');
+      expect(result.content.single.contributionPercentual, 0.75);
       expect(result.size, 10);
       expect(result.number, 1);
       expect(result.totalElements, 21);
@@ -54,6 +55,7 @@ Map<String, dynamic> _validPageJson() {
         'spaceUserRole': 'ROLE_SPACE_ADMIN',
         'taskCategories': <dynamic>['OPERATIONAL'],
         'score': 90.5,
+        'contributionPercentual': 0.75,
       },
     ],
     'page': <String, dynamic>{

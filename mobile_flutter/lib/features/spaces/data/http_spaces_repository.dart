@@ -584,20 +584,39 @@ final class HttpSpacesRepository implements SpacesRepository {
 
   ApiFailure _mapFailure(http.Response response) {
     final statusCode = response.statusCode;
-    return switch (statusCode) {
-      400 => ApiFailure(ApiFailureKind.validation, statusCode: statusCode),
-      401 => ApiFailure(ApiFailureKind.unauthorized, statusCode: statusCode),
-      403 => ApiFailure(ApiFailureKind.forbidden, statusCode: statusCode),
-      429 => ApiFailure(
-        ApiFailureKind.rateLimited,
-        statusCode: statusCode,
-        retryAfter: _parseRetryAfter(
-          _headerValue(response.headers, 'retry-after'),
-        ),
-      ),
-      >= 500 => ApiFailure(ApiFailureKind.server, statusCode: statusCode),
-      _ => ApiFailure(ApiFailureKind.unknown, statusCode: statusCode),
+    final kind = switch (statusCode) {
+      400 => ApiFailureKind.validation,
+      401 => ApiFailureKind.unauthorized,
+      403 => ApiFailureKind.forbidden,
+      429 => ApiFailureKind.rateLimited,
+      >= 500 => ApiFailureKind.server,
+      _ => ApiFailureKind.unknown,
     };
+    return ApiFailure(
+      kind,
+      statusCode: statusCode,
+      apiMessage: _parseApiMessage(response),
+      retryAfter: statusCode == 429
+          ? _parseRetryAfter(_headerValue(response.headers, 'retry-after'))
+          : null,
+    );
+  }
+
+  String? _parseApiMessage(http.Response response) {
+    try {
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! Map<String, dynamic>) {
+        return null;
+      }
+      final message = decodedBody['message'];
+      if (message is! String) {
+        return null;
+      }
+      final normalizedMessage = message.trim();
+      return normalizedMessage.isEmpty ? null : normalizedMessage;
+    } on FormatException {
+      return null;
+    }
   }
 
   Duration? _parseRetryAfter(String? value) {

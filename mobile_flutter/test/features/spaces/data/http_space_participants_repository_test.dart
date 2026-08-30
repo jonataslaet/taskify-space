@@ -36,6 +36,7 @@ void main() {
 
       expect(result.content, hasLength(1));
       expect(result.content.single.name, 'Joice Laet');
+      expect(result.content.single.contributionPercentual, 0.625);
       expect(result.totalElements, 1);
     });
 
@@ -616,6 +617,7 @@ Map<String, dynamic> _validPageBody() {
         'spaceUserRole': 'ROLE_SPACE_ADMIN',
         'taskCategories': <dynamic>['OPERATIONAL', 'FINANCIAL'],
         'score': 105.5,
+        'contributionPercentual': 0.625,
       },
     ],
     'page': <String, dynamic>{

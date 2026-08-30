@@ -246,7 +246,8 @@ void main() {
                   (failure) => failure.statusCode,
                   'statusCode',
                   errorCase.$1,
-                ),
+                )
+                .having((failure) => failure.apiMessage, 'apiMessage', isNull),
           ),
         );
       });
@@ -554,7 +555,76 @@ void main() {
                   (failure) => failure.statusCode,
                   'statusCode',
                   errorCase.$1,
-                ),
+                )
+                .having((failure) => failure.apiMessage, 'apiMessage', isNull),
+          ),
+        );
+      });
+    }
+
+    test('preserva a mensagem da API no 403', () async {
+      final repository = _repository(
+        MockClient(
+          (_) async => _jsonResponse(<String, dynamic>{
+            'message':
+                '  O espaço precisa manter pelo menos um administrador aprovado.  ',
+          }, statusCode: 403),
+        ),
+      );
+
+      await expectLater(
+        repository.updateSpaceParticipation(
+          accessToken: 'access-token-test-only',
+          spaceId: 1,
+          membershipId: 11,
+        ),
+        throwsA(
+          isA<ApiFailure>()
+              .having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.forbidden,
+              )
+              .having(
+                (failure) => failure.apiMessage,
+                'apiMessage',
+                'O espaço precisa manter pelo menos um administrador aprovado.',
+              ),
+        ),
+      );
+    });
+
+    for (final invalidMessageCase in <(String, http.Response)>[
+      ('corpo não JSON', http.Response('not-json', 403)),
+      (
+        'mensagem não textual',
+        _jsonResponse(<String, dynamic>{'message': 42}, statusCode: 403),
+      ),
+      (
+        'mensagem vazia',
+        _jsonResponse(<String, dynamic>{'message': '   '}, statusCode: 403),
+      ),
+    ]) {
+      test('ignora ${invalidMessageCase.$1} sem mascarar o 403', () async {
+        final repository = _repository(
+          MockClient((_) async => invalidMessageCase.$2),
+        );
+
+        await expectLater(
+          repository.updateSpaceParticipation(
+            accessToken: 'access-token-test-only',
+            spaceId: 1,
+            membershipId: 11,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.forbidden,
+                )
+                .having((failure) => failure.statusCode, 'statusCode', 403)
+                .having((failure) => failure.apiMessage, 'apiMessage', isNull),
           ),
         );
       });

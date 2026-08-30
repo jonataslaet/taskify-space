@@ -12,11 +12,17 @@ enum ApiFailureKind {
 }
 
 final class ApiFailure implements Exception {
-  const ApiFailure(this.kind, {this.statusCode, this.retryAfter});
+  const ApiFailure(
+    this.kind, {
+    this.statusCode,
+    this.retryAfter,
+    this.apiMessage,
+  });
 
   final ApiFailureKind kind;
   final int? statusCode;
   final Duration? retryAfter;
+  final String? apiMessage;
 
   String userMessage({int? retrySeconds}) {
     return switch (kind) {

@@ -12,6 +12,7 @@ void main() {
         'spaceUserRole': ' ROLE_SPACE_MANAGER ',
         'taskCategories': <dynamic>[' OPERATIONAL ', 'FINANCIAL'],
         'score': 49.1666666667,
+        'contributionPercentual': 0.491666666667,
       });
 
       expect(participant.id, 12);
@@ -22,9 +23,10 @@ void main() {
         TaskCategory.financial,
       ]);
       expect(participant.score, 49.1666666667);
+      expect(participant.contributionPercentual, 0.491666666667);
     });
 
-    test('aceita score zero e categorias ausentes ou nulas', () {
+    test('aceita score e percentual zero e categorias ausentes ou nulas', () {
       for (final json in <Map<String, dynamic>>[
         _validJson()..remove('taskCategories'),
         _validJson()..['taskCategories'] = null,
@@ -32,6 +34,7 @@ void main() {
         final participant = SpaceParticipant.fromJson(json);
 
         expect(participant.score, 0);
+        expect(participant.contributionPercentual, 0);
         expect(participant.taskCategories, isEmpty);
       }
     });
@@ -44,6 +47,7 @@ void main() {
         spaceUserRole: SpaceUserRole.participant,
         taskCategories: categories,
         score: 0,
+        contributionPercentual: 0,
       );
 
       categories.add(TaskCategory.financial);
@@ -57,7 +61,7 @@ void main() {
       );
     });
 
-    test('rejeita id, nome, papel ou score inválidos', () {
+    test('rejeita id, nome, papel, score ou percentual inválidos', () {
       for (final invalidJson in <Map<String, dynamic>>[
         _validJson()..['id'] = 0,
         _validJson()..['id'] = 1.0,
@@ -68,6 +72,11 @@ void main() {
         _validJson()..['score'] = double.nan,
         _validJson()..['score'] = double.infinity,
         _validJson()..['score'] = '10',
+        _validJson()..remove('contributionPercentual'),
+        _validJson()..['contributionPercentual'] = -1,
+        _validJson()..['contributionPercentual'] = double.nan,
+        _validJson()..['contributionPercentual'] = double.infinity,
+        _validJson()..['contributionPercentual'] = '0.5',
       ]) {
         expect(
           () => SpaceParticipant.fromJson(invalidJson),
@@ -101,5 +110,6 @@ Map<String, dynamic> _validJson() {
     'spaceUserRole': 'ROLE_SPACE_PARTICIPANT',
     'taskCategories': <dynamic>[],
     'score': 0,
+    'contributionPercentual': 0,
   };
 }

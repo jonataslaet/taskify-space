@@ -338,7 +338,8 @@ void main() {
     expect(find.byKey(const Key('space-participations-error')), findsOneWidget);
     expect(
       find.text(
-        'É necessária uma participação aprovada para consultar este espaço.',
+        'Apenas administradores e gerentes do espaço podem consultar as '
+        'participações.',
       ),
       findsOneWidget,
     );

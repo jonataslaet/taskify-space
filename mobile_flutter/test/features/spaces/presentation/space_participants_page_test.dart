@@ -56,6 +56,7 @@ void main() {
               TaskCategory.financial,
             },
             score: 42.5,
+            contributionPercentual: 0.425,
           ),
           _participant(12, name: 'Caio Souza'),
         ],
@@ -73,11 +74,13 @@ void main() {
     expect(find.text('Joice Lima'), findsOneWidget);
     expect(find.text('Gerente'), findsOneWidget);
     expect(find.text('42.5 pontos'), findsOneWidget);
+    expect(find.text('42.5% de contribuição'), findsOneWidget);
     expect(find.text('Operacional'), findsOneWidget);
     expect(find.text('Financeira'), findsOneWidget);
     expect(find.text('Caio Souza'), findsOneWidget);
     expect(find.text('Participante'), findsOneWidget);
     expect(find.text('0 pontos'), findsOneWidget);
+    expect(find.text('0% de contribuição'), findsOneWidget);
   });
 
   testWidgets('aplica todos os filtros e limpa os critérios', (tester) async {
@@ -332,6 +335,7 @@ SpaceParticipant _participant(
   SpaceUserRole role = SpaceUserRole.participant,
   Set<TaskCategory> categories = const {},
   num score = 0,
+  num contributionPercentual = 0,
 }) {
   return SpaceParticipant(
     id: id,
@@ -339,6 +343,7 @@ SpaceParticipant _participant(
     spaceUserRole: role,
     taskCategories: categories.toList(),
     score: score,
+    contributionPercentual: contributionPercentual,
   );
 }
 

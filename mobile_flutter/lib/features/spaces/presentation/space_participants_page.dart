@@ -696,6 +696,12 @@ class _ParticipantCard extends StatelessWidget {
                         icon: Icons.stars_outlined,
                         label: '${_scoreLabel(participant.score)} pontos',
                       ),
+                      _ParticipantInfoChip(
+                        icon: Icons.pie_chart_outline,
+                        label: _contributionLabel(
+                          participant.contributionPercentual,
+                        ),
+                      ),
                       for (final category in participant.taskCategories)
                         _ParticipantInfoChip(
                           icon: category == TaskCategory.financial
@@ -883,6 +889,10 @@ String _scoreLabel(num score) {
       .toStringAsFixed(2)
       .replaceFirst(RegExp(r'0+$'), '')
       .replaceFirst(RegExp(r'\.$'), '');
+}
+
+String _contributionLabel(num contributionPercentual) {
+  return '${_scoreLabel(contributionPercentual * 100)}% de contribuição';
 }
 
 String _initials(String name) {

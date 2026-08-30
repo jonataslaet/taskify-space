@@ -280,7 +280,7 @@ class _SpacesPageState extends State<SpacesPage> {
   }
 
   Future<void> _openParticipations(SpaceSummary space) async {
-    if (_isBusy) {
+    if (_isBusy || !space.canViewParticipations) {
       return;
     }
     final updatedParticipation = await Navigator.of(context)
@@ -573,8 +573,7 @@ class _SpacesPageState extends State<SpacesPage> {
                   onViewParticipants: space.spaceMembershipStatus == 'APPROVED'
                       ? () => _openParticipants(space)
                       : null,
-                  onViewParticipations:
-                      space.spaceMembershipStatus == 'APPROVED'
+                  onViewParticipations: space.canViewParticipations
                       ? () => unawaited(_openParticipations(space))
                       : null,
                   onViewTasks: space.spaceMembershipStatus == 'APPROVED'
@@ -994,26 +993,27 @@ class _SpaceCard extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Tooltip(
-                    message: onViewParticipations == null
-                        ? 'Participação aprovada necessária'
-                        : areActionsBusy
-                        ? 'Aguarde a solicitação em andamento'
-                        : 'Ver participações deste espaço',
-                    child: OutlinedButton.icon(
-                      key: ValueKey('space-participations-button-${space.id}'),
-                      onPressed: areActionsBusy ? null : onViewParticipations,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                  if (onViewParticipations != null)
+                    Tooltip(
+                      message: areActionsBusy
+                          ? 'Aguarde a solicitação em andamento'
+                          : 'Ver participações deste espaço',
+                      child: OutlinedButton.icon(
+                        key: ValueKey(
+                          'space-participations-button-${space.id}',
+                        ),
+                        onPressed: areActionsBusy ? null : onViewParticipations,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                        ),
+                        icon: const Icon(
+                          Icons.manage_accounts_outlined,
+                          size: 20,
+                        ),
+                        label: const Text('Ver participações'),
                       ),
-                      icon: const Icon(
-                        Icons.manage_accounts_outlined,
-                        size: 20,
-                      ),
-                      label: const Text('Ver participações'),
                     ),
-                  ),
                   Tooltip(
                     message: onViewTasks == null
                         ? 'Participação aprovada necessária'

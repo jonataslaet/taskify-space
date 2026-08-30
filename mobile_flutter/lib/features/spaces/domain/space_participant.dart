@@ -8,6 +8,7 @@ final class SpaceParticipant {
     required this.spaceUserRole,
     required List<TaskCategory> taskCategories,
     required this.score,
+    required this.contributionPercentual,
   }) : taskCategories = List<TaskCategory>.unmodifiable(taskCategories);
 
   factory SpaceParticipant.fromJson(Map<String, dynamic> json) {
@@ -17,6 +18,10 @@ final class SpaceParticipant {
       spaceUserRole: SpaceUserRole.fromApiValue(json['spaceUserRole']),
       taskCategories: _taskCategories(json['taskCategories']),
       score: _requiredNonNegativeNumber(json, 'score'),
+      contributionPercentual: _requiredNonNegativeNumber(
+        json,
+        'contributionPercentual',
+      ),
     );
   }
 
@@ -25,6 +30,7 @@ final class SpaceParticipant {
   final SpaceUserRole spaceUserRole;
   final List<TaskCategory> taskCategories;
   final num score;
+  final num contributionPercentual;
 
   static int _requiredPositiveInt(Map<String, dynamic> json, String key) {
     final value = json[key];

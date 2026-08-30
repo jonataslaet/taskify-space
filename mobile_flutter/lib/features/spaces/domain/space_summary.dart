@@ -39,7 +39,9 @@ final class SpaceSummary {
 
   bool get canEditTasks => canEditSpace;
 
-  bool get canEditParticipations => canEditSpace;
+  bool get canViewParticipations => canEditSpace;
+
+  bool get canEditParticipations => canViewParticipations;
 
   bool get canEditSpace {
     return spaceMembershipStatus == SpaceMembershipStatus.approved.apiValue &&

@@ -923,7 +923,8 @@ String _participationsFailureMessage(ApiFailure failure) {
     ApiFailureKind.unauthorized =>
       'Sua sessão expirou. Entre novamente para continuar.',
     ApiFailureKind.forbidden =>
-      'É necessária uma participação aprovada para consultar este espaço.',
+      'Apenas administradores e gerentes do espaço podem consultar as '
+          'participações.',
     ApiFailureKind.rateLimited =>
       'Muitas solicitações foram feitas. Aguarde e tente novamente.',
     ApiFailureKind.timeout =>

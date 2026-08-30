@@ -75,10 +75,18 @@ void main() {
 
       expect(space(role: 'ROLE_SPACE_ADMIN').canEditParticipations, isTrue);
       expect(space(role: 'ROLE_SPACE_MANAGER').canEditParticipations, isTrue);
+      expect(space(role: 'ROLE_SPACE_ADMIN').canViewParticipations, isTrue);
+      expect(space(role: 'ROLE_SPACE_MANAGER').canViewParticipations, isTrue);
       expect(
         space(role: 'ROLE_SPACE_PARTICIPANT').canEditParticipations,
         isFalse,
       );
+      expect(
+        space(role: 'ROLE_SPACE_PARTICIPANT').canViewParticipations,
+        isFalse,
+      );
+      expect(space(role: null).canViewParticipations, isFalse);
+      expect(space(role: 'ROLE_UNKNOWN').canViewParticipations, isFalse);
       expect(space(role: 'ROLE_SPACE_ADMIN').canEditParticipationRoles, isTrue);
       expect(space(role: 'ROLE_SPACE_ADMIN').canEditSpace, isTrue);
       expect(space(role: 'ROLE_SPACE_MANAGER').canEditSpace, isTrue);
@@ -93,6 +101,24 @@ void main() {
           role: 'ROLE_SPACE_ADMIN',
           status: 'PENDING',
         ).canEditParticipations,
+        isFalse,
+      );
+      expect(
+        space(
+          role: 'ROLE_SPACE_ADMIN',
+          status: 'PENDING',
+        ).canViewParticipations,
+        isFalse,
+      );
+      expect(
+        space(
+          role: 'ROLE_SPACE_MANAGER',
+          status: 'PENDING',
+        ).canViewParticipations,
+        isFalse,
+      );
+      expect(
+        space(role: 'ROLE_SPACE_MANAGER', status: null).canViewParticipations,
         isFalse,
       );
       expect(

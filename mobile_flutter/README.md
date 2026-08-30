@@ -70,15 +70,17 @@ página zero.
 
 Em espaços com participação aprovada, o chip com a quantidade de participantes
 abre uma tela própria por meio de `GET /spaces/{spaceId}/participants`. A lista
-exibe nome, papel, categorias consideradas e pontuação, com paginação e filtros
-opcionais por `name`, `spaceUserRole` e `taskCategories`. Também é possível
+exibe nome, papel, categorias consideradas, pontuação e percentual de
+contribuição, com paginação e filtros opcionais por `name`, `spaceUserRole` e
+`taskCategories`. Também é possível
 ordenar por identificador, nome, papel ou pontuação; por padrão, o aplicativo
 solicita a maior pontuação primeiro com `sort=score,desc`. Em caso de empate, o
 backend usa o identificador crescente. As categorias selecionadas determinam
 quais execuções compõem a pontuação e não removem participantes sem execução
 nelas.
 
-O botão **Ver participações**, exibido ao lado de **Ver tarefas**, abre a
+O botão **Ver participações** é exibido ao lado de **Ver tarefas** somente para
+administradores e gerentes com participação aprovada e abre a
 listagem paginada de `GET /spaces/{spaceId}/participations`. A tela mostra nome,
 papel e situação de cada vínculo e permite filtrar opcionalmente por `username`
 e por um ou mais valores de `statuses`. Sem esses filtros, todas as participações

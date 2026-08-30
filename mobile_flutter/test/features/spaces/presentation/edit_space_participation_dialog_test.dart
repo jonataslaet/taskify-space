@@ -216,7 +216,34 @@ void main() {
     expect(_statusDropdown(tester).onChanged, isNotNull);
   });
 
-  testWidgets('403 mostra erro inline e permite tentar novamente', (
+  testWidgets('403 mostra a mensagem da API', (tester) async {
+    final repository = _repository(
+      handler: (_, _, _, _, _) async => throw const ApiFailure(
+        ApiFailureKind.forbidden,
+        statusCode: 403,
+        apiMessage:
+            'O espaço precisa manter pelo menos um administrador aprovado.',
+      ),
+    );
+
+    await _pumpDialog(tester, repository: repository, canEditRole: false);
+    await _selectDropdown(
+      tester,
+      const ValueKey('edit-space-participation-status-field'),
+      'Suspensa',
+    );
+    await _submit(tester);
+
+    expect(
+      find.text(
+        'O espaço precisa manter pelo menos um administrador aprovado.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('A alteração não é permitida.'), findsNothing);
+  });
+
+  testWidgets('403 sem mensagem usa fallback e permite tentar novamente', (
     tester,
   ) async {
     var attempts = 0;

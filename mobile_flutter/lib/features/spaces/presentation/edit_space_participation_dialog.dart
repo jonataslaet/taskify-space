@@ -244,6 +244,12 @@ String _statusLabel(SpaceMembershipStatus status) {
 }
 
 String _updateFailureMessage(ApiFailure failure) {
+  if (const <int>{400, 403, 404, 409}.contains(failure.statusCode)) {
+    final apiMessage = failure.apiMessage?.trim();
+    if (apiMessage != null && apiMessage.isNotEmpty) {
+      return apiMessage;
+    }
+  }
   if (failure.statusCode == 404) {
     return 'A participação ou o espaço não foi encontrado.';
   }
