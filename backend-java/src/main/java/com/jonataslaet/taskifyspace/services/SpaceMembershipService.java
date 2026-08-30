@@ -210,8 +210,9 @@ public class SpaceMembershipService {
         Specification<@NonNull SpaceMembership> spaceSpecification, Pageable pageable, Long spaceId, User authUser) {
 
         boolean currentUserParticipatesInThisSpace = spaceMembershipRepository
-            .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnum(
-                spaceId, authUser.getId(), SpaceMembershipStatusEnum.APPROVED);
+            .existsBySpaceIdAndUserIdAndSpaceMembershipStatusEnumAndSpaceUserRoleIn(
+                spaceId, authUser.getId(), SpaceMembershipStatusEnum.APPROVED,
+                Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
 
         if (!currentUserParticipatesInThisSpace) {
             throw new ForbiddenException("Usuario nao possui permissao para visualizar as participacoes desse espaco");
