@@ -34,7 +34,7 @@ public class TaskExecutionController {
         return ResponseEntity.status(HttpStatus.OK).body(taskExecutions);
     }
 
-    @DeleteMapping("/{taskExecutionId}")
+    @DeleteMapping("/{taskExecutionId}/me")
     public ResponseEntity<@NonNull Void> removeCurrentUserFromTaskExecution(@PathVariable Long spaceId,
         @PathVariable Long taskExecutionId, @AuthenticationPrincipal User authenticatedUser){
         taskExecutionService.removeCurrentUserFromTaskExecution(spaceId, taskExecutionId, authenticatedUser);
