@@ -14,6 +14,13 @@ abstract interface class TasksRepository {
     DateTime? executionDate,
   });
 
+  Future<void> removeCurrentUserFromTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    required int taskExecutionId,
+  });
+
   Future<TaskSummary> createTask({
     required String accessToken,
     required int spaceId,

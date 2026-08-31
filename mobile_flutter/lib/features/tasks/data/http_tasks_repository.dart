@@ -78,6 +78,49 @@ final class HttpTasksRepository implements TasksRepository {
   }
 
   @override
+  Future<void> removeCurrentUserFromTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    required int taskExecutionId,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    if (normalizedToken.isEmpty ||
+        spaceId <= 0 ||
+        taskId <= 0 ||
+        taskExecutionId <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final response = await _client
+          .delete(
+            _config.endpoint(
+              '/spaces/$spaceId/tasks/$taskId/executions/'
+              '$taskExecutionId/me',
+            ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 204) {
+        throw _mapFailure(response);
+      }
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<TaskSummary> createTask({
     required String accessToken,
     required int spaceId,

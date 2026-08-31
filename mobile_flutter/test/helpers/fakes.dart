@@ -496,6 +496,13 @@ typedef ConfirmTaskExecutionHandler =
       Set<int> executorIds,
       DateTime? executionDate,
     );
+typedef RemoveCurrentUserFromTaskExecutionHandler =
+    Future<void> Function(
+      String accessToken,
+      int spaceId,
+      int taskId,
+      int taskExecutionId,
+    );
 typedef UpdateTaskHandler =
     Future<TaskSummary> Function(
       String accessToken,
@@ -517,6 +524,7 @@ final class FakeTasksRepository implements TasksRepository {
     this.handler,
     this.fetchTaskExecutionsHandler,
     this.confirmTaskExecutionHandler,
+    this.removeCurrentUserFromTaskExecutionHandler,
     this.createHandler,
     this.updateHandler,
     this.toggleTaskActiveHandler,
@@ -525,12 +533,15 @@ final class FakeTasksRepository implements TasksRepository {
   final FetchTasksHandler? handler;
   final FetchTaskExecutionsHandler? fetchTaskExecutionsHandler;
   final ConfirmTaskExecutionHandler? confirmTaskExecutionHandler;
+  final RemoveCurrentUserFromTaskExecutionHandler?
+  removeCurrentUserFromTaskExecutionHandler;
   final CreateTaskHandler? createHandler;
   final UpdateTaskHandler? updateHandler;
   final ToggleTaskActiveHandler? toggleTaskActiveHandler;
   int fetchTasksCalls = 0;
   int fetchTaskExecutionsCalls = 0;
   int confirmTaskExecutionCalls = 0;
+  int removeCurrentUserFromTaskExecutionCalls = 0;
   int createTaskCalls = 0;
   int updateTaskCalls = 0;
   int toggleTaskActiveCalls = 0;
@@ -549,6 +560,10 @@ final class FakeTasksRepository implements TasksRepository {
   final receivedConfirmTaskExecutionTaskIds = <int>[];
   final receivedConfirmTaskExecutionExecutorIds = <Set<int>>[];
   final receivedConfirmTaskExecutionDates = <DateTime?>[];
+  final receivedRemoveTaskExecutionAccessTokens = <String>[];
+  final receivedRemoveTaskExecutionSpaceIds = <int>[];
+  final receivedRemoveTaskExecutionTaskIds = <int>[];
+  final receivedRemoveTaskExecutionIds = <int>[];
   final receivedCreateAccessTokens = <String>[];
   final receivedCreateSpaceIds = <int>[];
   final receivedTaskCreations = <TaskCreation>[];
@@ -583,6 +598,27 @@ final class FakeTasksRepository implements TasksRepository {
       );
     }
     return handler(accessToken, spaceId, taskId, executorIds, executionDate);
+  }
+
+  @override
+  Future<void> removeCurrentUserFromTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    required int taskExecutionId,
+  }) {
+    removeCurrentUserFromTaskExecutionCalls += 1;
+    receivedRemoveTaskExecutionAccessTokens.add(accessToken);
+    receivedRemoveTaskExecutionSpaceIds.add(spaceId);
+    receivedRemoveTaskExecutionTaskIds.add(taskId);
+    receivedRemoveTaskExecutionIds.add(taskExecutionId);
+    final handler = removeCurrentUserFromTaskExecutionHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Handler de remoção de execução não configurado.'),
+      );
+    }
+    return handler(accessToken, spaceId, taskId, taskExecutionId);
   }
 
   @override

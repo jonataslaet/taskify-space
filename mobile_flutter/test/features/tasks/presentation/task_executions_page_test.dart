@@ -147,6 +147,208 @@ void main() {
     );
   });
 
+  testWidgets('mostra a ação de sair em cada execução com semântica', (
+    tester,
+  ) async {
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: [_execution(id: 1), _execution(id: 2)],
+        number: page,
+        size: size,
+        totalElements: 2,
+        totalPages: 1,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+
+    final firstButton = find.byKey(
+      const ValueKey('task-executions-remove-button-1'),
+    );
+    final secondButton = find.byKey(
+      const ValueKey('task-executions-remove-button-2'),
+    );
+    expect(firstButton, findsOneWidget);
+    expect(secondButton, findsOneWidget);
+    expect(
+      tester.getSemantics(firstButton),
+      matchesSemantics(
+        label: 'Sair da execução de 21/08/2026 18:31',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+  });
+
+  testWidgets('mostra a confirmação exata e cancelar não chama a API', (
+    tester,
+  ) async {
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: [_execution(id: 7)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-button-7')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('task-executions-remove-dialog-7')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Tem certeza disso que deseja se excluir dessa execução?'),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-cancel-7')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.removeCalls, 0);
+    expect(
+      find.byKey(const ValueKey('task-executions-remove-dialog-7')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('confirma a saída, informa sucesso e recarrega a página', (
+    tester,
+  ) async {
+    var removed = false;
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: removed ? const [] : [_execution(id: 9)],
+        number: page,
+        size: size,
+        totalElements: removed ? 0 : 1,
+        totalPages: removed ? 0 : 1,
+      ),
+      removeCurrentUserFromTaskExecutionHandler:
+          (accessToken, spaceId, taskId, taskExecutionId) async {
+            removed = true;
+          },
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-button-9')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-confirm-9')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.removeCalls, 1);
+    expect(repository.removeAccessTokens, [_session.accessToken]);
+    expect(repository.removeSpaceIds, [7]);
+    expect(repository.removeTaskIds, [23]);
+    expect(repository.removedExecutionIds, [9]);
+    expect(repository.fetchCalls, 2);
+    expect(repository.pages, [0, 0]);
+    expect(repository.sizes, [10, 10]);
+    expect(
+      find.byKey(const ValueKey('task-execution-removed-message')),
+      findsOneWidget,
+    );
+    expect(find.text('Você saiu desta execução.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-executions-empty')), findsOneWidget);
+  });
+
+  testWidgets('encerra a sessão quando a remoção recebe 401', (tester) async {
+    var sessionExpiredCalls = 0;
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: [_execution(id: 11)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      removeCurrentUserFromTaskExecutionHandler: (_, _, _, _) async {
+        throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401);
+      },
+    );
+
+    await tester.pumpWidget(
+      _testApp(repository, onSessionExpired: () => sessionExpiredCalls += 1),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-button-11')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-confirm-11')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.removeCalls, 1);
+    expect(sessionExpiredCalls, 1);
+    expect(repository.fetchCalls, 1);
+    expect(
+      find.byKey(const ValueKey('task-execution-remove-error')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('mantém a lista e informa erro quando a remoção recebe 403', (
+    tester,
+  ) async {
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(
+        content: [_execution(id: 12)],
+        number: page,
+        size: size,
+        totalElements: 1,
+        totalPages: 1,
+      ),
+      removeCurrentUserFromTaskExecutionHandler: (_, _, _, _) async {
+        throw const ApiFailure(ApiFailureKind.forbidden, statusCode: 403);
+      },
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-button-12')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('task-executions-remove-confirm-12')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.removeCalls, 1);
+    expect(repository.fetchCalls, 1);
+    expect(
+      find.byKey(const ValueKey('task-execution-remove-error')),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Você não tem permissão para sair desta execução.'),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('task-executions-card-12')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('apresenta estado vazio', (tester) async {
     final repository = _FakeTasksRepository(
       (_, _, _, page, size) async => _page(number: page, size: size),
@@ -356,17 +558,34 @@ typedef _FetchExecutionsHandler =
       int page,
       int size,
     );
+typedef _RemoveCurrentUserFromTaskExecutionHandler =
+    Future<void> Function(
+      String accessToken,
+      int spaceId,
+      int taskId,
+      int taskExecutionId,
+    );
 
 final class _FakeTasksRepository implements TasksRepository {
-  _FakeTasksRepository(this._handler);
+  _FakeTasksRepository(
+    this._handler, {
+    this.removeCurrentUserFromTaskExecutionHandler,
+  });
 
   final _FetchExecutionsHandler _handler;
+  final _RemoveCurrentUserFromTaskExecutionHandler?
+  removeCurrentUserFromTaskExecutionHandler;
   int fetchCalls = 0;
+  int removeCalls = 0;
   final accessTokens = <String>[];
   final spaceIds = <int>[];
   final taskIds = <int>[];
   final pages = <int>[];
   final sizes = <int>[];
+  final removeAccessTokens = <String>[];
+  final removeSpaceIds = <int>[];
+  final removeTaskIds = <int>[];
+  final removedExecutionIds = <int>[];
 
   @override
   Future<void> confirmTaskExecution({
@@ -396,6 +615,27 @@ final class _FakeTasksRepository implements TasksRepository {
     pages.add(page);
     sizes.add(size);
     return _handler(accessToken, spaceId, taskId, page, size);
+  }
+
+  @override
+  Future<void> removeCurrentUserFromTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    required int taskExecutionId,
+  }) {
+    removeCalls += 1;
+    removeAccessTokens.add(accessToken);
+    removeSpaceIds.add(spaceId);
+    removeTaskIds.add(taskId);
+    removedExecutionIds.add(taskExecutionId);
+    final handler = removeCurrentUserFromTaskExecutionHandler;
+    if (handler == null) {
+      return Future<void>.error(
+        StateError('Remoção de execução não esperada neste teste.'),
+      );
+    }
+    return handler(accessToken, spaceId, taskId, taskExecutionId);
   }
 
   @override

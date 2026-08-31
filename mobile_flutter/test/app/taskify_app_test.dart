@@ -472,6 +472,18 @@ final class _FakeTasksRepository implements TasksRepository {
   }
 
   @override
+  Future<void> removeCurrentUserFromTaskExecution({
+    required String accessToken,
+    required int spaceId,
+    required int taskId,
+    required int taskExecutionId,
+  }) {
+    return Future<void>.error(
+      StateError('Remoção de execução não esperada neste teste.'),
+    );
+  }
+
+  @override
   Future<TaskSummary> updateTask({
     required String accessToken,
     required int spaceId,

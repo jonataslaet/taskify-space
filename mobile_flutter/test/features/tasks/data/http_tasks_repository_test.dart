@@ -1392,6 +1392,247 @@ void main() {
       });
     });
 
+    group('removeCurrentUserFromTaskExecution', () {
+      test('faz DELETE com Bearer, sem body e aceita 204', () async {
+        final client = MockClient((request) async {
+          expect(request.method, 'DELETE');
+          expect(
+            request.url.toString(),
+            'http://localhost:8080/api/spaces/7/tasks/42/executions/9/me',
+          );
+          expect(request.url.query, isEmpty);
+          expect(request.headers['Accept'], 'application/json');
+          expect(
+            request.headers['Authorization'],
+            'Bearer access-token-test-only',
+          );
+          expect(request.headers, isNot(contains('Content-Type')));
+          expect(request.bodyBytes, isEmpty);
+          return http.Response('', 204);
+        });
+
+        await _repository(client).removeCurrentUserFromTaskExecution(
+          accessToken: ' access-token-test-only ',
+          spaceId: 7,
+          taskId: 42,
+          taskExecutionId: 9,
+        );
+      });
+
+      test('rejeita token ou IDs inválidos antes da rede', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            return http.Response('', 204);
+          }),
+        );
+        final requests = <Future<void>>[
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: '   ',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'token',
+            spaceId: 0,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'token',
+            spaceId: -1,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 0,
+            taskExecutionId: 9,
+          ),
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: -1,
+            taskExecutionId: 9,
+          ),
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: 0,
+          ),
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'token',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: -1,
+          ),
+        ];
+
+        for (final request in requests) {
+          await expectLater(
+            request,
+            throwsA(
+              isA<ApiFailure>().having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              ),
+            ),
+          );
+        }
+        expect(calls, 0);
+      });
+
+      test('rejeita status diferente de 204', () async {
+        final repository = _repository(
+          MockClient((_) async => http.Response('{}', 200)),
+        );
+
+        await expectLater(
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.unknown,
+                )
+                .having((failure) => failure.statusCode, 'statusCode', 200),
+          ),
+        );
+      });
+
+      for (final errorCase in <(int, ApiFailureKind)>[
+        (400, ApiFailureKind.validation),
+        (401, ApiFailureKind.unauthorized),
+        (403, ApiFailureKind.forbidden),
+        (404, ApiFailureKind.unknown),
+        (409, ApiFailureKind.validation),
+        (503, ApiFailureKind.server),
+      ]) {
+        test('mapeia ${errorCase.$1} para ${errorCase.$2.name}', () async {
+          final repository = _repository(
+            MockClient((_) async => http.Response('{}', errorCase.$1)),
+          );
+
+          await expectLater(
+            repository.removeCurrentUserFromTaskExecution(
+              accessToken: 'access-token-test-only',
+              spaceId: 7,
+              taskId: 42,
+              taskExecutionId: 9,
+            ),
+            throwsA(
+              isA<ApiFailure>()
+                  .having((failure) => failure.kind, 'kind', errorCase.$2)
+                  .having(
+                    (failure) => failure.statusCode,
+                    'statusCode',
+                    errorCase.$1,
+                  ),
+            ),
+          );
+        });
+      }
+
+      test('mapeia 429 e lê Retry-After', () async {
+        final repository = _repository(
+          MockClient(
+            (_) async => http.Response(
+              '{}',
+              429,
+              headers: const <String, String>{'Retry-After': '12'},
+            ),
+          ),
+        );
+
+        await expectLater(
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.rateLimited,
+                )
+                .having((failure) => failure.statusCode, 'statusCode', 429)
+                .having(
+                  (failure) => failure.retryAfter,
+                  'retryAfter',
+                  const Duration(seconds: 12),
+                ),
+          ),
+        );
+      });
+
+      test('mapeia falha do cliente para network', () async {
+        final repository = _repository(
+          MockClient((request) async {
+            throw http.ClientException('Falha simulada.', request.url);
+          }),
+        );
+
+        await expectLater(
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.network,
+            ),
+          ),
+        );
+      });
+
+      test('mapeia timeout sem repetir a requisição', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            await Future<void>.delayed(const Duration(milliseconds: 30));
+            return http.Response('', 204);
+          }),
+          timeout: const Duration(milliseconds: 1),
+        );
+
+        await expectLater(
+          repository.removeCurrentUserFromTaskExecution(
+            accessToken: 'access-token-test-only',
+            spaceId: 7,
+            taskId: 42,
+            taskExecutionId: 9,
+          ),
+          throwsA(
+            isA<ApiFailure>().having(
+              (failure) => failure.kind,
+              'kind',
+              ApiFailureKind.timeout,
+            ),
+          ),
+        );
+        expect(calls, 1);
+      });
+    });
+
     group('confirmTaskExecution', () {
       test('faz POST com executores ordenados e data em 24 horas', () async {
         final client = MockClient((request) async {

@@ -43,9 +43,12 @@ class _TaskExecutionsPageState extends State<TaskExecutionsPage> {
   TaskExecutionPageResult? _result;
   ApiFailure? _failure;
   bool _isLoading = false;
+  int? _removingExecutionId;
   int _requestGeneration = 0;
   int _requestedPage = 0;
   int _pageSize = 10;
+
+  bool get _isBusy => _isLoading || _removingExecutionId != null;
 
   @override
   void initState() {
@@ -72,6 +75,7 @@ class _TaskExecutionsPageState extends State<TaskExecutionsPage> {
     _result = null;
     _failure = null;
     _isLoading = false;
+    _removingExecutionId = null;
     _requestedPage = 0;
     _pageSize = 10;
     unawaited(_loadExecutions());
@@ -84,7 +88,7 @@ class _TaskExecutionsPageState extends State<TaskExecutionsPage> {
   }
 
   Future<void> _loadExecutions({int? page, int? size}) async {
-    if (_isLoading) {
+    if (_isBusy) {
       return;
     }
 
@@ -157,7 +161,7 @@ class _TaskExecutionsPageState extends State<TaskExecutionsPage> {
 
   void _goToPage(int page) {
     final result = _result;
-    if (_isLoading ||
+    if (_isBusy ||
         result == null ||
         page < 0 ||
         page >= result.totalPages ||
@@ -168,13 +172,128 @@ class _TaskExecutionsPageState extends State<TaskExecutionsPage> {
   }
 
   void _changePageSize(int? size) {
-    if (_isLoading ||
+    if (_isBusy ||
         size == null ||
         size == _pageSize ||
         !_pageSizeOptions.contains(size)) {
       return;
     }
     unawaited(_loadExecutions(page: 0, size: size));
+  }
+
+  Future<void> _confirmRemoveFromExecution(
+    TaskExecutionSummary execution,
+  ) async {
+    if (_isBusy) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        key: ValueKey('task-executions-remove-dialog-${execution.id}'),
+        title: const Text('Sair da execução'),
+        content: Text(
+          'Tem certeza disso que deseja se excluir dessa execução?',
+          key: ValueKey('task-executions-remove-message-${execution.id}'),
+        ),
+        actions: [
+          TextButton(
+            key: ValueKey('task-executions-remove-cancel-${execution.id}'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            key: ValueKey('task-executions-remove-confirm-${execution.id}'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    await _removeFromExecution(execution);
+  }
+
+  Future<void> _removeFromExecution(TaskExecutionSummary execution) async {
+    if (_isBusy) {
+      return;
+    }
+
+    final requestGeneration = _requestGeneration;
+    setState(() => _removingExecutionId = execution.id);
+
+    try {
+      await widget.tasksRepository.removeCurrentUserFromTaskExecution(
+        accessToken: widget.session.accessToken,
+        spaceId: widget.spaceId,
+        taskId: widget.taskId,
+        taskExecutionId: execution.id,
+      );
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+
+      setState(() => _removingExecutionId = null);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            key: ValueKey('task-execution-removed-message'),
+            content: Text('Você saiu desta execução.'),
+          ),
+        );
+
+      final result = _result;
+      await _loadExecutions(
+        page: result?.number ?? _requestedPage,
+        size: _pageSize,
+      );
+    } on ApiFailure catch (failure) {
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+      setState(() => _removingExecutionId = null);
+      if (failure.kind == ApiFailureKind.unauthorized) {
+        widget.onSessionExpired?.call();
+        return;
+      }
+      _showRemoveFromExecutionError(failure);
+      if (_shouldRefreshAfterRemovalFailure(failure)) {
+        final result = _result;
+        await _loadExecutions(
+          page: result?.number ?? _requestedPage,
+          size: _pageSize,
+        );
+      }
+    } on Object {
+      if (!mounted || requestGeneration != _requestGeneration) {
+        return;
+      }
+      setState(() => _removingExecutionId = null);
+      const failure = ApiFailure(ApiFailureKind.unknown);
+      _showRemoveFromExecutionError(failure);
+      final result = _result;
+      await _loadExecutions(
+        page: result?.number ?? _requestedPage,
+        size: _pageSize,
+      );
+    }
+  }
+
+  void _showRemoveFromExecutionError(ApiFailure failure) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('task-execution-remove-error'),
+          content: Text(_removeFromExecutionFailureMessage(failure)),
+        ),
+      );
   }
 
   Future<void> _showExecutors(TaskExecutionSummary execution) {
@@ -299,7 +418,11 @@ class _TaskExecutionsPageState extends State<TaskExecutionsPage> {
               for (final execution in result.content) ...[
                 _ExecutionCard(
                   execution: execution,
+                  isRemoving: _removingExecutionId == execution.id,
                   onShowExecutors: () => unawaited(_showExecutors(execution)),
+                  onRemoveFromExecution: _removingExecutionId == null
+                      ? () => unawaited(_confirmRemoveFromExecution(execution))
+                      : null,
                 ),
                 const SizedBox(height: 12),
               ],
@@ -372,11 +495,15 @@ class _ExecutionsHeader extends StatelessWidget {
 class _ExecutionCard extends StatelessWidget {
   const _ExecutionCard({
     required this.execution,
+    required this.isRemoving,
     required this.onShowExecutors,
+    required this.onRemoveFromExecution,
   });
 
   final TaskExecutionSummary execution;
+  final bool isRemoving;
   final VoidCallback onShowExecutors;
+  final VoidCallback? onRemoveFromExecution;
 
   @override
   Widget build(BuildContext context) {
@@ -444,6 +571,38 @@ class _ExecutionCard extends StatelessWidget {
                 tooltip: 'Ver executores',
                 onPressed: onShowExecutors,
                 icon: const Icon(Icons.groups_outlined),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Semantics(
+              key: ValueKey('task-executions-remove-button-${execution.id}'),
+              label: isRemoving
+                  ? 'Saindo da execução'
+                  : 'Sair da execução de '
+                        '${_executionDateLabel(execution.executionDate)}',
+              container: true,
+              button: true,
+              enabled: onRemoveFromExecution != null,
+              excludeSemantics: true,
+              onTap: onRemoveFromExecution,
+              child: IconButton(
+                tooltip: 'Sair da execução',
+                onPressed: onRemoveFromExecution,
+                icon: isRemoving
+                    ? SizedBox.square(
+                        key: ValueKey(
+                          'task-executions-remove-progress-${execution.id}',
+                        ),
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.error,
+                        ),
+                      )
+                    : Icon(
+                        Icons.person_remove_outlined,
+                        color: theme.colorScheme.error,
+                      ),
               ),
             ),
           ],
@@ -582,5 +741,40 @@ String _executionsFailureMessage(ApiFailure failure) {
     ApiFailureKind.malformedResponse =>
       'A API retornou uma resposta inesperada.',
     _ => 'Ocorreu um erro inesperado. Tente novamente.',
+  };
+}
+
+String _removeFromExecutionFailureMessage(ApiFailure failure) {
+  if (failure.statusCode == 404) {
+    return 'A execução não foi encontrada. A lista será atualizada.';
+  }
+  return switch (failure.kind) {
+    ApiFailureKind.validation =>
+      'Não foi possível excluir você desta execução.',
+    ApiFailureKind.unauthorized =>
+      'Sua sessão expirou. Entre novamente para continuar.',
+    ApiFailureKind.forbidden =>
+      'Você não tem permissão para sair desta execução.',
+    ApiFailureKind.rateLimited =>
+      'Muitas solicitações foram feitas. Aguarde e tente novamente.',
+    ApiFailureKind.timeout ||
+    ApiFailureKind.network ||
+    ApiFailureKind.server ||
+    ApiFailureKind.unknown =>
+      'Não foi possível confirmar a alteração. A lista será atualizada.',
+    _ => 'Não foi possível sair desta execução agora.',
+  };
+}
+
+bool _shouldRefreshAfterRemovalFailure(ApiFailure failure) {
+  if (failure.statusCode == 404) {
+    return true;
+  }
+  return switch (failure.kind) {
+    ApiFailureKind.timeout ||
+    ApiFailureKind.network ||
+    ApiFailureKind.server ||
+    ApiFailureKind.unknown => true,
+    _ => false,
   };
 }
