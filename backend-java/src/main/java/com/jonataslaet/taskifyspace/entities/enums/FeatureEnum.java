@@ -6,6 +6,8 @@ public enum FeatureEnum {
 
     CREATE_TASK("Criação de tarefas"),
 
+    CREATE_TASK_CATEGORY("Criação de categorias de tarefas"),
+
     APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT("Quantidade de participantes aprovados no espaço"),
 
     APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN("Quantidade de administradores aprovados no espaço"),
@@ -27,7 +29,7 @@ public enum FeatureEnum {
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT -> SpaceUserRoleEnum.ROLE_SPACE_PARTICIPANT;
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN -> SpaceUserRoleEnum.ROLE_SPACE_ADMIN;
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER -> SpaceUserRoleEnum.ROLE_SPACE_MANAGER;
-            case CREATE_SPACE, CREATE_TASK -> null;
+            case CREATE_SPACE, CREATE_TASK, CREATE_TASK_CATEGORY -> null;
         };
     }
 }

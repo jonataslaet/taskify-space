@@ -14,6 +14,7 @@ import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskCategoryRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,9 @@ class FeatureAccessServiceTests {
     private TaskRepository taskRepository;
 
     @Mock
+    private TaskCategoryRepository taskCategoryRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     private FeatureAccessService featureAccessService;
@@ -65,6 +69,7 @@ class FeatureAccessServiceTests {
             spaceMembershipRepository,
             spaceRepository,
             taskRepository,
+            taskCategoryRepository,
             userRepository,
             clock);
     }

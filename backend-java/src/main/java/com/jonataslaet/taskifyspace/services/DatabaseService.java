@@ -144,6 +144,8 @@ public class DatabaseService {
             plan.setActive(true);
             plan.setFeatureLimits(featureLimits);
             planRepository.save(plan);
+        } else if (plan.getFeatureLimits().addAll(featureLimits)) {
+            planRepository.save(plan);
         }
         return plan;
     }
@@ -174,6 +176,7 @@ public class DatabaseService {
             Set.of(
                 new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 1L),
                 new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 10L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK_CATEGORY, 10L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 1L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 1L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 4L)
@@ -183,6 +186,7 @@ public class DatabaseService {
             Set.of(
                 new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 3L),
                 new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 50L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK_CATEGORY, 50L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 2L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 5L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 20L)
@@ -192,6 +196,7 @@ public class DatabaseService {
             Set.of(
                 new PlanFeatureLimit(FeatureEnum.CREATE_SPACE, 20L),
                 new PlanFeatureLimit(FeatureEnum.CREATE_TASK, 250L),
+                new PlanFeatureLimit(FeatureEnum.CREATE_TASK_CATEGORY, 250L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN, 5L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER, 10L),
                 new PlanFeatureLimit(FeatureEnum.APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT, 100L)
@@ -260,6 +265,14 @@ public class DatabaseService {
         return TaskMapper.toDTO(task);
     }
 
+    public TaskRecordDTO getTaskRecordResolver10QuestoesConcursosDTO() {
+        Task task = new Task();
+        task.setCategory(TaskCategoryEnum.PERSONAL);
+        task.setScore(new BigDecimal("20.0"));
+        task.setDescription("Resolver 10 questões de concursos");
+        return TaskMapper.toDTO(task);
+    }
+
     private void activateUser(User user) {
         user.setStatus(UserStatusEnum.ACTIVE);
         userRepository.save(user);
@@ -296,9 +309,11 @@ public class DatabaseService {
 
         TaskRecordDTO taskRecordDTO1 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordTrocarBotijaoDTO());
         TaskRecordDTO taskRecordDTO2 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordPagarContaAguaDTO());
+        TaskRecordDTO taskRecordDTO3 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordResolver10QuestoesConcursosDTO());
 
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO1.id());
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO2.id());
+        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO3.id());
 
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
 //        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);

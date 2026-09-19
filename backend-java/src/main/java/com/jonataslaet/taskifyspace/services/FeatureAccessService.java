@@ -11,6 +11,7 @@ import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.repositories.SpaceMembershipRepository;
 import com.jonataslaet.taskifyspace.repositories.SpaceRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskCategoryRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import org.springframework.stereotype.Service;
@@ -29,16 +30,19 @@ public class FeatureAccessService {
     private final SpaceMembershipRepository spaceMembershipRepository;
     private final SpaceRepository spaceRepository;
     private final TaskRepository taskRepository;
+    private final TaskCategoryRepository taskCategoryRepository;
     private final UserRepository userRepository;
     private final Clock clock;
 
     public FeatureAccessService(SubscriptionRepository subscriptionRepository,
         SpaceMembershipRepository spaceMembershipRepository, SpaceRepository spaceRepository,
-        TaskRepository taskRepository, UserRepository userRepository, Clock clock) {
+        TaskRepository taskRepository, TaskCategoryRepository taskCategoryRepository,
+        UserRepository userRepository, Clock clock) {
         this.subscriptionRepository = subscriptionRepository;
         this.spaceMembershipRepository = spaceMembershipRepository;
         this.spaceRepository = spaceRepository;
         this.taskRepository = taskRepository;
+        this.taskCategoryRepository = taskCategoryRepository;
         this.userRepository = userRepository;
         this.clock = clock;
     }
@@ -79,7 +83,7 @@ public class FeatureAccessService {
 
     private void lockUsageScope(User user, FeatureEnum feature, Space space) {
         switch (feature) {
-            case CREATE_SPACE, CREATE_TASK ->
+            case CREATE_SPACE, CREATE_TASK, CREATE_TASK_CATEGORY ->
                 userRepository.findByIdForUpdate(user.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
@@ -140,7 +144,7 @@ public class FeatureAccessService {
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
                  APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_MANAGER,
                  APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_PARTICIPANT -> true;
-            case CREATE_SPACE, CREATE_TASK -> false;
+            case CREATE_SPACE, CREATE_TASK, CREATE_TASK_CATEGORY -> false;
         };
     }
 
@@ -152,6 +156,10 @@ public class FeatureAccessService {
 
             case CREATE_TASK ->
                 taskRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                    user.getId(), periodStart, periodEnd);
+
+            case CREATE_TASK_CATEGORY ->
+                taskCategoryRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                     user.getId(), periodStart, periodEnd);
 
             case APPROVE_SPACE_MEMBERSHIP_ROLE_SPACE_ADMIN,
