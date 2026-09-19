@@ -48,7 +48,7 @@ void main() {
           'size': <String>['25'],
           'name': <String>['Joice Laet'],
           'spaceUserRole': <String>['ROLE_SPACE_MANAGER'],
-          'taskCategories': <String>['OPERATIONAL', 'FINANCIAL'],
+          'taskCategories': <String>['OPERATIONAL', 'FINANCIAL', 'PERSONAL'],
           'sort': <String>['score,desc'],
         });
         final body = _validPageBody();

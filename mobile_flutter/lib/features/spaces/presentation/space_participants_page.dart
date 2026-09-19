@@ -865,6 +865,7 @@ String _categoryLabel(TaskCategory category) {
   return switch (category) {
     TaskCategory.operational => 'Operacional',
     TaskCategory.financial => 'Financeira',
+    TaskCategory.personal => 'Pessoal',
   };
 }
 

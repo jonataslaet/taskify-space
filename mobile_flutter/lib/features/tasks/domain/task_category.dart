@@ -1,6 +1,7 @@
 enum TaskCategory {
   operational('OPERATIONAL'),
-  financial('FINANCIAL');
+  financial('FINANCIAL'),
+  personal('PERSONAL');
 
   const TaskCategory(this.apiValue);
 
