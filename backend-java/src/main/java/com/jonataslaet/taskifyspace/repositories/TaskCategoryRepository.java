@@ -38,4 +38,11 @@ public interface TaskCategoryRepository extends JpaRepository<@NonNull TaskCateg
         """)
     List<TaskCategoryRecordDTO> searchTaskCategoriesByName(
         @Param("spaceId") Long spaceId, @Param("name") String name);
+
+    @Query("""
+        SELECT taskCategory FROM TaskCategory taskCategory
+        WHERE taskCategory.space.id = :spaceId
+            AND LOWER(taskCategory.name) LIKE LOWER(CONCAT('%', :name, '%'))
+        """)
+    Optional<TaskCategory> findTaskCategoryByName(@Param("spaceId") Long spaceId, @Param("name") String name);
 }

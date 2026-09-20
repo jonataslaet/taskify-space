@@ -42,24 +42,34 @@ CREATE TABLE space_memberships (
     space_membership_status_enum VARCHAR(255) NOT NULL,
     CONSTRAINT uq_space_memberships_user_space UNIQUE (user_id, space_id),
     CONSTRAINT fk_space_memberships_user
-        FOREIGN KEY (user_id) REFERENCES users (id),
+       FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_space_memberships_space
-        FOREIGN KEY (space_id) REFERENCES spaces (id)
+       FOREIGN KEY (space_id) REFERENCES spaces (id)
+);
+
+CREATE TABLE task_categories (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
 );
 
 CREATE TABLE tasks (
     id BIGSERIAL PRIMARY KEY,
     description VARCHAR(255),
     score NUMERIC(38, 2),
-    category VARCHAR(255),
+    category_id BIGINT,
     active BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE,
     user_id BIGINT,
     space_id BIGINT NOT NULL,
+
     CONSTRAINT fk_tasks_creator
-        FOREIGN KEY (user_id) REFERENCES users (id),
+       FOREIGN KEY (user_id) REFERENCES users (id),
+
     CONSTRAINT fk_tasks_space
-        FOREIGN KEY (space_id) REFERENCES spaces (id)
+       FOREIGN KEY (space_id) REFERENCES spaces (id),
+
+    CONSTRAINT fk_tasks_category
+       FOREIGN KEY (category_id) REFERENCES task_categories (id)
 );
 
 CREATE TABLE tasks_executions (
@@ -95,9 +105,9 @@ CREATE TABLE subscriptions (
     external_subscription_id VARCHAR(255),
     external_price_id VARCHAR(255),
     CONSTRAINT fk_subscriptions_user
-        FOREIGN KEY (user_id) REFERENCES users (id),
+       FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT fk_subscriptions_plan
-        FOREIGN KEY (plan_id) REFERENCES plans (id)
+       FOREIGN KEY (plan_id) REFERENCES plans (id)
 );
 
 CREATE TABLE refresh_tokens (

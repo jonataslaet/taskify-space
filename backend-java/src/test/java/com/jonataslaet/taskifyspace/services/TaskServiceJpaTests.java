@@ -66,6 +66,7 @@ public class TaskServiceJpaTests {
         taskService = new TaskService(
             taskRepository,
             mock(SpaceService.class),
+            mock(TaskCategoryService.class),
             mock(SpaceMembershipService.class),
             taskExecutionRepository,
             mock(FeatureAccessService.class),

@@ -20,7 +20,6 @@ public class TaskMapper {
         task.setSpace(space);
         task.setDescription(taskRecordDTO.description());
         task.setScore(taskRecordDTO.score());
-        task.setCategory(taskRecordDTO.category());
         applySchedule(task, taskRecordDTO.schedule());
         return task;
     }
@@ -44,7 +43,7 @@ public class TaskMapper {
     public static TaskRecordDTO toDTO(Task task) {
         if (Objects.isNull(task)) return null;
         return new TaskRecordDTO(task.getId(), Objects.isNull(task.getSpace()) ? null : task.getSpace().getId(), task.getDescription(),
-            task.getScore(), task.getCategory(), toScheduleDTO(task.getSchedule()), task.isActive(), Objects.nonNull(task.getCreator()) ?
+            task.getScore(), Objects.isNull(task.getCategory()) ? null : task.getCategory().getName(), toScheduleDTO(task.getSchedule()), task.isActive(), Objects.nonNull(task.getCreator()) ?
             task.getCreator().getName() : null);
     }
 

@@ -2,7 +2,6 @@ package com.jonataslaet.taskifyspace.controllers.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonView;
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -37,9 +36,9 @@ public record TaskRecordDTO(
     @JsonView({TaskView.CreateTask.class, TaskView.ReadTask.class, TaskView.UpdateTask.class})
     BigDecimal score,
 
-    @NotNull(groups = TaskView.CreateTask.class, message = "Categoria da tarefa e obrigatoria")
+//    @NotNull(groups = TaskView.CreateTask.class, message = "Categoria da tarefa e obrigatoria")
     @JsonView({TaskView.CreateTask.class, TaskView.ReadTask.class, TaskView.UpdateTask.class})
-    TaskCategoryEnum category,
+    String category,
 
     @Valid
     @JsonView({TaskView.CreateTask.class, TaskView.ReadTask.class, TaskView.UpdateTask.class})

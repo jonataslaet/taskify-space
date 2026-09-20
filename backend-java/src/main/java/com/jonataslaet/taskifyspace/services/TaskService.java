@@ -6,7 +6,6 @@ import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.exceptions.DuplicationException;
 import com.jonataslaet.taskifyspace.exceptions.ForbiddenException;
-import com.jonataslaet.taskifyspace.exceptions.InvalidRequestException;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
 import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
@@ -39,17 +38,19 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final SpaceService spaceService;
+    private final TaskCategoryService taskCategoryService;
     private final SpaceMembershipService spaceMembershipService;
     private final TaskExecutionRepository taskExecutionRepository;
     private final FeatureAccessService featureAccessService;
     private final TaskSchedulerValidator taskSchedulerValidator;
 
     public TaskService(TaskRepository taskRepository,
-                       SpaceService spaceService, SpaceMembershipService spaceMembershipService,
+                       SpaceService spaceService, TaskCategoryService taskCategoryService, SpaceMembershipService spaceMembershipService,
                        TaskExecutionRepository taskExecutionRepository, FeatureAccessService featureAccessService,
                        TaskSchedulerValidator taskSchedulerValidator) {
         this.taskRepository = taskRepository;
         this.spaceService = spaceService;
+        this.taskCategoryService = taskCategoryService;
         this.spaceMembershipService = spaceMembershipService;
         this.taskExecutionRepository = taskExecutionRepository;
         this.featureAccessService = featureAccessService;
@@ -59,6 +60,8 @@ public class TaskService {
     @Transactional
     public TaskRecordDTO createTask(Long spaceId, User authenticatedUser, TaskRecordDTO taskRecordDTO) {
         Space space = spaceService.getSpaceEntity(spaceId);
+        TaskCategory taskCategory = taskCategoryService.getTaskEntity(
+            space.getId(), authenticatedUser, taskRecordDTO.category());
         featureAccessService.requireFeatureWithUsageLock(authenticatedUser, FeatureEnum.CREATE_TASK, space);
         spaceService.validActiveSpace(space);
         spaceService.validateActiveParticipation(authenticatedUser, space, Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
@@ -68,6 +71,7 @@ public class TaskService {
             throw new DuplicationException("Essa tarefa já existe");
         }
         Task task = TaskMapper.toEntity(taskRecordDTO, space, authenticatedUser);
+        task.setCategory(taskCategory);
         taskSchedulerValidator.validate(task.getSchedule());
         task.setActive(false);
         return TaskMapper.toDTO(taskRepository.save(task));
@@ -159,7 +163,10 @@ public class TaskService {
         }
 
         if (Objects.nonNull(taskRecordDTO.score())) taskEntity.setScore(taskRecordDTO.score());
-        if (Objects.nonNull(taskRecordDTO.category())) taskEntity.setCategory(taskRecordDTO.category());
+        if (Objects.nonNull(taskRecordDTO.category())) {
+            TaskCategory taskCategory = taskCategoryService.getTaskEntity(space.getId(), authenticatedUser, taskRecordDTO.category());
+            taskEntity.setCategory(taskCategory);
+        }
         TaskMapper.applySchedule(taskEntity, taskRecordDTO.schedule());
         taskSchedulerValidator.validate(taskEntity.getSchedule());
         return TaskMapper.toDTO(taskRepository.save(taskEntity));

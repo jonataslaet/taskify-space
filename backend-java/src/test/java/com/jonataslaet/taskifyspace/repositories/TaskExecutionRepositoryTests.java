@@ -1,14 +1,9 @@
 package com.jonataslaet.taskifyspace.repositories;
 
-import com.jonataslaet.taskifyspace.entities.Space;
-import com.jonataslaet.taskifyspace.entities.SpaceMembership;
-import com.jonataslaet.taskifyspace.entities.Task;
-import com.jonataslaet.taskifyspace.entities.TaskExecution;
-import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import org.junit.jupiter.api.Test;
@@ -89,8 +84,8 @@ class TaskExecutionRepositoryTests {
             .toList();
 
         assertThat(participants).hasSize(3);
-        assertThat(participants.get(0).taskCategories()).containsExactly(TaskCategoryEnum.OPERATIONAL);
-        assertThat(participants.get(1).taskCategories()).containsExactly(TaskCategoryEnum.OPERATIONAL);
+        assertThat(participants.get(0).taskCategories()).containsExactly("OPERATIONAL");
+        assertThat(participants.get(1).taskCategories()).containsExactly("OPERATIONAL");
         assertThat(participants.get(2).taskCategories()).isEmpty();
         assertThat(participants)
             .extracting(ParticipantDTO::id)
@@ -139,9 +134,9 @@ class TaskExecutionRepositoryTests {
         saveApprovedParticipant(space, user2);
 
         Task operationalTask = taskRepository.save(
-            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+            createTask(space, "Operational task", "90.0", "OPERATIONAL"));
         Task financialTask = taskRepository.save(
-            createTask(space, "Financial task", "30.0", TaskCategoryEnum.FINANCIAL));
+            createTask(space, "Financial task", "30.0", "FINANCIAL"));
 
         taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
         taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
@@ -152,7 +147,7 @@ class TaskExecutionRepositoryTests {
                 PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "id")),
                 null,
                 null,
-                List.of(TaskCategoryEnum.FINANCIAL))
+                List.of("FINANCIAL"))
             .getContent();
 
         Map<Long, BigDecimal> scoresByUserId = participants.stream()
@@ -160,7 +155,7 @@ class TaskExecutionRepositoryTests {
 
         assertThat(participants)
             .allSatisfy(participant ->
-                assertThat(participant.taskCategories()).containsExactly(TaskCategoryEnum.FINANCIAL));
+                assertThat(participant.taskCategories()).containsExactly("FINANCIAL"));
         assertThat(scoresByUserId.get(user1.getId())).isEqualByComparingTo("15.0");
         assertThat(scoresByUserId.get(user2.getId())).isEqualByComparingTo("15.0");
     }
@@ -176,9 +171,9 @@ class TaskExecutionRepositoryTests {
         saveApprovedParticipant(space, user2);
 
         Task operationalTask = taskRepository.save(
-            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+            createTask(space, "Operational task", "90.0", "OPERATIONAL"));
         Task financialTask = taskRepository.save(
-            createTask(space, "Financial task", "30.0", TaskCategoryEnum.FINANCIAL));
+            createTask(space, "Financial task", "30.0", "FINANCIAL"));
 
         taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
         taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
@@ -189,7 +184,7 @@ class TaskExecutionRepositoryTests {
                 PageRequest.of(0, 1, Sort.by(Sort.Direction.ASC, "id")),
                 null,
                 null,
-                List.of(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL));
+                List.of("OPERATIONAL","FINANCIAL"));
 
         assertThat(participants.getTotalElements()).isEqualTo(2);
         assertThat(participants.getContent()).hasSize(1);
@@ -197,7 +192,7 @@ class TaskExecutionRepositoryTests {
             .singleElement()
             .satisfies(participant -> {
                 assertThat(participant.taskCategories())
-                    .containsExactly(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL);
+                    .containsExactly("FINANCIAL", "OPERATIONAL");
                 assertThat(participant.score()).isEqualByComparingTo("105.0");
             });
     }
@@ -217,9 +212,9 @@ class TaskExecutionRepositoryTests {
         saveApprovedParticipant(space, user4);
 
         Task operationalTask = taskRepository.save(
-            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+            createTask(space, "Operational task", "90.0", "OPERATIONAL"));
         Task financialTask = taskRepository.save(
-            createTask(space, "Financial task", "80.0", TaskCategoryEnum.FINANCIAL));
+            createTask(space, "Financial task", "80.0", "FINANCIAL"));
 
         taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1, user2, user3, user4)));
         taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user2, user3, user4)));
@@ -230,7 +225,7 @@ class TaskExecutionRepositoryTests {
                 PageRequest.of(0, 4, Sort.by(Sort.Direction.DESC, "score")),
                 null,
                 null,
-                List.of(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL))
+                List.of("FINANCIAL", "OPERATIONAL"))
             .getContent();
 
         assertThat(participants)
@@ -239,11 +234,11 @@ class TaskExecutionRepositoryTests {
         assertThat(participants.subList(0, 3))
             .allSatisfy(participant -> {
                 assertThat(participant.taskCategories())
-                    .containsExactly(TaskCategoryEnum.FINANCIAL, TaskCategoryEnum.OPERATIONAL);
+                    .containsExactly("FINANCIAL", "OPERATIONAL");
                 assertThat(participant.score())
                     .isBetween(new BigDecimal("49.1666"), new BigDecimal("49.1667"));
             });
-        assertThat(participants.get(3).taskCategories()).containsExactly(TaskCategoryEnum.OPERATIONAL);
+        assertThat(participants.get(3).taskCategories()).containsExactly("OPERATIONAL");
         assertThat(participants.get(3).score()).isEqualByComparingTo("22.5000000000000000");
     }
 
@@ -258,9 +253,9 @@ class TaskExecutionRepositoryTests {
         saveApprovedParticipant(space, user2);
 
         Task operationalTask = taskRepository.save(
-            createTask(space, "Operational task", "90.0", TaskCategoryEnum.OPERATIONAL));
+            createTask(space, "Operational task", "90.0", "OPERATIONAL"));
         Task financialTask = taskRepository.save(
-            createTask(space, "Financial task", "30.0", TaskCategoryEnum.FINANCIAL));
+            createTask(space, "Financial task", "30.0", "FINANCIAL"));
 
         taskExecutionRepository.save(new TaskExecution(operationalTask, space, Set.of(user1)));
         taskExecutionRepository.save(new TaskExecution(financialTask, space, Set.of(user1, user2)));
@@ -279,7 +274,7 @@ class TaskExecutionRepositoryTests {
             .singleElement()
             .satisfies(participant -> {
                 assertThat(participant.taskCategories())
-                    .containsExactly(TaskCategoryEnum.OPERATIONAL, TaskCategoryEnum.FINANCIAL);
+                    .containsExactly("FINANCIAL", "OPERATIONAL");
                 assertThat(participant.score()).isEqualByComparingTo("105.0");
             });
     }
@@ -361,16 +356,16 @@ class TaskExecutionRepositoryTests {
     }
 
     private Task createTask(Space space, String description, String score) {
-        return createTask(space, description, score, TaskCategoryEnum.OPERATIONAL);
+        return createTask(space, description, score, "OPERATIONAL");
     }
 
     private Task createTask(
-        Space space, String description, String score, TaskCategoryEnum taskCategory) {
+        Space space, String description, String score, String taskCategory) {
         Task task = new Task();
         task.setSpace(space);
         task.setDescription(description);
         task.setScore(new BigDecimal(score));
-        task.setCategory(taskCategory);
+        task.setCategory(new TaskCategory());
         task.setActive(true);
         return task;
     }

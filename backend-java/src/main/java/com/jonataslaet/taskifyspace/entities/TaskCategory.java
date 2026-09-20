@@ -13,7 +13,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "taskcategories")
+@Table(name = "task_categories")
 public class TaskCategory {
 
     @Id

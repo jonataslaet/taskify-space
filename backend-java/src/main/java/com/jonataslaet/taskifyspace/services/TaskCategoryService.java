@@ -50,7 +50,15 @@ public class TaskCategoryService {
     public List<TaskCategoryRecordDTO> searchTaskCategoriesByName(Long spaceId, User authenticatedUser, String name) {
         Space space = spaceService.getSpaceEntity(spaceId);
         spaceService.validateApprovedParticipation(authenticatedUser, space);
-        return taskCategoryRepository.searchTaskCategoriesByName(spaceId, Objects.requireNonNullElse(name, ""));
+        return taskCategoryRepository.searchTaskCategoriesByName(space.getId(), Objects.requireNonNullElse(name, ""));
+    }
+
+    public TaskCategory getTaskEntity(Long spaceId, User authenticatedUser, String name) {
+        if (name == null) return null;
+        Space space = spaceService.getSpaceEntity(spaceId);
+        spaceService.validateApprovedParticipation(authenticatedUser, space);
+        return taskCategoryRepository.findTaskCategoryByName(spaceId, Objects.requireNonNullElse(name, ""))
+            .orElseThrow(() -> new ResourceNotFoundException("Não foi encontrada uma categoria de tarefa com o nome " + name));
     }
 
     @Transactional

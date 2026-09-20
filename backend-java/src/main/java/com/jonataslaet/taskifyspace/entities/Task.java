@@ -1,6 +1,5 @@
 package com.jonataslaet.taskifyspace.entities;
 
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -18,8 +17,9 @@ public class Task {
 
     private BigDecimal score;
 
-    @Enumerated(EnumType.STRING)
-    private TaskCategoryEnum category;
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private TaskCategory category;
 
     @Column(nullable = false)
     private Boolean active = Boolean.FALSE;
@@ -55,10 +55,6 @@ public class Task {
         return score;
     }
 
-    public TaskCategoryEnum getCategory() {
-        return category;
-    }
-
     public Space getSpace() {
         return space;
     }
@@ -71,7 +67,11 @@ public class Task {
         this.score = score;
     }
 
-    public void setCategory(TaskCategoryEnum category) {
+    public TaskCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(TaskCategory category) {
         this.category = category;
     }
 

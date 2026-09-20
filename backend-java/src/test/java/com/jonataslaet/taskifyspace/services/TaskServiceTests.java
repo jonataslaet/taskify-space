@@ -2,14 +2,9 @@ package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskScheduleRecordDTO;
-import com.jonataslaet.taskifyspace.entities.Space;
-import com.jonataslaet.taskifyspace.entities.SpaceMembership;
-import com.jonataslaet.taskifyspace.entities.Task;
-import com.jonataslaet.taskifyspace.entities.TaskExecution;
-import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.exceptions.ResourceNotFoundException;
@@ -52,6 +47,9 @@ class TaskServiceTests {
     private SpaceService spaceService;
 
     @Mock
+    private TaskCategoryService taskCategoryService;
+
+    @Mock
     private SpaceMembershipService spaceMembershipService;
 
     @Mock
@@ -70,6 +68,7 @@ class TaskServiceTests {
         taskService = new TaskService(
             taskRepository,
             spaceService,
+            taskCategoryService,
             spaceMembershipService,
             taskExecutionRepository,
             featureAccessService,
@@ -188,7 +187,7 @@ class TaskServiceTests {
         Task task = createTask(20L, space);
         task.setDescription("Original task");
         task.setScore(new BigDecimal("10.0"));
-        task.setCategory(TaskCategoryEnum.OPERATIONAL);
+        task.setCategory(new TaskCategory("OPERATIONAL", space, authenticatedUser));
         task.setActive(true);
         TaskRecordDTO partialUpdate = new TaskRecordDTO(
             null,
@@ -207,7 +206,7 @@ class TaskServiceTests {
 
         assertThat(updatedTask.description()).isEqualTo("Original task");
         assertThat(updatedTask.score()).isEqualByComparingTo("20.0");
-        assertThat(updatedTask.category()).isEqualTo(TaskCategoryEnum.OPERATIONAL);
+        assertThat(updatedTask.category()).isEqualTo("OPERATIONAL");
         assertThat(updatedTask.active()).isTrue();
     }
 
@@ -221,7 +220,7 @@ class TaskServiceTests {
             space.getId(),
             "Scheduled task",
             BigDecimal.TEN,
-            TaskCategoryEnum.OPERATIONAL,
+            "OPERATIONAL",
             new TaskScheduleRecordDTO(Set.of(scheduledDate), FrequenceEnum.WEEKLY),
             null,
             null);

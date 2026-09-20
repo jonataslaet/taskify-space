@@ -1,7 +1,6 @@
 package com.jonataslaet.taskifyspace.controllers.dtos;
 
 import com.jonataslaet.taskifyspace.entities.enums.FrequenceEnum;
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -59,7 +58,7 @@ class TaskAndSpaceRecordDTOValidationTests {
             -1L,
             "",
             new BigDecimal("1.001"),
-            TaskCategoryEnum.OPERATIONAL,
+            "OPERATIONAL",
             null,
             null,
             null);
@@ -78,7 +77,7 @@ class TaskAndSpaceRecordDTOValidationTests {
             1L,
             "Task",
             BigDecimal.ONE,
-            TaskCategoryEnum.OPERATIONAL,
+            "OPERATIONAL",
             new TaskScheduleRecordDTO(Set.of(), null),
             null,
             null);
@@ -87,7 +86,7 @@ class TaskAndSpaceRecordDTOValidationTests {
             1L,
             "Task",
             BigDecimal.ONE,
-            TaskCategoryEnum.OPERATIONAL,
+            "OPERATIONAL",
             new TaskScheduleRecordDTO(Set.of(LocalDate.of(2026, 8, 4)), null),
             null,
             null);
@@ -109,7 +108,7 @@ class TaskAndSpaceRecordDTOValidationTests {
             1L,
             "Task",
             BigDecimal.ONE,
-            TaskCategoryEnum.OPERATIONAL,
+            "OPERATIONAL",
             new TaskScheduleRecordDTO(null, FrequenceEnum.DAILY),
             null,
             null);
@@ -125,7 +124,7 @@ class TaskAndSpaceRecordDTOValidationTests {
             1L,
             "Task",
             BigDecimal.ONE,
-            TaskCategoryEnum.OPERATIONAL,
+            "OPERATIONAL",
             new TaskScheduleRecordDTO(Set.of(), FrequenceEnum.WEEKLY),
             null,
             null);

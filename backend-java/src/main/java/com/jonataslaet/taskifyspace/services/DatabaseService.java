@@ -2,22 +2,17 @@ package com.jonataslaet.taskifyspace.services;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.SpaceRecordDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
-import com.jonataslaet.taskifyspace.entities.Plan;
-import com.jonataslaet.taskifyspace.entities.PlanFeatureLimit;
-import com.jonataslaet.taskifyspace.entities.Space;
-import com.jonataslaet.taskifyspace.entities.Subscription;
-import com.jonataslaet.taskifyspace.entities.Task;
-import com.jonataslaet.taskifyspace.entities.User;
+import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionProviderEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionStatusEnum;
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserRoleEnum;
 import com.jonataslaet.taskifyspace.entities.enums.UserStatusEnum;
 import com.jonataslaet.taskifyspace.mappers.SpaceMapper;
 import com.jonataslaet.taskifyspace.mappers.TaskMapper;
 import com.jonataslaet.taskifyspace.repositories.PlanRepository;
 import com.jonataslaet.taskifyspace.repositories.SubscriptionRepository;
+import com.jonataslaet.taskifyspace.repositories.TaskCategoryRepository;
 import com.jonataslaet.taskifyspace.repositories.UserRepository;
 import com.jonataslaet.taskifyspace.utils.EmailUtils;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,11 +45,12 @@ public class DatabaseService {
     private final SpaceMembershipService spaceMembershipService;
     private final PlanRepository planRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final TaskCategoryRepository taskCategoryRepository;
     private final Clock clock;
 
     public DatabaseService(PasswordEncoder passwordEncoder, UserRepository userRepository, SpaceService spaceService,
                            TaskService taskService, SpaceMembershipService spaceMembershipService,
-                           PlanRepository planRepository, SubscriptionRepository subscriptionRepository, Clock clock) {
+                           PlanRepository planRepository, SubscriptionRepository subscriptionRepository, TaskCategoryRepository taskCategoryRepository, Clock clock) {
         this.passwordEncoder = passwordEncoder;
         this.userRepository = userRepository;
         this.spaceService = spaceService;
@@ -62,6 +58,7 @@ public class DatabaseService {
         this.spaceMembershipService = spaceMembershipService;
         this.planRepository = planRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.taskCategoryRepository = taskCategoryRepository;
         this.clock = clock;
     }
 
@@ -249,33 +246,41 @@ public class DatabaseService {
         ).forEach(spaceName -> createActiveSpace(spaceName, adminJonatasLaet));
     }
 
-    public TaskRecordDTO getTaskRecordTrocarBotijaoDTO() {
+    public TaskRecordDTO getTaskRecordTrocarBotijaoDTO(TaskCategory category) {
         Task task = new Task();
-        task.setCategory(TaskCategoryEnum.OPERATIONAL);
+        task.setCategory(category);
         task.setScore(new BigDecimal("90.0"));
         task.setDescription("Trocar o botijão de gás");
         return TaskMapper.toDTO(task);
     }
 
-    public TaskRecordDTO getTaskRecordPagarContaAguaDTO() {
+    public TaskRecordDTO getTaskRecordPagarContaAguaDTO(TaskCategory category) {
         Task task = new Task();
-        task.setCategory(TaskCategoryEnum.FINANCIAL);
+        task.setCategory(category);
         task.setScore(new BigDecimal("80.0"));
         task.setDescription("Pagar conta de água");
         return TaskMapper.toDTO(task);
     }
 
-    public TaskRecordDTO getTaskRecordResolver10QuestoesConcursosDTO() {
+    public TaskRecordDTO getTaskRecordResolver10QuestoesConcursosDTO(TaskCategory category) {
         Task task = new Task();
-        task.setCategory(TaskCategoryEnum.PERSONAL);
+        task.setCategory(category);
         task.setScore(new BigDecimal("20.0"));
         task.setDescription("Resolver 10 questões de concursos");
         return TaskMapper.toDTO(task);
     }
-
     private void activateUser(User user) {
         user.setStatus(UserStatusEnum.ACTIVE);
         userRepository.save(user);
+    }
+
+    private TaskCategory getTaskCategory(Long spaceId, String categoryName) {
+        return taskCategoryRepository
+            .findTaskCategoryByName(spaceId, categoryName)
+            .orElseThrow(() -> new IllegalStateException(
+                "TaskCategory '%s' não encontrada no space %d"
+                    .formatted(categoryName, spaceId)
+            ));
     }
 
     public void initializeDemoDatabase() {
@@ -304,12 +309,57 @@ public class DatabaseService {
         SpaceRecordDTO spaceResidenciaCasalLaet = spaceService.createSpace(getSpaceResidenciaCasalLaetDTO(), userJoiceLaet);
         spaceService.toggleActiveSpace(userJoiceLaet, spaceResidenciaCasalLaet.id());
 
+        TaskCategory operationalCategory = new TaskCategory();
+        operationalCategory.setName("OPERATIONAL");
+        operationalCategory.setCreator(userJoiceLaet);
+        operationalCategory.setSpace(
+            spaceService.getSpaceEntity(spaceResidenciaCasalLaet.id())
+        );
+
+        taskCategoryRepository.save(operationalCategory);
+
+        TaskCategory financialCategory = new TaskCategory();
+        financialCategory.setName("FINANCIAL");
+        financialCategory.setCreator(userJoiceLaet);
+        financialCategory.setSpace(
+            spaceService.getSpaceEntity(spaceResidenciaCasalLaet.id())
+        );
+
+        taskCategoryRepository.save(financialCategory);
+
+        TaskCategory personalCategory = new TaskCategory();
+        personalCategory.setName("PERSONAL");
+        personalCategory.setCreator(userJoiceLaet);
+        personalCategory.setSpace(
+            spaceService.getSpaceEntity(spaceResidenciaCasalLaet.id())
+        );
+
+        taskCategoryRepository.save(personalCategory);
+
         SpaceRecordDTO spaceBella = spaceService.createSpace(getSpaceBellaResidenceDTO(), userBellaLaet);
         spaceService.toggleActiveSpace(userBellaLaet, spaceBella.id());
 
-        TaskRecordDTO taskRecordDTO1 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordTrocarBotijaoDTO());
-        TaskRecordDTO taskRecordDTO2 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordPagarContaAguaDTO());
-        TaskRecordDTO taskRecordDTO3 = taskService.createTask(spaceResidenciaCasalLaet.id(), userJoiceLaet, getTaskRecordResolver10QuestoesConcursosDTO());
+        operationalCategory =  getTaskCategory(spaceResidenciaCasalLaet.id(), "OPERATIONAL");
+        financialCategory = getTaskCategory(spaceResidenciaCasalLaet.id(), "FINANCIAL");
+        personalCategory =  getTaskCategory(spaceResidenciaCasalLaet.id(), "PERSONAL");
+
+        TaskRecordDTO taskRecordDTO1 = taskService.createTask(
+            spaceResidenciaCasalLaet.id(),
+            userJoiceLaet,
+            getTaskRecordTrocarBotijaoDTO(operationalCategory)
+        );
+
+        TaskRecordDTO taskRecordDTO2 = taskService.createTask(
+            spaceResidenciaCasalLaet.id(),
+            userJoiceLaet,
+            getTaskRecordPagarContaAguaDTO(financialCategory)
+        );
+
+        TaskRecordDTO taskRecordDTO3 = taskService.createTask(
+            spaceResidenciaCasalLaet.id(),
+            userJoiceLaet,
+            getTaskRecordResolver10QuestoesConcursosDTO(personalCategory)
+        );
 
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO1.id());
         taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO2.id());

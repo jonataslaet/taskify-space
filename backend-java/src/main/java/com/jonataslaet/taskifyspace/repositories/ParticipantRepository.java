@@ -2,7 +2,6 @@ package com.jonataslaet.taskifyspace.repositories;
 
 import com.jonataslaet.taskifyspace.controllers.dtos.ParticipantDTO;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
-import com.jonataslaet.taskifyspace.entities.enums.TaskCategoryEnum;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.jspecify.annotations.NonNull;
@@ -14,10 +13,8 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Repository
@@ -36,23 +33,24 @@ public class ParticipantRepository {
         LEFT JOIN (
             SELECT
                 teu.user_id AS user_id,
-                STRING_AGG(DISTINCT CAST(t.category AS varchar), ',') AS task_categories,
+                STRING_AGG(DISTINCT tc.name, ',') AS task_categories,
                 SUM(t.score / executor_counts.executor_count) AS score
             FROM task_execution_users teu
             JOIN tasks_executions te ON te.id = teu.task_execution_id
             JOIN tasks t ON t.id = te.task_id
+            JOIN task_categories tc ON tc.id = t.category_id
             JOIN (
                 SELECT task_execution_id, COUNT(*) AS executor_count
                 FROM task_execution_users
                 GROUP BY task_execution_id
             ) executor_counts ON executor_counts.task_execution_id = te.id
             WHERE te.space_id = :spaceId
-            AND CAST(t.category AS varchar) IN (%s)
+            AND tc.name IN (%s)
             GROUP BY teu.user_id
         ) scores ON scores.user_id = u.id
         WHERE sm.space_id = :spaceId
         AND sm.space_membership_status_enum = 'APPROVED'
-        """;
+    """;
 
     private final EntityManager entityManager;
 
@@ -62,9 +60,8 @@ public class ParticipantRepository {
 
     public Page<@NonNull ParticipantDTO> findParticipantsWithScores(
         Long spaceId, Pageable pageable, String name, SpaceUserRoleEnum spaceUserRole,
-        List<TaskCategoryEnum> taskCategories) {
-        List<TaskCategoryEnum> resolvedTaskCategories = resolveTaskCategories(taskCategories);
-        String fromParticipants = buildFromParticipants(resolvedTaskCategories);
+        List<String> taskCategories) {
+        String fromParticipants = buildFromParticipants(taskCategories);
         String filters = buildFilters(name, spaceUserRole);
         String sql = """
             SELECT u.id, u.name, sm.space_user_role, scores.task_categories, COALESCE(scores.score, 0)
@@ -84,7 +81,7 @@ public class ParticipantRepository {
             row -> toBigDecimal(row[4])).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<@NonNull ParticipantDTO> participants = rows.stream()
-            .map(row -> toParticipantDTO(row, resolvedTaskCategories, totalScore))
+            .map(row -> toParticipantDTO(row, taskCategories, totalScore))
             .toList();
 
         Long total = ((Number) bindFilters(
@@ -97,28 +94,13 @@ public class ParticipantRepository {
         return new PageImpl<>(participants, pageable, total);
     }
 
-    private List<TaskCategoryEnum> resolveTaskCategories(List<TaskCategoryEnum> taskCategories) {
-        if (taskCategories == null || taskCategories.isEmpty()) {
-            return List.of(TaskCategoryEnum.values());
-        }
-
-        List<TaskCategoryEnum> resolvedTaskCategories = taskCategories.stream()
-            .filter(Objects::nonNull)
-            .distinct()
-            .toList();
-
-        return resolvedTaskCategories.isEmpty()
-            ? List.of(TaskCategoryEnum.values())
-            : resolvedTaskCategories;
-    }
-
-    private String buildFromParticipants(List<TaskCategoryEnum> taskCategories) {
+    private String buildFromParticipants(List<String> taskCategories) {
         return FROM_PARTICIPANTS.formatted(buildTaskCategoryFilterValues(taskCategories));
     }
 
-    private String buildTaskCategoryFilterValues(List<TaskCategoryEnum> taskCategories) {
+    private String buildTaskCategoryFilterValues(List<String> taskCategories) {
         return taskCategories.stream()
-            .map(taskCategory -> "'" + taskCategory.name() + "'")
+            .map(taskCategory -> "'" + taskCategory + "'")
             .collect(Collectors.joining(", "));
     }
 
@@ -175,26 +157,12 @@ public class ParticipantRepository {
         return column + " " + order.getDirection().name();
     }
 
-    private ParticipantDTO toParticipantDTO(Object[] row, List<TaskCategoryEnum> taskCategories, BigDecimal totalScore) {
+    private ParticipantDTO toParticipantDTO(Object[] row, List<String> taskCategories, BigDecimal totalScore) {
         BigDecimal participantScore = toBigDecimal(row[4]);
         return new ParticipantDTO(((Number) row[0]).longValue(), (String) row[1],
-            SpaceUserRoleEnum.valueOf(row[2].toString()), toTaskCategories(row[3], taskCategories),
+            SpaceUserRoleEnum.valueOf(row[2].toString()), taskCategories,
             participantScore, totalScore.compareTo(BigDecimal.ZERO) == 0 ?
             BigDecimal.ZERO : participantScore.divide(totalScore, RoundingMode.FLOOR));
-    }
-
-    private List<TaskCategoryEnum> toTaskCategories(Object value, List<TaskCategoryEnum> selectedTaskCategories) {
-        if (value == null) {
-            return List.of();
-        }
-
-        List<String> categoryNames = Arrays.stream(value.toString().split(","))
-            .filter(this::hasText)
-            .toList();
-
-        return selectedTaskCategories.stream()
-            .filter(taskCategory -> categoryNames.contains(taskCategory.name()))
-            .toList();
     }
 
     private BigDecimal toBigDecimal(Object value) {
