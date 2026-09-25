@@ -30,7 +30,7 @@ public class ParticipantRepository {
     private static final String FROM_PARTICIPANTS = """
         FROM space_memberships sm
         JOIN users u ON u.id = sm.user_id
-        LEFT JOIN (
+        JOIN (
             SELECT
                 teu.user_id AS user_id,
                 STRING_AGG(DISTINCT tc.name, ',') AS task_categories,
