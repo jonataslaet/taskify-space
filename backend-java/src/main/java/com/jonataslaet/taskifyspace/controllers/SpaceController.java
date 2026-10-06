@@ -66,7 +66,7 @@ public class SpaceController {
     @GetMapping("/{spaceId}/participants/search")
     public ResponseEntity<List<ParticipantSummaryDTO>> readParticipantsByName(
         @PathVariable("spaceId") Long spaceId,
-        @RequestParam("name") String name,
+        @RequestParam(value = "name", required = false) String name,
         @AuthenticationPrincipal User authenticatedUser) {
 
         List<ParticipantSummaryDTO> participants =

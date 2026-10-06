@@ -45,7 +45,7 @@ public class ParticipantRepository {
                 GROUP BY task_execution_id
             ) executor_counts ON executor_counts.task_execution_id = te.id
             WHERE te.space_id = :spaceId
-            AND tc.name IN (%s)
+            %s
             GROUP BY teu.user_id
         ) scores ON scores.user_id = u.id
         WHERE sm.space_id = :spaceId
@@ -95,7 +95,13 @@ public class ParticipantRepository {
     }
 
     private String buildFromParticipants(List<String> taskCategories) {
-        return FROM_PARTICIPANTS.formatted(buildTaskCategoryFilterValues(taskCategories));
+        String taskCategoryFilter = "";
+
+        if (taskCategories != null && !taskCategories.isEmpty()) {
+            taskCategoryFilter = "AND tc.name IN (%s)".formatted(buildTaskCategoryFilterValues(taskCategories));
+        }
+
+        return FROM_PARTICIPANTS.formatted(taskCategoryFilter);
     }
 
     private String buildTaskCategoryFilterValues(List<String> taskCategories) {

@@ -185,7 +185,8 @@ public class SpaceService {
 
     public List<ParticipantSummaryDTO> readParticipantsByName(
         Long spaceId, User authenticatedUser, String name) {
-        return spaceMembershipService.readParticipantsByName(spaceId, authenticatedUser.getId(), name);
+        return spaceMembershipService.readParticipantsByName(
+            spaceId, authenticatedUser.getId(), Objects.requireNonNullElse(name, ""));
     }
 
     public void validateActiveParticipation(User authenticatedUser,

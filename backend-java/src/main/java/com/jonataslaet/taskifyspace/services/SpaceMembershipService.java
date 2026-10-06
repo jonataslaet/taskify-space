@@ -235,7 +235,7 @@ public class SpaceMembershipService {
             throw new ForbiddenException("Usuario nao possui permissao para visualizar os participantes desse espaco");
         }
 
-        return participantRepository.findParticipantsWithScores(spaceId, pageable, name, spaceUserRole, taskCategories);
+        return participantRepository.findParticipantsWithScores(spaceId, pageable, Objects.requireNonNullElse(name, ""), spaceUserRole, taskCategories);
     }
 
     public List<ParticipantSummaryDTO> readParticipantsByName(Long spaceId, Long authUserId, String name) {

@@ -33,7 +33,7 @@ public class TaskCategoryController {
     @GetMapping("/search")
     public ResponseEntity<List<TaskCategoryRecordDTO>> searchTaskCategoriesByName(
         @PathVariable("spaceId") Long spaceId,
-        @RequestParam("name") String name,
+        @RequestParam(value = "name", required = false) String name,
         @AuthenticationPrincipal User authenticatedUser) {
 
         List<TaskCategoryRecordDTO> taskCategories =
