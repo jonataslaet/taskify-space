@@ -3,6 +3,7 @@ package com.jonataslaet.taskifyspace.entities;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.time.temporal.TemporalAccessor;
 import java.util.Set;
 
 @Entity
@@ -21,7 +22,11 @@ public class TaskExecution {
     @JoinColumn(name = "task_id", nullable = false)
     private Task task;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     @ManyToMany
     @JoinTable(
@@ -60,10 +65,6 @@ public class TaskExecution {
         return task;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
     public Set<User> getExecutors() {
         return executors;
     }
@@ -72,18 +73,21 @@ public class TaskExecution {
         this.task = task;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public void setExecutors(Set<User> executors) {
-        this.executors = executors;
-    }
-
     @PrePersist
     public void prePersist() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
+    }
+
+    public Instant getCreatedAt() {
+        return this.createdAt;
+    }
+
+    public void setCreatedAt(Instant instant) {
+        this.createdAt = instant;
     }
 }

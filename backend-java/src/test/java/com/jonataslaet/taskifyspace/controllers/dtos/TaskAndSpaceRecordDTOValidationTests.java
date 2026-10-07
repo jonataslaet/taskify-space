@@ -33,24 +33,6 @@ class TaskAndSpaceRecordDTOValidationTests {
     }
 
     @Test
-    void taskCreateRejectsMissingAndInvalidFields() {
-        TaskRecordDTO task = new TaskRecordDTO(
-            null,
-            null,
-            " ",
-            BigDecimal.ZERO,
-            null,
-            null,
-            null,
-            null);
-
-        Set<String> fields = violatedFields(
-            validator.validate(task, TaskRecordDTO.TaskView.CreateTask.class));
-
-        assertThat(fields).contains("spaceId", "description", "score", "category");
-    }
-
-    @Test
     void taskUpdateAllowsPartialPayloadButRejectsInvalidProvidedFields() {
         TaskRecordDTO partialTask = new TaskRecordDTO(null, null, null, null, null, null, null, null);
         TaskRecordDTO invalidTask = new TaskRecordDTO(

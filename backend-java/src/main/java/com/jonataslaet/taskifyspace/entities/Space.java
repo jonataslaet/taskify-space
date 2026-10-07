@@ -23,7 +23,11 @@ public class Space {
     @Column(nullable = false)
     private Boolean available = Boolean.FALSE;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "creator_id", nullable = false, updatable = false)
@@ -46,10 +50,6 @@ public class Space {
     public String getName() { return name; }
 
     public Set<SpaceMembership> getSpaceMemberships() { return spaceMemberships; }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
 
     public User getCreator() {
         return creator;
@@ -81,10 +81,6 @@ public class Space {
         this.spaceMemberships = spaceMemberships;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public void setCreator(User creator) {
         if (creator == null) {
             throw new IllegalArgumentException("Creator is required");
@@ -112,8 +108,11 @@ public class Space {
 
     @PrePersist
     public void prePersist() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 }

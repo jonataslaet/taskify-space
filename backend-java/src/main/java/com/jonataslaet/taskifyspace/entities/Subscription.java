@@ -2,17 +2,7 @@ package com.jonataslaet.taskifyspace.entities;
 
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionProviderEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SubscriptionStatusEnum;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.Set;
@@ -53,6 +43,12 @@ public class Subscription {
     private String externalSubscriptionId;
 
     private String externalPriceId;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     public Subscription() {}
 
@@ -152,5 +148,15 @@ public class Subscription {
 
     public void setExternalPriceId(String externalPriceId) {
         this.externalPriceId = externalPriceId;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 }

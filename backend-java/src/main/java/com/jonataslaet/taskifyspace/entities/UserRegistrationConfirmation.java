@@ -39,11 +39,11 @@ public class UserRegistrationConfirmation {
     @Column(name = "used_at")
     private Instant usedAt;
 
-    @Column(name = "updated_on")
-    private LocalDateTime updatedOn;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
-    @Column(name = "created_on")
-    private LocalDateTime createdOn;
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     public UserRegistrationConfirmation() {}
 
@@ -55,12 +55,12 @@ public class UserRegistrationConfirmation {
 
     @PrePersist
     public void prePersist() {
-        createdOn = LocalDateTime.now();
+        createdAt = Instant.now();
     }
 
     @PreUpdate
     public void preUpdate() {
-        updatedOn = LocalDateTime.now();
+        updatedAt = Instant.now();
     }
 
     public Long getId() {

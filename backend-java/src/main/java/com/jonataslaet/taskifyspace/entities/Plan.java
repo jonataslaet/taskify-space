@@ -1,15 +1,8 @@
 package com.jonataslaet.taskifyspace.entities;
 
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -31,6 +24,12 @@ public class Plan {
 
     @Column(nullable = false)
     private Boolean active = Boolean.TRUE;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     @ElementCollection
     @CollectionTable(name = "plan_feature_limits", joinColumns = @JoinColumn(name = "plan_id"))
@@ -56,6 +55,16 @@ public class Plan {
 
     public Boolean getActive() {
         return active;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 
     public Set<PlanFeatureLimit> getFeatureLimits() {

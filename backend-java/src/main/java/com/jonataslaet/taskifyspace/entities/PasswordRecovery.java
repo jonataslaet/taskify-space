@@ -45,11 +45,11 @@ public class PasswordRecovery {
     @Column(name = "reset_session_used_at")
     private Instant resetSessionUsedAt;
 
-    @Column(name = "updated_on")
-    private LocalDateTime updatedOn;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
-    @Column(name = "created_on")
-    private LocalDateTime createdOn;
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     public  PasswordRecovery() {}
 
@@ -62,12 +62,12 @@ public class PasswordRecovery {
 
     @PrePersist
     public void prePersist() {
-        createdOn = LocalDateTime.now();
+        createdAt = Instant.now();
     }
 
     @PreUpdate
     public void preUpdate() {
-        updatedOn = LocalDateTime.now();
+        updatedAt = Instant.now();
     }
 
     public void setExpiration(Instant now) {

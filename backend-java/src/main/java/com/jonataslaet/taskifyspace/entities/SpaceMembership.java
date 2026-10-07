@@ -4,6 +4,8 @@ import com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum;
 import com.jonataslaet.taskifyspace.entities.enums.SpaceUserRoleEnum;
 import jakarta.persistence.*;
 
+import java.time.Instant;
+
 @Entity
 @Table(
     name = "space_memberships",
@@ -31,6 +33,12 @@ public class SpaceMembership {
     @Column(nullable = false)
     private SpaceMembershipStatusEnum spaceMembershipStatusEnum;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
     public SpaceMembership() {}
 
     public SpaceMembership(User user, Space space, SpaceUserRoleEnum role) {
@@ -55,5 +63,15 @@ public class SpaceMembership {
 
     public void setSpaceMembershipStatusEnum(SpaceMembershipStatusEnum spaceMembershipStatusEnum) {
         this.spaceMembershipStatusEnum = spaceMembershipStatusEnum;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 }

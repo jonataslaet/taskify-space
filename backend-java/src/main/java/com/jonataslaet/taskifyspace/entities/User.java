@@ -48,6 +48,12 @@ public class User implements UserDetails {
     @Column(name = "registration_confirmation_expires_at")
     private Instant registrationConfirmationExpiresAt;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<SpaceMembership> memberships = new HashSet<>();
 
@@ -141,6 +147,16 @@ public class User implements UserDetails {
 
     public void setRegistrationConfirmationExpiresAt(Instant registrationConfirmationExpiresAt) {
         this.registrationConfirmationExpiresAt = registrationConfirmationExpiresAt;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 
     public void requestEmailConfirmation(Instant expiration) {

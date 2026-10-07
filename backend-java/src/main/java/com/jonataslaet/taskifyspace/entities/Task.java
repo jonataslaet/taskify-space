@@ -24,7 +24,11 @@ public class Task {
     @Column(nullable = false)
     private Boolean active = Boolean.FALSE;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -87,16 +91,8 @@ public class Task {
         return Boolean.TRUE.equals(active);
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
     public void setActive(Boolean active) {
         this.active = active;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 
     public User getCreator() {
@@ -124,8 +120,11 @@ public class Task {
 
     @PrePersist
     public void prePersist() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
+        createdAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
     }
 }
