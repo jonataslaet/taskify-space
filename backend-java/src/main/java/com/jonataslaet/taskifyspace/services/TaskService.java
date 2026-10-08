@@ -1,5 +1,6 @@
 package com.jonataslaet.taskifyspace.services;
 
+import com.jonataslaet.taskifyspace.controllers.dtos.RequestParamsTasksDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
 import com.jonataslaet.taskifyspace.entities.*;
 import com.jonataslaet.taskifyspace.entities.enums.FeatureEnum;
@@ -12,6 +13,7 @@ import com.jonataslaet.taskifyspace.repositories.TaskExecutionRepository;
 import com.jonataslaet.taskifyspace.repositories.TaskRepository;
 import com.jonataslaet.taskifyspace.validations.TaskSchedulerValidator;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,12 +21,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.jonataslaet.taskifyspace.entities.enums.SpaceMembershipStatusEnum.APPROVED;
@@ -188,8 +189,9 @@ public class TaskService {
         taskRepository.save(task);
     }
 
-    public Page<@NonNull TaskRecordDTO> findAll(
-        Long spaceId, Specification<@NonNull Task> taskSpecification, Pageable pageable, User authenticatedUser) {
+    public Page<@NonNull TaskRecordDTO> findAll(Long spaceId,
+        RequestParamsTasksDTO requestParamsTasksDTO, Pageable pageable, User authenticatedUser) {
+        Specification<@NonNull Task> taskSpecification = buildTaskSpecification(requestParamsTasksDTO);
 
         Specification<@NonNull Task> authenticatedUserTasks = (root, query, criteriaBuilder) -> {
             query.distinct(true);
@@ -204,6 +206,39 @@ public class TaskService {
         if (Objects.nonNull(taskSpecification)) finalSpecification = authenticatedUserTasks.and(taskSpecification);
 
         return taskRepository.findAll(finalSpecification, pageable).map(TaskMapper::toDTO);
+    }
+
+    private Specification<@NonNull Task> buildTaskSpecification(RequestParamsTasksDTO requestParamsTasksDTO) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (requestParamsTasksDTO.description() != null && !requestParamsTasksDTO.description().isBlank()) {
+                predicates.add(criteriaBuilder.like(
+                    criteriaBuilder.lower(root.get("description")),
+                    "%" + requestParamsTasksDTO.description().toLowerCase(Locale.ROOT) + "%"));
+            }
+            if (requestParamsTasksDTO.score() != null) predicates.add(criteriaBuilder.equal(root.get("score"), requestParamsTasksDTO.score()));
+            if (requestParamsTasksDTO.active() != null) predicates.add(criteriaBuilder.equal(root.get("active"), requestParamsTasksDTO.active()));
+            if (requestParamsTasksDTO.minScore() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("score"), requestParamsTasksDTO.minScore()));
+            }
+            if (requestParamsTasksDTO.maxScore() != null) predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("score"), requestParamsTasksDTO.maxScore()));
+
+            List<String> filteredCategories = normalizeCategories(requestParamsTasksDTO.categories());
+            if (!filteredCategories.isEmpty()) {
+                predicates.add(root.join("category", JoinType.INNER).get("name").in(filteredCategories));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private List<String> normalizeCategories(List<String> categories) {
+        if (categories == null) return List.of();
+        return categories.stream()
+            .filter(category -> category != null && !category.isBlank())
+            .map(String::trim)
+            .toList();
     }
 
     public Page<@NonNull TaskRecordDTO> findAllScheduledTasks(Long spaceId,

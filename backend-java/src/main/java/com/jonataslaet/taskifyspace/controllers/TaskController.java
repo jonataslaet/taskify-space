@@ -1,13 +1,18 @@
 package com.jonataslaet.taskifyspace.controllers;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.jonataslaet.taskifyspace.controllers.dtos.RequestParamsTasksDTO;
 import com.jonataslaet.taskifyspace.controllers.dtos.TaskRecordDTO;
+import com.jonataslaet.taskifyspace.entities.Task;
 import com.jonataslaet.taskifyspace.entities.User;
 import com.jonataslaet.taskifyspace.services.TaskService;
 import com.jonataslaet.taskifyspace.specifications.SpecificationTemplate;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +29,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @RestController
@@ -48,13 +57,20 @@ public class TaskController {
     @GetMapping
     public ResponseEntity<@NonNull Page<@NonNull TaskRecordDTO>> readAllTasks(
         @PathVariable("spaceId") Long spaceId,
-        SpecificationTemplate.TaskSpecification taskSpecification,
+        @RequestParam(value = "description", required = false) String description,
+        @RequestParam(value = "score", required = false) BigDecimal score,
+        @RequestParam(value = "active", required = false) Boolean active,
+        @RequestParam(value = "categories", required = false) List<String> categories,
+        @RequestParam(value = "minScore", required = false) BigDecimal minScore,
+        @RequestParam(value = "maxScore", required = false) BigDecimal maxScore,
         Pageable pageable,
         @AuthenticationPrincipal User authenticatedUser) {
-        Page<@NonNull TaskRecordDTO> taskModelPage = taskService.findAll(
-            spaceId, taskSpecification, pageable, authenticatedUser);
+        Page<@NonNull TaskRecordDTO> taskModelPage = taskService.findAll(spaceId, new RequestParamsTasksDTO(
+            description, score, active, categories, minScore, maxScore), pageable, authenticatedUser);
         return ResponseEntity.status(HttpStatus.OK).body(taskModelPage);
     }
+
+
 
     @JsonView(TaskRecordDTO.TaskView.ReadTask.class)
     @PostMapping
