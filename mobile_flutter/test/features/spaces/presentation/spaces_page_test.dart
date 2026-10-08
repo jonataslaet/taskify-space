@@ -969,8 +969,11 @@ void main() {
         fetchParticipantsHandler: (_, _, _, page, size) async =>
             makeSpaceParticipantPage(number: page, size: size),
       );
+      final tasksRepository = FakeTasksRepository();
 
-      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpWidget(
+        _testApp(repository, tasksRepository: tasksRepository),
+      );
       await tester.pumpAndSettle();
 
       final participantsChip = find.byKey(
@@ -995,6 +998,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(SpaceParticipantsPage), findsOneWidget);
+      final participantsPage = tester.widget<SpaceParticipantsPage>(
+        find.byType(SpaceParticipantsPage),
+      );
+      expect(
+        identical(participantsPage.tasksRepository, tasksRepository),
+        isTrue,
+      );
       expect(repository.fetchSpaceParticipantsCalls, 1);
       expect(repository.receivedParticipantAccessTokens, [
         testSession.accessToken,

@@ -5,6 +5,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
+import 'package:mobile_flutter/features/tasks/presentation/task_category_search_dialog.dart';
 
 typedef TaskFormSubmit = Future<TaskSummary> Function(TaskUpdate task);
 typedef TaskFormFailureMessage = String Function(ApiFailure failure);
@@ -22,6 +23,7 @@ class TaskFormDialog extends StatefulWidget {
     required this.submitLabel,
     required this.submittingLabel,
     required this.submitIcon,
+    required this.searchCategories,
     required this.onSubmit,
     required this.failureMessage,
     this.creationOutcomeCanBeUncertain = false,
@@ -34,12 +36,13 @@ class TaskFormDialog extends StatefulWidget {
   final String details;
   final String initialDescription;
   final num? initialScore;
-  final TaskCategory initialCategory;
+  final TaskCategory? initialCategory;
   final TaskScheduleSummary? initialSchedule;
   final String scheduleSubtitle;
   final String submitLabel;
   final String submittingLabel;
   final IconData submitIcon;
+  final TaskCategorySearch searchCategories;
   final TaskFormSubmit onSubmit;
   final TaskFormFailureMessage failureMessage;
   final bool creationOutcomeCanBeUncertain;
@@ -53,8 +56,9 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _descriptionController;
   late final TextEditingController _scoreController;
+  late final TextEditingController _categoryController;
   late final TextEditingController _datesController;
-  late TaskCategory _category;
+  TaskCategory? _category;
   late bool _hasSchedule;
   TaskFrequency? _frequency;
   bool _isSubmitting = false;
@@ -75,6 +79,9 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
           ? ''
           : _formatScore(widget.initialScore!),
     );
+    _categoryController = TextEditingController(
+      text: widget.initialCategory?.apiValue ?? '',
+    );
     _datesController = TextEditingController(
       text: schedule == null ? '' : _formatDates(schedule.localDates),
     );
@@ -87,6 +94,7 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
   void dispose() {
     _descriptionController.dispose();
     _scoreController.dispose();
+    _categoryController.dispose();
     _datesController.dispose();
     super.dispose();
   }
@@ -118,7 +126,7 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
         TaskUpdate(
           description: _descriptionController.text.trim(),
           score: score,
-          category: _category,
+          category: _category!,
           schedule: schedule,
         ),
       );
@@ -168,6 +176,34 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
 
   String? _validateScore(String? value) {
     return _parseScore(value ?? '').error;
+  }
+
+  String? _validateCategory(String? value) {
+    return _category == null ? 'Informe a categoria da tarefa.' : null;
+  }
+
+  Future<void> _selectCategory() async {
+    if (!_canEdit) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    final selected = await showDialog<TaskCategory>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TaskCategorySearchDialog(
+        keyPrefix: widget.keyPrefix,
+        searchCategories: widget.searchCategories,
+        initialCategory: _category,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() {
+      _category = selected;
+      _categoryController.text = selected.apiValue;
+    });
   }
 
   String? _validateDates(String? value) {
@@ -228,24 +264,18 @@ class _TaskFormDialogState extends State<TaskFormDialog> {
                     validator: _validateScore,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<TaskCategory>(
+                  TextFormField(
                     key: ValueKey('$keyPrefix-category-field'),
-                    initialValue: _category,
-                    decoration: const InputDecoration(labelText: 'Categoria'),
-                    items: [
-                      for (final category in TaskCategory.values)
-                        DropdownMenuItem(
-                          value: category,
-                          child: Text(_categoryLabel(category)),
-                        ),
-                    ],
-                    onChanged: _canEdit
-                        ? (category) {
-                            if (category != null) {
-                              setState(() => _category = category);
-                            }
-                          }
-                        : null,
+                    controller: _categoryController,
+                    enabled: _canEdit,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoria',
+                      hintText: 'Toque para buscar uma categoria',
+                      suffixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onTap: _selectCategory,
+                    validator: _validateCategory,
                   ),
                   const SizedBox(height: 10),
                   SwitchListTile.adaptive(
@@ -425,14 +455,6 @@ String _formatScore(num score) {
   return score == score.roundToDouble()
       ? score.toStringAsFixed(0)
       : score.toString();
-}
-
-String _categoryLabel(TaskCategory category) {
-  return switch (category) {
-    TaskCategory.operational => 'Operacional',
-    TaskCategory.financial => 'Financeira',
-    TaskCategory.personal => 'Pessoal',
-  };
 }
 
 String _frequencyLabel(TaskFrequency frequency) {

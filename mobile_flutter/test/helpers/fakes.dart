@@ -17,6 +17,8 @@ import 'package:mobile_flutter/features/spaces/domain/space_summary.dart';
 import 'package:mobile_flutter/features/spaces/domain/space_update.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/spaces/domain/updated_space.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_summary.dart';
@@ -518,6 +520,12 @@ typedef CreateTaskHandler =
     );
 typedef ToggleTaskActiveHandler =
     Future<void> Function(String accessToken, int spaceId, int taskId);
+typedef SearchTaskCategoriesHandler =
+    Future<List<TaskCategorySummary>> Function(
+      String accessToken,
+      int spaceId,
+      String? name,
+    );
 
 final class FakeTasksRepository implements TasksRepository {
   FakeTasksRepository({
@@ -528,6 +536,7 @@ final class FakeTasksRepository implements TasksRepository {
     this.createHandler,
     this.updateHandler,
     this.toggleTaskActiveHandler,
+    this.searchTaskCategoriesHandler,
   });
 
   final FetchTasksHandler? handler;
@@ -538,6 +547,7 @@ final class FakeTasksRepository implements TasksRepository {
   final CreateTaskHandler? createHandler;
   final UpdateTaskHandler? updateHandler;
   final ToggleTaskActiveHandler? toggleTaskActiveHandler;
+  final SearchTaskCategoriesHandler? searchTaskCategoriesHandler;
   int fetchTasksCalls = 0;
   int fetchTaskExecutionsCalls = 0;
   int confirmTaskExecutionCalls = 0;
@@ -545,6 +555,7 @@ final class FakeTasksRepository implements TasksRepository {
   int createTaskCalls = 0;
   int updateTaskCalls = 0;
   int toggleTaskActiveCalls = 0;
+  int searchTaskCategoriesCalls = 0;
   final receivedAccessTokens = <String>[];
   final receivedSpaceIds = <int>[];
   final receivedFilters = <TaskFilters>[];
@@ -574,6 +585,9 @@ final class FakeTasksRepository implements TasksRepository {
   final receivedToggleTaskActiveAccessTokens = <String>[];
   final receivedToggleTaskActiveSpaceIds = <int>[];
   final receivedToggleTaskActiveIds = <int>[];
+  final receivedTaskCategorySearchAccessTokens = <String>[];
+  final receivedTaskCategorySearchSpaceIds = <int>[];
+  final receivedTaskCategorySearchNames = <String?>[];
 
   @override
   Future<void> confirmTaskExecution({
@@ -722,6 +736,27 @@ final class FakeTasksRepository implements TasksRepository {
       );
     }
     return handler(accessToken, spaceId, taskId);
+  }
+
+  @override
+  Future<List<TaskCategorySummary>> searchTaskCategories({
+    required String accessToken,
+    required int spaceId,
+    String? name,
+  }) {
+    searchTaskCategoriesCalls += 1;
+    receivedTaskCategorySearchAccessTokens.add(accessToken);
+    receivedTaskCategorySearchSpaceIds.add(spaceId);
+    receivedTaskCategorySearchNames.add(name);
+    final handler = searchTaskCategoriesHandler;
+    if (handler != null) {
+      return handler(accessToken, spaceId, name);
+    }
+    return Future<List<TaskCategorySummary>>.value(const <TaskCategorySummary>[
+      TaskCategorySummary(id: 2, category: TaskCategory.financial),
+      TaskCategorySummary(id: 1, category: TaskCategory.operational),
+      TaskCategorySummary(id: 3, category: TaskCategory.personal),
+    ]);
   }
 }
 

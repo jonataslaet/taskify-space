@@ -45,6 +45,8 @@ void main() {
     );
 
     test('envia todos os filtros da TaskSpecification', () async {
+      final household = TaskCategory.fromApiValue('HOUSEHOLD');
+      final errands = TaskCategory.fromApiValue('ERRANDS');
       final client = MockClient((request) async {
         expect(request.url.queryParameters, <String, String>{
           'page': '2',
@@ -53,7 +55,7 @@ void main() {
           'description': 'Conta de água',
           'score': '12.5',
           'active': 'false',
-          'categories': 'OPERATIONAL,FINANCIAL',
+          'categories': 'OPERATIONAL,FINANCIAL,ERRANDS,HOUSEHOLD',
           'minScore': '1',
           'maxScore': '100.25',
         });
@@ -63,13 +65,15 @@ void main() {
       await _repository(client).fetchTasks(
         accessToken: 'access-token-test-only',
         spaceId: 7,
-        filters: const TaskFilters(
+        filters: TaskFilters(
           description: '  Conta de água  ',
           score: 12.5,
           active: false,
           categories: <TaskCategory>{
+            household,
             TaskCategory.financial,
             TaskCategory.operational,
+            errands,
           },
           minScore: 1,
           maxScore: 100.25,
@@ -93,6 +97,129 @@ void main() {
         accessToken: 'access-token-test-only',
         spaceId: 7,
         filters: const TaskFilters(description: '   '),
+      );
+    });
+
+    group('searchTaskCategories', () {
+      test(
+        'faz GET autenticado com nome normalizado e interpreta UTF-8',
+        () async {
+          final client = MockClient((request) async {
+            expect(request.method, 'GET');
+            expect(request.url.path, '/api/spaces/7/taskcategories/search');
+            expect(request.url.queryParameters, <String, String>{
+              'name': 'finanças',
+            });
+            expect(request.headers['Accept'], 'application/json');
+            expect(
+              request.headers['Authorization'],
+              'Bearer access-token-test-only',
+            );
+            expect(request.headers, isNot(contains('Content-Type')));
+            return _jsonListResponse(<dynamic>[
+              <String, dynamic>{'id': 4, 'name': 'FINANÇAS'},
+              <String, dynamic>{'id': 2, 'name': 'FINANCIAL'},
+            ]);
+          });
+
+          final result = await _repository(client).searchTaskCategories(
+            accessToken: ' access-token-test-only ',
+            spaceId: 7,
+            name: '  finanças  ',
+          );
+
+          expect(result, hasLength(2));
+          expect(result.first.id, 4);
+          expect(result.first.name, 'FINANÇAS');
+          expect(result.first.category, TaskCategory.fromApiValue('FINANÇAS'));
+          expect(result.last.category, TaskCategory.financial);
+          expect(() => result.clear(), throwsUnsupportedError);
+        },
+      );
+
+      test(
+        'omite o request param quando o nome está ausente ou vazio',
+        () async {
+          for (final name in <String?>[null, '   ']) {
+            final client = MockClient((request) async {
+              expect(request.url.path, '/api/spaces/7/taskcategories/search');
+              expect(request.url.query, isEmpty);
+              return _jsonListResponse(const <dynamic>[]);
+            });
+
+            final result = await _repository(client).searchTaskCategories(
+              accessToken: 'access-token-test-only',
+              spaceId: 7,
+              name: name,
+            );
+
+            expect(result, isEmpty);
+          }
+        },
+      );
+
+      test('rejeita token ou spaceId inválidos antes da rede', () async {
+        var calls = 0;
+        final repository = _repository(
+          MockClient((_) async {
+            calls += 1;
+            return _jsonListResponse(const <dynamic>[]);
+          }),
+        );
+
+        for (final invocation in <Future<List<Object?>> Function()>[
+          () => repository.searchTaskCategories(accessToken: '   ', spaceId: 7),
+          () => repository.searchTaskCategories(
+            accessToken: 'access-token-test-only',
+            spaceId: 0,
+          ),
+        ]) {
+          await expectLater(
+            invocation(),
+            throwsA(
+              isA<ApiFailure>().having(
+                (failure) => failure.kind,
+                'kind',
+                ApiFailureKind.validation,
+              ),
+            ),
+          );
+        }
+        expect(calls, 0);
+      });
+
+      test(
+        'mapeia lista ou item incompatível para malformedResponse',
+        () async {
+          final responses = <http.Response>[
+            _jsonResponse(<String, dynamic>{}),
+            _jsonListResponse(<dynamic>[null]),
+            _jsonListResponse(<dynamic>[
+              <String, dynamic>{'id': 0, 'name': 'FINANCIAL'},
+            ]),
+            _jsonListResponse(<dynamic>[
+              <String, dynamic>{'id': 1, 'name': '   '},
+            ]),
+          ];
+
+          for (final response in responses) {
+            final repository = _repository(MockClient((_) async => response));
+
+            await expectLater(
+              repository.searchTaskCategories(
+                accessToken: 'access-token-test-only',
+                spaceId: 7,
+              ),
+              throwsA(
+                isA<ApiFailure>().having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.malformedResponse,
+                ),
+              ),
+            );
+          }
+        },
       );
     });
 
@@ -1938,6 +2065,14 @@ HttpTasksRepository _repository(
 }
 
 http.Response _jsonResponse(Map<String, dynamic> body, {int statusCode = 200}) {
+  return http.Response.bytes(
+    utf8.encode(jsonEncode(body)),
+    statusCode,
+    headers: const {'content-type': 'application/json; charset=utf-8'},
+  );
+}
+
+http.Response _jsonListResponse(List<dynamic> body, {int statusCode = 200}) {
   return http.Response.bytes(
     utf8.encode(jsonEncode(body)),
     statusCode,

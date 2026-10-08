@@ -37,6 +37,11 @@ class EditTaskDialog extends StatelessWidget {
       submitLabel: 'Atualizar',
       submittingLabel: 'Atualizando...',
       submitIcon: Icons.save_outlined,
+      searchCategories: (name) => tasksRepository.searchTaskCategories(
+        accessToken: accessToken,
+        spaceId: task.spaceId,
+        name: name,
+      ),
       onSessionExpired: onSessionExpired,
       failureMessage: _updateFailureMessage,
       onSubmit: (update) async {

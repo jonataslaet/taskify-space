@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
@@ -21,13 +22,20 @@ void main() {
     expect(find.text('Ativa · Criada por $_creatorName'), findsOneWidget);
     expect(_fieldText(tester, 'create-task-description-field'), isEmpty);
     expect(_fieldText(tester, 'create-task-score-field'), isEmpty);
+    expect(_fieldText(tester, 'create-task-category-field'), isEmpty);
+    final categoryField = find.byKey(
+      const ValueKey('create-task-category-field'),
+    );
     expect(
       tester
-          .widget<DropdownButtonFormField<TaskCategory>>(
-            find.byKey(const ValueKey('create-task-category-field')),
+          .widget<TextField>(
+            find.descendant(
+              of: categoryField,
+              matching: find.byType(TextField),
+            ),
           )
-          .initialValue,
-      TaskCategory.operational,
+          .readOnly,
+      isTrue,
     );
     expect(
       tester
@@ -43,6 +51,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('create-task-dates-field')), findsNothing);
     expect(repository.createTaskCalls, 0);
+    expect(repository.searchTaskCategoriesCalls, 0);
   });
 
   testWidgets(
@@ -61,10 +70,11 @@ void main() {
         find.byKey(const ValueKey('create-task-score-field')),
         '80,00',
       );
-      await _selectDropdownOption(
+      await _selectTaskCategory(
         tester,
-        fieldKey: 'create-task-category-field',
-        optionLabel: 'Financeira',
+        keyPrefix: 'create-task',
+        query: '  FIN  ',
+        optionId: 2,
       );
       await _tapVisible(
         tester,
@@ -85,6 +95,10 @@ void main() {
       expect(repository.createTaskCalls, 1);
       expect(repository.receivedCreateAccessTokens, [_accessToken]);
       expect(repository.receivedCreateSpaceIds, [_spaceId]);
+      expect(repository.searchTaskCategoriesCalls, 1);
+      expect(repository.receivedTaskCategorySearchAccessTokens, [_accessToken]);
+      expect(repository.receivedTaskCategorySearchSpaceIds, [_spaceId]);
+      expect(repository.receivedTaskCategorySearchNames, ['FIN']);
       final creation = repository.receivedTaskCreations.single;
       expect(creation.spaceId, _spaceId);
       expect(creation.description, 'Pagar conta de água');
@@ -113,6 +127,142 @@ void main() {
       expect(find.byType(CreateTaskDialog), findsNothing);
     },
   );
+
+  testWidgets(
+    'busca somente ao confirmar, aceita consulta vazia e seleciona resultado',
+    (tester) async {
+      final repository = FakeTasksRepository();
+
+      await _pumpDialog(tester, repository: repository);
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('create-task-category-field')),
+      );
+
+      expect(
+        find.byKey(const ValueKey('create-task-category-search-dialog')),
+        findsOneWidget,
+      );
+      final searchField = find.byKey(
+        const ValueKey('create-task-category-search-field'),
+      );
+      await tester.enterText(searchField, '   ');
+      await tester.pump();
+      expect(repository.searchTaskCategoriesCalls, 0);
+
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+
+      expect(repository.searchTaskCategoriesCalls, 1);
+      expect(repository.receivedTaskCategorySearchNames, <String?>[null]);
+      expect(
+        find.byKey(const ValueKey('create-task-category-search-results')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('create-task-category-option-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('create-task-category-search-dialog')),
+        findsNothing,
+      );
+      expect(
+        _fieldText(tester, 'create-task-category-field'),
+        TaskCategory.operational.apiValue,
+      );
+    },
+  );
+
+  testWidgets('mostra estado vazio na busca de categorias', (tester) async {
+    final repository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, _) async =>
+          const <TaskCategorySummary>[],
+    );
+
+    await _pumpDialog(tester, repository: repository);
+    await _openCategorySearch(tester, keyPrefix: 'create-task');
+    await tester.enterText(
+      find.byKey(const ValueKey('create-task-category-search-field')),
+      'Inexistente',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('create-task-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.receivedTaskCategorySearchNames, ['Inexistente']);
+    expect(
+      find.byKey(const ValueKey('create-task-category-search-empty')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('mostra falha da busca e permite tentar novamente', (
+    tester,
+  ) async {
+    var attempts = 0;
+    final repository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, _) async {
+        attempts += 1;
+        if (attempts == 1) {
+          throw const ApiFailure(ApiFailureKind.network);
+        }
+        return const <TaskCategorySummary>[
+          TaskCategorySummary(id: 3, category: TaskCategory.personal),
+        ];
+      },
+    );
+
+    await _pumpDialog(tester, repository: repository);
+    await _openCategorySearch(tester, keyPrefix: 'create-task');
+    final searchButton = find.byKey(
+      const ValueKey('create-task-category-search-button'),
+    );
+    await tester.tap(searchButton);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('create-task-category-search-error')),
+      findsOneWidget,
+    );
+
+    await tester.tap(searchButton);
+    await tester.pumpAndSettle();
+
+    expect(repository.searchTaskCategoriesCalls, 2);
+    expect(
+      find.byKey(const ValueKey('create-task-category-option-3')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('401 na busca chama onSessionExpired', (tester) async {
+    var sessionExpiredCalls = 0;
+    final repository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, _) async =>
+          throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
+    );
+
+    await _pumpDialog(
+      tester,
+      repository: repository,
+      onSessionExpired: () => sessionExpiredCalls += 1,
+    );
+    await _openCategorySearch(tester, keyPrefix: 'create-task');
+    await tester.tap(
+      find.byKey(const ValueKey('create-task-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.searchTaskCategoriesCalls, 1);
+    expect(sessionExpiredCalls, 1);
+    expect(
+      find.byKey(const ValueKey('create-task-category-search-error')),
+      findsNothing,
+    );
+  });
 
   testWidgets('permite criar agenda diária sem datas', (tester) async {
     final repository = FakeTasksRepository(
@@ -185,6 +335,7 @@ void main() {
     expect(repository.createTaskCalls, 0);
     expect(find.text('Informe a descrição da tarefa.'), findsOneWidget);
     expect(find.textContaining('pontuação positiva'), findsOneWidget);
+    expect(find.text('Informe a categoria da tarefa.'), findsOneWidget);
     expect(find.text('Informe a frequência da agenda.'), findsOneWidget);
     expect(
       find.text('Informe ao menos uma data para a agenda.'),
@@ -313,6 +464,7 @@ Future<void> _fillMinimumValidForm(WidgetTester tester) async {
     find.byKey(const ValueKey('create-task-score-field')),
     '10',
   );
+  await _selectTaskCategory(tester, keyPrefix: 'create-task', optionId: 1);
 }
 
 Future<void> _submitAndSettle(WidgetTester tester) {
@@ -338,6 +490,39 @@ Future<void> _selectDropdownOption(
   await tester.tap(dropdown);
   await tester.pumpAndSettle();
   await tester.tap(find.text(optionLabel).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openCategorySearch(
+  WidgetTester tester, {
+  required String keyPrefix,
+}) async {
+  await _tapVisible(tester, find.byKey(ValueKey('$keyPrefix-category-field')));
+  expect(
+    find.byKey(ValueKey('$keyPrefix-category-search-dialog')),
+    findsOneWidget,
+  );
+}
+
+Future<void> _selectTaskCategory(
+  WidgetTester tester, {
+  required String keyPrefix,
+  required int optionId,
+  String? query,
+}) async {
+  await _openCategorySearch(tester, keyPrefix: keyPrefix);
+  if (query != null) {
+    await tester.enterText(
+      find.byKey(ValueKey('$keyPrefix-category-search-field')),
+      query,
+    );
+    await tester.pump();
+  }
+  await tester.tap(find.byKey(ValueKey('$keyPrefix-category-search-button')));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(ValueKey('$keyPrefix-category-option-$optionId')),
+  );
   await tester.pumpAndSettle();
 }
 

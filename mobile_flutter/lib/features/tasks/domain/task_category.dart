@@ -1,9 +1,11 @@
-enum TaskCategory {
-  operational('OPERATIONAL'),
-  financial('FINANCIAL'),
-  personal('PERSONAL');
+final class TaskCategory {
+  const TaskCategory._(this.apiValue);
 
-  const TaskCategory(this.apiValue);
+  static const operational = TaskCategory._('OPERATIONAL');
+  static const financial = TaskCategory._('FINANCIAL');
+  static const personal = TaskCategory._('PERSONAL');
+
+  static const values = <TaskCategory>[operational, financial, personal];
 
   final String apiValue;
 
@@ -13,11 +15,27 @@ enum TaskCategory {
     }
 
     final normalizedValue = value.trim();
+    if (normalizedValue.isEmpty) {
+      throw const FormatException('Campo category ausente ou inválido.');
+    }
+
     for (final category in values) {
       if (category.apiValue == normalizedValue) {
         return category;
       }
     }
-    throw const FormatException('Campo category inválido.');
+    return TaskCategory._(normalizedValue);
   }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is TaskCategory && other.apiValue == apiValue;
+  }
+
+  @override
+  int get hashCode => apiValue.hashCode;
+
+  @override
+  String toString() => 'TaskCategory($apiValue)';
 }

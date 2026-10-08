@@ -504,10 +504,9 @@ final class HttpSpacesRepository implements SpacesRepository {
     required int size,
   }) {
     final normalizedName = filters.name?.trim();
-    final selectedTaskCategories = <String>[
-      for (final category in TaskCategory.values)
-        if (filters.taskCategories.contains(category)) category.apiValue,
-    ];
+    final selectedTaskCategories = _sortedTaskCategories(
+      filters.taskCategories,
+    ).map((category) => category.apiValue).toList(growable: false);
     final queryParameters = <String, Object>{
       'page': page.toString(),
       'size': size.toString(),
@@ -580,6 +579,29 @@ final class HttpSpacesRepository implements SpacesRepository {
       result[entry.key as String] = entry.value;
     }
     return result;
+  }
+
+  List<TaskCategory> _sortedTaskCategories(Iterable<TaskCategory> categories) {
+    final knownOrder = <TaskCategory, int>{
+      for (var index = 0; index < TaskCategory.values.length; index += 1)
+        TaskCategory.values[index]: index,
+    };
+    final sorted = categories.toList(growable: false);
+    sorted.sort((first, second) {
+      final firstOrder = knownOrder[first];
+      final secondOrder = knownOrder[second];
+      if (firstOrder != null && secondOrder != null) {
+        return firstOrder.compareTo(secondOrder);
+      }
+      if (firstOrder != null) {
+        return -1;
+      }
+      if (secondOrder != null) {
+        return 1;
+      }
+      return first.apiValue.compareTo(second.apiValue);
+    });
+    return sorted;
   }
 
   ApiFailure _mapFailure(http.Response response) {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_update.dart';
@@ -37,8 +38,12 @@ void main() {
         _fieldText(tester, 'edit-task-dates-field'),
         '2026-08-02, 2026-08-09',
       );
-      expect(find.text('Financeira'), findsOneWidget);
+      expect(
+        _fieldText(tester, 'edit-task-category-field'),
+        TaskCategory.financial.apiValue,
+      );
       expect(find.text('Semanal'), findsOneWidget);
+      expect(repository.searchTaskCategoriesCalls, 0);
 
       await tester.enterText(
         find.byKey(const ValueKey('edit-task-description-field')),
@@ -62,6 +67,42 @@ void main() {
       expect(find.byType(EditTaskDialog), findsNothing);
     },
   );
+
+  testWidgets('busca e seleciona uma categoria dinâmica antes de atualizar', (
+    tester,
+  ) async {
+    final task = _task();
+    final customCategory = TaskCategory.fromApiValue('MAINTENANCE');
+    final repository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, name) async => <TaskCategorySummary>[
+        TaskCategorySummary(id: 17, category: customCategory),
+      ],
+      updateHandler: (_, _, _, update) async => _applyUpdate(task, update),
+    );
+
+    await _pumpDialog(tester, repository: repository, task: task);
+    await _selectTaskCategory(
+      tester,
+      keyPrefix: 'edit-task',
+      query: '  maint  ',
+      optionId: 17,
+    );
+
+    expect(repository.searchTaskCategoriesCalls, 1);
+    expect(repository.receivedTaskCategorySearchAccessTokens, [_accessToken]);
+    expect(repository.receivedTaskCategorySearchSpaceIds, [task.spaceId]);
+    expect(repository.receivedTaskCategorySearchNames, ['maint']);
+    expect(
+      _fieldText(tester, 'edit-task-category-field'),
+      customCategory.apiValue,
+    );
+
+    await _submitAndSettle(tester);
+
+    expect(repository.updateTaskCalls, 1);
+    expect(repository.receivedTaskUpdates.single.category, customCategory);
+    expect(find.byType(EditTaskDialog), findsNothing);
+  });
 
   testWidgets('desligar agenda envia schedule nulo', (tester) async {
     final task = _task(
@@ -429,6 +470,34 @@ Future<void> _selectFrequency(WidgetTester tester, String label) async {
   await tester.tap(dropdown);
   await tester.pumpAndSettle();
   await tester.tap(find.text(label).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _selectTaskCategory(
+  WidgetTester tester, {
+  required String keyPrefix,
+  required String query,
+  required int optionId,
+}) async {
+  await _tapVisible(tester, find.byKey(ValueKey('$keyPrefix-category-field')));
+  expect(
+    find.byKey(ValueKey('$keyPrefix-category-search-dialog')),
+    findsOneWidget,
+  );
+  await tester.enterText(
+    find.byKey(ValueKey('$keyPrefix-category-search-field')),
+    query,
+  );
+  await tester.pump();
+  expect(
+    find.byKey(ValueKey('$keyPrefix-category-search-results')),
+    findsNothing,
+  );
+  await tester.tap(find.byKey(ValueKey('$keyPrefix-category-search-button')));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(ValueKey('$keyPrefix-category-option-$optionId')),
+  );
   await tester.pumpAndSettle();
 }
 

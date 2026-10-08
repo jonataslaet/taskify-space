@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
@@ -225,8 +226,20 @@ void main() {
   testWidgets(
     'aplica todos os filtros com vírgula, reseta a página e permite limpar',
     (tester) async {
+      final maintenance = TaskCategory.fromApiValue('MAINTENANCE');
       final repository = _FakeTasksRepository(
         (_, _, _, page, size) async => _page(number: page, size: size),
+        searchTaskCategoriesHandler: (_, _, name) async {
+          if (name == 'maint') {
+            return <TaskCategorySummary>[
+              TaskCategorySummary(id: 17, category: maintenance),
+            ];
+          }
+          return const <TaskCategorySummary>[
+            TaskCategorySummary(id: 1, category: TaskCategory.operational),
+            TaskCategorySummary(id: 2, category: TaskCategory.financial),
+          ];
+        },
       );
 
       await tester.pumpWidget(_testApp(repository));
@@ -255,17 +268,56 @@ void main() {
             find.byKey(const ValueKey('tasks-active-filter')),
           )
           .onChanged!(true);
-      tester
-          .widget<FilterChip>(
-            find.byKey(const ValueKey('tasks-category-operational')),
-          )
-          .onSelected!(true);
-      tester
-          .widget<FilterChip>(
-            find.byKey(const ValueKey('tasks-category-financial')),
-          )
-          .onSelected!(true);
-      await tester.pump();
+      await _openTaskCategorySearch(tester);
+      expect(repository.searchTaskCategoriesCalls, 0);
+
+      await _searchTaskCategories(tester, '   ');
+      expect(repository.searchTaskCategoriesCalls, 1);
+      expect(repository.taskCategorySearchAccessTokens, [_session.accessToken]);
+      expect(repository.taskCategorySearchSpaceIds, [7]);
+      expect(repository.taskCategorySearchNames, <String?>[null]);
+      await _toggleTaskCategoryOption(tester, 1);
+      await _toggleTaskCategoryOption(tester, 2);
+
+      await _searchTaskCategories(tester, '  maint  ');
+      expect(repository.searchTaskCategoriesCalls, 2);
+      expect(repository.taskCategorySearchAccessTokens, [
+        _session.accessToken,
+        _session.accessToken,
+      ]);
+      expect(repository.taskCategorySearchSpaceIds, [7, 7]);
+      expect(repository.taskCategorySearchNames, <String?>[null, 'maint']);
+      await _toggleTaskCategoryOption(tester, 17);
+      expect(
+        find.byKey(
+          const ValueKey('tasks-filter-category-selection-OPERATIONAL'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-filter-category-selection-FINANCIAL')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('tasks-filter-category-selection-MAINTENANCE'),
+        ),
+        findsOneWidget,
+      );
+      await _applyTaskCategorySelection(tester);
+
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-FINANCIAL')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-MAINTENANCE')),
+        findsOneWidget,
+      );
 
       await _tapVisible(
         tester,
@@ -283,6 +335,7 @@ void main() {
       expect(filters.categories, {
         TaskCategory.operational,
         TaskCategory.financial,
+        maintenance,
       });
       expect(filters.minScore, 5.25);
       expect(filters.maxScore, 20.75);
@@ -304,6 +357,18 @@ void main() {
       expect(cleared.categories, isEmpty);
       expect(cleared.minScore, isNull);
       expect(cleared.maxScore, isNull);
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-FINANCIAL')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-MAINTENANCE')),
+        findsNothing,
+      );
       await _scrollTo(tester, find.byKey(const ValueKey('tasks-empty')));
       expect(find.byKey(const ValueKey('tasks-empty')), findsOneWidget);
       expect(
@@ -317,6 +382,185 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'preserva categorias, descarta cancelamento e permite removê-las',
+    (tester) async {
+      final repository = _FakeTasksRepository(
+        (_, _, _, page, size) async => _page(number: page, size: size),
+        searchTaskCategoriesHandler: (_, _, _) async =>
+            const <TaskCategorySummary>[
+              TaskCategorySummary(id: 1, category: TaskCategory.operational),
+              TaskCategorySummary(id: 2, category: TaskCategory.financial),
+            ],
+      );
+
+      await tester.pumpWidget(_testApp(repository));
+      await tester.pumpAndSettle();
+      await _openFilters(tester);
+      await _openTaskCategorySearch(tester);
+      await _searchTaskCategories(tester, '');
+      await _toggleTaskCategoryOption(tester, 1);
+      await _toggleTaskCategoryOption(tester, 2);
+      await _applyTaskCategorySelection(tester);
+
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-FINANCIAL')),
+        findsOneWidget,
+      );
+      expect(repository.fetchCalls, 1);
+
+      await _openTaskCategorySearch(tester);
+      expect(
+        find.byKey(
+          const ValueKey('tasks-filter-category-selection-OPERATIONAL'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-filter-category-selection-FINANCIAL')),
+        findsOneWidget,
+      );
+      await _searchTaskCategories(tester, '');
+      await _toggleTaskCategoryOption(tester, 2);
+      await tester.tap(
+        find.byKey(
+          const ValueKey('tasks-filter-category-search-cancel-button'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-FINANCIAL')),
+        findsOneWidget,
+      );
+      expect(repository.fetchCalls, 1);
+
+      await _openTaskCategorySearch(tester);
+      await _searchTaskCategories(tester, '');
+      await _toggleTaskCategoryOption(tester, 2);
+      await _applyTaskCategorySelection(tester);
+
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-FINANCIAL')),
+        findsNothing,
+      );
+      final operationalChip = tester.widget<InputChip>(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+      );
+      operationalChip.onDeleted!();
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('tasks-selected-category-OPERATIONAL')),
+        findsNothing,
+      );
+      expect(repository.fetchCalls, 1);
+      expect(repository.taskCategorySearchNames, <String?>[null, null, null]);
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('tasks-apply-filters')),
+      );
+
+      expect(repository.fetchCalls, 2);
+      expect(repository.filters.last.categories, isEmpty);
+    },
+  );
+
+  testWidgets('mostra busca vazia e permite tentar novamente após falha', (
+    tester,
+  ) async {
+    var retryAttempts = 0;
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(number: page, size: size),
+      searchTaskCategoriesHandler: (_, _, name) async {
+        if (name == 'empty') {
+          return const <TaskCategorySummary>[];
+        }
+        retryAttempts += 1;
+        if (retryAttempts == 1) {
+          throw const ApiFailure(ApiFailureKind.network);
+        }
+        return const <TaskCategorySummary>[
+          TaskCategorySummary(id: 3, category: TaskCategory.personal),
+        ];
+      },
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpAndSettle();
+    await _openFilters(tester);
+    await _openTaskCategorySearch(tester);
+
+    await _searchTaskCategories(tester, 'empty');
+    expect(
+      find.byKey(const ValueKey('tasks-filter-category-search-empty')),
+      findsOneWidget,
+    );
+
+    await _searchTaskCategories(tester, 'retry');
+    expect(
+      find.byKey(const ValueKey('tasks-filter-category-search-error')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('tasks-filter-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(retryAttempts, 2);
+    expect(repository.taskCategorySearchNames, <String?>[
+      'empty',
+      'retry',
+      'retry',
+    ]);
+    expect(
+      find.byKey(const ValueKey('tasks-filter-category-search-error')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('tasks-filter-category-option-3')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('401 na busca de categorias expira a sessão', (tester) async {
+    var sessionExpiredCalls = 0;
+    final repository = _FakeTasksRepository(
+      (_, _, _, page, size) async => _page(number: page, size: size),
+      searchTaskCategoriesHandler: (_, _, _) async =>
+          throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
+    );
+
+    await tester.pumpWidget(
+      _testApp(repository, onSessionExpired: () => sessionExpiredCalls += 1),
+    );
+    await tester.pumpAndSettle();
+    await _openFilters(tester);
+    await _openTaskCategorySearch(tester);
+    await _searchTaskCategories(tester, '');
+
+    expect(repository.searchTaskCategoriesCalls, 1);
+    expect(sessionExpiredCalls, 1);
+    expect(
+      find.byKey(const ValueKey('tasks-filter-category-search-error')),
+      findsNothing,
+    );
+  });
 
   testWidgets('rejeita pontuação inválida e intervalo invertido localmente', (
     tester,
@@ -939,6 +1183,22 @@ void main() {
     );
     await _tapVisible(
       tester,
+      find.byKey(const ValueKey('create-task-category-field')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('create-task-category-search-field')),
+      'OPERA',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('create-task-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('create-task-category-option-1')),
+    );
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
       find.byKey(const ValueKey('create-task-schedule-switch')),
     );
     await _selectDropdownOption(
@@ -1039,12 +1299,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await _openFilters(tester);
-      tester
-          .widget<FilterChip>(
-            find.byKey(const ValueKey('tasks-category-operational')),
-          )
-          .onSelected!(true);
-      await tester.pump();
+      await _openTaskCategorySearch(tester);
+      await _searchTaskCategories(tester, '');
+      await _toggleTaskCategoryOption(tester, 1);
+      await _applyTaskCategorySelection(tester);
       await _tapVisible(
         tester,
         find.byKey(const ValueKey('tasks-apply-filters')),
@@ -1131,6 +1389,12 @@ typedef _ConfirmTaskExecutionHandler =
       Set<int> executorIds,
       DateTime? executionDate,
     );
+typedef _SearchTaskCategoriesHandler =
+    Future<List<TaskCategorySummary>> Function(
+      String accessToken,
+      int spaceId,
+      String? name,
+    );
 
 final class _FakeTasksRepository implements TasksRepository {
   _FakeTasksRepository(
@@ -1140,6 +1404,7 @@ final class _FakeTasksRepository implements TasksRepository {
     this.toggleTaskActiveHandler,
     this.fetchTaskExecutionsHandler,
     this.confirmTaskExecutionHandler,
+    this.searchTaskCategoriesHandler,
   });
 
   final _FetchHandler _handler;
@@ -1148,12 +1413,14 @@ final class _FakeTasksRepository implements TasksRepository {
   final _ToggleTaskActiveHandler? toggleTaskActiveHandler;
   final _FetchTaskExecutionsHandler? fetchTaskExecutionsHandler;
   final _ConfirmTaskExecutionHandler? confirmTaskExecutionHandler;
+  final _SearchTaskCategoriesHandler? searchTaskCategoriesHandler;
   int fetchCalls = 0;
   int createCalls = 0;
   int updateCalls = 0;
   int toggleTaskActiveCalls = 0;
   int fetchTaskExecutionsCalls = 0;
   int confirmTaskExecutionCalls = 0;
+  int searchTaskCategoriesCalls = 0;
   final accessTokens = <String>[];
   final spaceIds = <int>[];
   final filters = <TaskFilters>[];
@@ -1179,6 +1446,9 @@ final class _FakeTasksRepository implements TasksRepository {
   final confirmedExecutionTaskIds = <int>[];
   final confirmedExecutionExecutorIds = <Set<int>>[];
   final confirmedExecutionDates = <DateTime?>[];
+  final taskCategorySearchAccessTokens = <String>[];
+  final taskCategorySearchSpaceIds = <int>[];
+  final taskCategorySearchNames = <String?>[];
 
   @override
   Future<void> confirmTaskExecution({
@@ -1302,6 +1572,25 @@ final class _FakeTasksRepository implements TasksRepository {
   }
 
   @override
+  Future<List<TaskCategorySummary>> searchTaskCategories({
+    required String accessToken,
+    required int spaceId,
+    String? name,
+  }) {
+    searchTaskCategoriesCalls += 1;
+    taskCategorySearchAccessTokens.add(accessToken);
+    taskCategorySearchSpaceIds.add(spaceId);
+    taskCategorySearchNames.add(name);
+    final handler = searchTaskCategoriesHandler;
+    if (handler != null) {
+      return handler(accessToken, spaceId, name);
+    }
+    return Future<List<TaskCategorySummary>>.value(const <TaskCategorySummary>[
+      TaskCategorySummary(id: 1, category: TaskCategory.operational),
+    ]);
+  }
+
+  @override
   Future<void> toggleTaskActive({
     required String accessToken,
     required int spaceId,
@@ -1391,6 +1680,37 @@ TaskPageResult _page({
 
 Future<void> _openFilters(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('tasks-toggle-filters')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openTaskCategorySearch(WidgetTester tester) async {
+  await _tapVisible(tester, find.byKey(const ValueKey('tasks-category-field')));
+  expect(
+    find.byKey(const ValueKey('tasks-filter-category-search-dialog')),
+    findsOneWidget,
+  );
+}
+
+Future<void> _searchTaskCategories(WidgetTester tester, String query) async {
+  await tester.enterText(
+    find.byKey(const ValueKey('tasks-filter-category-search-field')),
+    query,
+  );
+  await tester.tap(
+    find.byKey(const ValueKey('tasks-filter-category-search-button')),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _toggleTaskCategoryOption(WidgetTester tester, int id) async {
+  await tester.tap(find.byKey(ValueKey('tasks-filter-category-option-$id')));
+  await tester.pump();
+}
+
+Future<void> _applyTaskCategorySelection(WidgetTester tester) async {
+  await tester.tap(
+    find.byKey(const ValueKey('tasks-filter-category-search-apply-button')),
+  );
   await tester.pumpAndSettle();
 }
 

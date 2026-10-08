@@ -15,6 +15,7 @@ import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/presentation/create_task_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/confirm_task_execution_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/edit_task_dialog.dart';
+import 'package:mobile_flutter/features/tasks/presentation/task_category_search_dialog.dart';
 import 'package:mobile_flutter/features/tasks/presentation/task_executions_page.dart';
 
 class TasksPage extends StatefulWidget {
@@ -258,14 +259,49 @@ class _TasksPageState extends State<TasksPage> {
     setState(() => _areFiltersExpanded = !_areFiltersExpanded);
   }
 
-  void _toggleCategory(TaskCategory category, bool selected) {
+  Future<void> _selectCategories() async {
+    if (_isBusy) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    final sourceSessionId = widget.session.id;
+    final sourceAccessToken = widget.session.accessToken;
+    final sourceSpaceId = widget.spaceId;
+    final sourceTasksRepository = widget.tasksRepository;
+    final selectedCategories = await showDialog<Set<TaskCategory>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TaskCategoryMultiSelectDialog(
+        keyPrefix: 'tasks-filter',
+        searchCategories: (name) => sourceTasksRepository.searchTaskCategories(
+          accessToken: sourceAccessToken,
+          spaceId: sourceSpaceId,
+          name: name,
+        ),
+        initialCategories: _selectedCategories,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || selectedCategories == null) {
+      return;
+    }
+    if (widget.session.id != sourceSessionId ||
+        widget.session.accessToken != sourceAccessToken ||
+        widget.spaceId != sourceSpaceId ||
+        !identical(widget.tasksRepository, sourceTasksRepository)) {
+      return;
+    }
+
     setState(() {
-      if (selected) {
-        _selectedCategories.add(category);
-      } else {
-        _selectedCategories.remove(category);
-      }
+      _selectedCategories
+        ..clear()
+        ..addAll(selectedCategories);
     });
+  }
+
+  void _removeCategory(TaskCategory category) {
+    setState(() => _selectedCategories.remove(category));
   }
 
   void _goToPage(int page) {
@@ -555,7 +591,8 @@ class _TasksPageState extends State<TasksPage> {
             validationMessage: _filterValidationMessage,
             onActiveChanged: (active) =>
                 setState(() => _selectedActive = active),
-            onCategoryChanged: _toggleCategory,
+            onCategoriesPressed: _selectCategories,
+            onCategoryRemoved: _removeCategory,
             onToggle: _toggleFilters,
             onApply: _applyFilters,
             onClear: _clearFilters,
@@ -663,7 +700,8 @@ class _TasksFilterPanel extends StatelessWidget {
     required this.hasActiveFilters,
     required this.validationMessage,
     required this.onActiveChanged,
-    required this.onCategoryChanged,
+    required this.onCategoriesPressed,
+    required this.onCategoryRemoved,
     required this.onToggle,
     required this.onApply,
     required this.onClear,
@@ -680,7 +718,8 @@ class _TasksFilterPanel extends StatelessWidget {
   final bool hasActiveFilters;
   final String? validationMessage;
   final ValueChanged<bool?> onActiveChanged;
-  final void Function(TaskCategory category, bool selected) onCategoryChanged;
+  final VoidCallback onCategoriesPressed;
+  final ValueChanged<TaskCategory> onCategoryRemoved;
   final VoidCallback onToggle;
   final VoidCallback onApply;
   final VoidCallback onClear;
@@ -688,6 +727,8 @@ class _TasksFilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final orderedSelectedCategories = selectedCategories.toList(growable: false)
+      ..sort((first, second) => first.apiValue.compareTo(second.apiValue));
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -786,30 +827,50 @@ class _TasksFilterPanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    'Categorias',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: const Color(0xFF173B38),
-                      fontWeight: FontWeight.w700,
+                  Semantics(
+                    button: true,
+                    enabled: !isLoading,
+                    child: InkWell(
+                      onTap: isLoading ? null : onCategoriesPressed,
+                      borderRadius: BorderRadius.circular(4),
+                      child: InputDecorator(
+                        key: const ValueKey('tasks-category-field'),
+                        isEmpty: false,
+                        decoration: InputDecoration(
+                          labelText: 'Categorias',
+                          suffixIcon: const Icon(Icons.search_rounded),
+                          enabled: !isLoading,
+                        ),
+                        child: Text(
+                          selectedCategories.isEmpty
+                              ? 'Nenhuma categoria selecionada'
+                              : selectedCategories.length == 1
+                              ? '1 categoria selecionada'
+                              : '${selectedCategories.length} categorias selecionadas',
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final category in TaskCategory.values)
-                        FilterChip(
-                          key: ValueKey('tasks-category-${category.name}'),
-                          label: Text(_categoryLabel(category)),
-                          selected: selectedCategories.contains(category),
-                          onSelected: isLoading
-                              ? null
-                              : (selected) =>
-                                    onCategoryChanged(category, selected),
-                        ),
-                    ],
-                  ),
+                  if (orderedSelectedCategories.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      key: const ValueKey('tasks-selected-categories'),
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final category in orderedSelectedCategories)
+                          InputChip(
+                            key: ValueKey(
+                              'tasks-selected-category-${category.apiValue}',
+                            ),
+                            label: Text(_categoryLabel(category)),
+                            onDeleted: isLoading
+                                ? null
+                                : () => onCategoryRemoved(category),
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -1306,6 +1367,7 @@ String _categoryLabel(TaskCategory category) {
     TaskCategory.operational => 'Operacional',
     TaskCategory.financial => 'Financeira',
     TaskCategory.personal => 'Pessoal',
+    _ => category.apiValue,
   };
 }
 

@@ -6,7 +6,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_schedule_summary.dart'
 void main() {
   group('TaskFilters', () {
     test('mantém todos os filtros aceitos pela specification', () {
-      const filters = TaskFilters(
+      final filters = TaskFilters(
         description: 'Conta',
         score: 20.5,
         active: true,
@@ -27,6 +27,7 @@ void main() {
       expect(TaskCategory.values.map((category) => category.apiValue), <String>[
         'OPERATIONAL',
         'FINANCIAL',
+        'PERSONAL',
       ]);
       expect(
         TaskFrequency.values.map((frequency) => frequency.apiValue),

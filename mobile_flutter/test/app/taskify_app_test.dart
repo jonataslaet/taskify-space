@@ -6,6 +6,7 @@ import 'package:mobile_flutter/app/taskify_app.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/auth/domain/auth_session.dart';
 import 'package:mobile_flutter/features/auth/presentation/new_password_page.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
@@ -492,6 +493,17 @@ final class _FakeTasksRepository implements TasksRepository {
   }) {
     return Future<TaskSummary>.error(
       StateError('Atualização de tarefa não esperada neste teste.'),
+    );
+  }
+
+  @override
+  Future<List<TaskCategorySummary>> searchTaskCategories({
+    required String accessToken,
+    required int spaceId,
+    String? name,
+  }) {
+    return Future<List<TaskCategorySummary>>.error(
+      StateError('Busca de categorias não esperada neste teste.'),
     );
   }
 

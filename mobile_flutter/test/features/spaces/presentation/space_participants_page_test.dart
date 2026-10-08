@@ -9,6 +9,7 @@ import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/presentation/space_participants_page.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 
 import '../../../helpers/fakes.dart';
 
@@ -51,10 +52,7 @@ void main() {
             11,
             name: 'Joice Lima',
             role: SpaceUserRole.manager,
-            categories: const {
-              TaskCategory.operational,
-              TaskCategory.financial,
-            },
+            categories: {TaskCategory.operational, TaskCategory.financial},
             score: 42.5,
             contributionPercentual: 0.425,
           ),
@@ -84,13 +82,29 @@ void main() {
   });
 
   testWidgets('aplica todos os filtros e limpa os critérios', (tester) async {
+    final maintenance = TaskCategory.fromApiValue('MAINTENANCE');
     final repository = FakeSpacesRepository(
       (_) async => makeSpacePage(),
       fetchParticipantsHandler: (_, _, _, page, size) async =>
           makeSpaceParticipantPage(number: page, size: size),
     );
+    final tasksRepository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, name) async {
+        if (name == 'maint') {
+          return <TaskCategorySummary>[
+            TaskCategorySummary(id: 17, category: maintenance),
+          ];
+        }
+        return const <TaskCategorySummary>[
+          TaskCategorySummary(id: 1, category: TaskCategory.operational),
+          TaskCategorySummary(id: 2, category: TaskCategory.financial),
+        ];
+      },
+    );
 
-    await tester.pumpWidget(_testApp(repository));
+    await tester.pumpWidget(
+      _testApp(repository, tasksRepository: tasksRepository),
+    );
     await tester.pumpAndSettle();
     await _tapVisible(
       tester,
@@ -112,16 +126,96 @@ void main() {
     sortDropdown.onChanged!(ParticipantSort.nameDescending);
     await tester.pump();
 
-    final operationalFinder = find.byKey(
-      const Key('space-participants-category-OPERATIONAL'),
+    await _tapVisible(
+      tester,
+      find.byKey(const Key('space-participants-category-field')),
     );
-    tester.widget<FilterChip>(operationalFinder).onSelected!(true);
-    await tester.pump();
-    final financialFinder = find.byKey(
-      const Key('space-participants-category-FINANCIAL'),
+    expect(
+      find.byKey(const Key('space-participants-category-search-dialog')),
+      findsOneWidget,
     );
-    tester.widget<FilterChip>(financialFinder).onSelected!(true);
+    expect(tasksRepository.searchTaskCategoriesCalls, 0);
+
+    await tester.enterText(
+      find.byKey(const Key('space-participants-category-search-field')),
+      '   ',
+    );
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tasksRepository.searchTaskCategoriesCalls, 1);
+    expect(tasksRepository.receivedTaskCategorySearchAccessTokens, [
+      testSession.accessToken,
+    ]);
+    expect(tasksRepository.receivedTaskCategorySearchSpaceIds, [7]);
+    expect(tasksRepository.receivedTaskCategorySearchNames, <String?>[null]);
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-option-1')),
+    );
     await tester.pump();
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-option-2')),
+    );
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const Key('space-participants-category-search-field')),
+      '  maint  ',
+    );
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tasksRepository.searchTaskCategoriesCalls, 2);
+    expect(tasksRepository.receivedTaskCategorySearchAccessTokens, [
+      testSession.accessToken,
+      testSession.accessToken,
+    ]);
+    expect(tasksRepository.receivedTaskCategorySearchSpaceIds, [7, 7]);
+    expect(tasksRepository.receivedTaskCategorySearchNames, <String?>[
+      null,
+      'maint',
+    ]);
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-option-17')),
+    );
+    await tester.pump();
+    expect(
+      find.byKey(
+        const Key('space-participants-category-selection-OPERATIONAL'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('space-participants-category-selection-FINANCIAL')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const Key('space-participants-category-selection-MAINTENANCE'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-search-apply-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('space-participants-selected-category-OPERATIONAL')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('space-participants-selected-category-FINANCIAL')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('space-participants-selected-category-MAINTENANCE')),
+      findsOneWidget,
+    );
 
     await _tapVisible(
       tester,
@@ -137,6 +231,7 @@ void main() {
     expect(applied.taskCategories, {
       TaskCategory.operational,
       TaskCategory.financial,
+      maintenance,
     });
     expect(applied.sort, ParticipantSort.nameDescending);
     expect(
@@ -171,13 +266,232 @@ void main() {
     );
     expect(_roleDropdown(tester).value, isNull);
     expect(_sortDropdown(tester).value, ParticipantSort.scoreDescending);
-    expect(tester.widget<FilterChip>(operationalFinder).selected, isFalse);
-    expect(tester.widget<FilterChip>(financialFinder).selected, isFalse);
+    expect(
+      find.byKey(const Key('space-participants-selected-category-OPERATIONAL')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('space-participants-selected-category-FINANCIAL')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('space-participants-selected-category-MAINTENANCE')),
+      findsNothing,
+    );
     expect(
       find.byKey(const Key('space-participants-active-filters')),
       findsNothing,
     );
     expect(find.byKey(const Key('space-participants-empty')), findsOneWidget);
+  });
+
+  testWidgets(
+    'preserva seleção entre buscas, descarta cancelamento e permite remover',
+    (tester) async {
+      final repository = FakeSpacesRepository(
+        (_) async => makeSpacePage(),
+        fetchParticipantsHandler: (_, _, _, page, size) async =>
+            makeSpaceParticipantPage(number: page, size: size),
+      );
+      final tasksRepository = FakeTasksRepository();
+
+      await tester.pumpWidget(
+        _testApp(repository, tasksRepository: tasksRepository),
+      );
+      await tester.pumpAndSettle();
+      await _tapVisible(
+        tester,
+        find.byKey(const Key('space-participants-toggle-filters')),
+      );
+      await _openCategorySearch(tester);
+      await _searchCategories(tester, '');
+      await _toggleCategoryOption(tester, 1);
+      await _toggleCategoryOption(tester, 2);
+      await _applyCategorySelection(tester);
+
+      expect(
+        find.byKey(
+          const Key('space-participants-selected-category-OPERATIONAL'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('space-participants-selected-category-FINANCIAL')),
+        findsOneWidget,
+      );
+
+      await _openCategorySearch(tester);
+      expect(
+        find.byKey(
+          const Key('space-participants-category-selection-OPERATIONAL'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const Key('space-participants-category-selection-FINANCIAL'),
+        ),
+        findsOneWidget,
+      );
+      await _searchCategories(tester, '');
+      await _toggleCategoryOption(tester, 2);
+      await tester.tap(
+        find.byKey(
+          const Key('space-participants-category-search-cancel-button'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const Key('space-participants-selected-category-OPERATIONAL'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('space-participants-selected-category-FINANCIAL')),
+        findsOneWidget,
+      );
+
+      await _openCategorySearch(tester);
+      await _searchCategories(tester, '');
+      await _toggleCategoryOption(tester, 2);
+      await _applyCategorySelection(tester);
+
+      expect(
+        find.byKey(
+          const Key('space-participants-selected-category-OPERATIONAL'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('space-participants-selected-category-FINANCIAL')),
+        findsNothing,
+      );
+      final operationalChip = tester.widget<InputChip>(
+        find.byKey(
+          const Key('space-participants-selected-category-OPERATIONAL'),
+        ),
+      );
+      operationalChip.onDeleted!();
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          const Key('space-participants-selected-category-OPERATIONAL'),
+        ),
+        findsNothing,
+      );
+      expect(tasksRepository.receivedTaskCategorySearchNames, <String?>[
+        null,
+        null,
+        null,
+      ]);
+    },
+  );
+
+  testWidgets('mostra busca vazia e permite tentar novamente após falha', (
+    tester,
+  ) async {
+    var retryAttempts = 0;
+    final repository = FakeSpacesRepository(
+      (_) async => makeSpacePage(),
+      fetchParticipantsHandler: (_, _, _, page, size) async =>
+          makeSpaceParticipantPage(number: page, size: size),
+    );
+    final tasksRepository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, name) async {
+        if (name == 'empty') {
+          return const <TaskCategorySummary>[];
+        }
+        retryAttempts += 1;
+        if (retryAttempts == 1) {
+          throw const ApiFailure(ApiFailureKind.network);
+        }
+        return const <TaskCategorySummary>[
+          TaskCategorySummary(id: 3, category: TaskCategory.personal),
+        ];
+      },
+    );
+
+    await tester.pumpWidget(
+      _testApp(repository, tasksRepository: tasksRepository),
+    );
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
+      find.byKey(const Key('space-participants-toggle-filters')),
+    );
+    await _openCategorySearch(tester);
+
+    await _searchCategories(tester, 'empty');
+    expect(
+      find.byKey(const Key('space-participants-category-search-empty')),
+      findsOneWidget,
+    );
+
+    await _searchCategories(tester, 'retry');
+    expect(
+      find.byKey(const Key('space-participants-category-search-error')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('space-participants-category-search-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(retryAttempts, 2);
+    expect(tasksRepository.receivedTaskCategorySearchNames, <String?>[
+      'empty',
+      'retry',
+      'retry',
+    ]);
+    expect(
+      find.byKey(const Key('space-participants-category-search-error')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('space-participants-category-option-3')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('encaminha 401 da busca de categorias para expiração', (
+    tester,
+  ) async {
+    var sessionExpiredCalls = 0;
+    final repository = FakeSpacesRepository(
+      (_) async => makeSpacePage(),
+      fetchParticipantsHandler: (_, _, _, page, size) async =>
+          makeSpaceParticipantPage(number: page, size: size),
+    );
+    final tasksRepository = FakeTasksRepository(
+      searchTaskCategoriesHandler: (_, _, _) async =>
+          throw const ApiFailure(ApiFailureKind.unauthorized, statusCode: 401),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        repository,
+        tasksRepository: tasksRepository,
+        onSessionExpired: () => sessionExpiredCalls += 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
+      find.byKey(const Key('space-participants-toggle-filters')),
+    );
+    await _openCategorySearch(tester);
+    await _searchCategories(tester, '');
+
+    expect(tasksRepository.searchTaskCategoriesCalls, 1);
+    expect(sessionExpiredCalls, 1);
+    expect(
+      find.byKey(const Key('space-participants-category-search-error')),
+      findsNothing,
+    );
   });
 
   testWidgets(
@@ -316,6 +630,7 @@ void main() {
 
 Widget _testApp(
   FakeSpacesRepository repository, {
+  FakeTasksRepository? tasksRepository,
   VoidCallback? onSessionExpired,
 }) {
   return MaterialApp(
@@ -324,6 +639,7 @@ Widget _testApp(
       spaceId: 7,
       spaceName: 'Espaço de testes',
       spacesRepository: repository,
+      tasksRepository: tasksRepository ?? FakeTasksRepository(),
       onSessionExpired: onSessionExpired,
     ),
   );
@@ -363,6 +679,42 @@ DropdownButton<ParticipantSort> _sortDropdown(WidgetTester tester) {
       matching: find.byType(DropdownButton<ParticipantSort>),
     ),
   );
+}
+
+Future<void> _openCategorySearch(WidgetTester tester) async {
+  await _tapVisible(
+    tester,
+    find.byKey(const Key('space-participants-category-field')),
+  );
+  expect(
+    find.byKey(const Key('space-participants-category-search-dialog')),
+    findsOneWidget,
+  );
+}
+
+Future<void> _searchCategories(WidgetTester tester, String query) async {
+  await tester.enterText(
+    find.byKey(const Key('space-participants-category-search-field')),
+    query,
+  );
+  await tester.tap(
+    find.byKey(const Key('space-participants-category-search-button')),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _toggleCategoryOption(WidgetTester tester, int id) async {
+  await tester.tap(
+    find.byKey(ValueKey('space-participants-category-option-$id')),
+  );
+  await tester.pump();
+}
+
+Future<void> _applyCategorySelection(WidgetTester tester) async {
+  await tester.tap(
+    find.byKey(const Key('space-participants-category-search-apply-button')),
+  );
+  await tester.pumpAndSettle();
 }
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {

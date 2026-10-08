@@ -39,6 +39,16 @@ void main() {
       }
     });
 
+    test('aceita categorias dinâmicas na pontuação', () {
+      final participant = SpaceParticipant.fromJson(
+        _validJson()..['taskCategories'] = <dynamic>[' HOUSEHOLD '],
+      );
+
+      expect(participant.taskCategories, <TaskCategory>[
+        TaskCategory.fromApiValue('HOUSEHOLD'),
+      ]);
+    });
+
     test('mantém taskCategories imutável e isolada da lista recebida', () {
       final categories = <TaskCategory>[TaskCategory.operational];
       final participant = SpaceParticipant(
@@ -86,12 +96,12 @@ void main() {
     });
 
     test(
-      'rejeita taskCategories que não seja lista ou contenha valor desconhecido',
+      'rejeita taskCategories que não seja lista ou contenha valor inválido',
       () {
         for (final invalidJson in <Map<String, dynamic>>[
           _validJson()..['taskCategories'] = 'OPERATIONAL',
           _validJson()..['taskCategories'] = <dynamic>[null],
-          _validJson()..['taskCategories'] = <dynamic>['UNKNOWN'],
+          _validJson()..['taskCategories'] = <dynamic>['   '],
         ]) {
           expect(
             () => SpaceParticipant.fromJson(invalidJson),

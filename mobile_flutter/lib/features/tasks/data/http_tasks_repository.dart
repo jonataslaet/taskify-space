@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:mobile_flutter/core/config/app_config.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/task_category_summary.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_execution_page_result.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_filters.dart';
@@ -324,6 +325,68 @@ final class HttpTasksRepository implements TasksRepository {
   }
 
   @override
+  Future<List<TaskCategorySummary>> searchTaskCategories({
+    required String accessToken,
+    required int spaceId,
+    String? name,
+  }) async {
+    final normalizedToken = accessToken.trim();
+    final normalizedName = name?.trim();
+    if (normalizedToken.isEmpty || spaceId <= 0) {
+      throw const ApiFailure(ApiFailureKind.validation);
+    }
+
+    try {
+      final endpoint = _config.endpoint(
+        '/spaces/$spaceId/taskcategories/search',
+      );
+      final response = await _client
+          .get(
+            normalizedName == null || normalizedName.isEmpty
+                ? endpoint
+                : endpoint.replace(
+                    queryParameters: <String, String>{'name': normalizedName},
+                  ),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $normalizedToken',
+            },
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode != 200) {
+        throw _mapFailure(response);
+      }
+
+      final decodedBody = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decodedBody is! List<dynamic>) {
+        throw const FormatException(
+          'Resposta de categorias de tarefa não é uma lista JSON.',
+        );
+      }
+      return List<TaskCategorySummary>.unmodifiable(<TaskCategorySummary>[
+        for (var index = 0; index < decodedBody.length; index += 1)
+          TaskCategorySummary.fromJson(
+            _stringKeyedMap(
+              decodedBody[index],
+              field: 'taskCategories[$index]',
+            ),
+          ),
+      ]);
+    } on ApiFailure {
+      rethrow;
+    } on TimeoutException {
+      throw const ApiFailure(ApiFailureKind.timeout);
+    } on http.ClientException {
+      throw const ApiFailure(ApiFailureKind.network);
+    } on FormatException {
+      throw const ApiFailure(ApiFailureKind.malformedResponse);
+    } on Object {
+      throw const ApiFailure(ApiFailureKind.unknown);
+    }
+  }
+
+  @override
   Future<TaskExecutionPageResult> fetchTaskExecutions({
     required String accessToken,
     required int spaceId,
@@ -389,10 +452,9 @@ final class HttpTasksRepository implements TasksRepository {
     required int size,
   }) {
     final normalizedDescription = filters.description?.trim();
-    final selectedCategories = TaskCategory.values
-        .where(filters.categories.contains)
-        .map((category) => category.apiValue)
-        .join(',');
+    final selectedCategories = _sortedTaskCategories(
+      filters.categories,
+    ).map((category) => category.apiValue).join(',');
     final queryParameters = <String, String>{
       'page': page.toString(),
       'size': size.toString(),
@@ -519,6 +581,44 @@ final class HttpTasksRepository implements TasksRepository {
     }
     final asDouble = value.toDouble();
     return double.parse(asDouble.toStringAsFixed(2)) == asDouble;
+  }
+
+  List<TaskCategory> _sortedTaskCategories(Iterable<TaskCategory> categories) {
+    final knownOrder = <TaskCategory, int>{
+      for (var index = 0; index < TaskCategory.values.length; index += 1)
+        TaskCategory.values[index]: index,
+    };
+    final sorted = categories.toList(growable: false);
+    sorted.sort((first, second) {
+      final firstOrder = knownOrder[first];
+      final secondOrder = knownOrder[second];
+      if (firstOrder != null && secondOrder != null) {
+        return firstOrder.compareTo(secondOrder);
+      }
+      if (firstOrder != null) {
+        return -1;
+      }
+      if (secondOrder != null) {
+        return 1;
+      }
+      return first.apiValue.compareTo(second.apiValue);
+    });
+    return sorted;
+  }
+
+  Map<String, dynamic> _stringKeyedMap(Object? value, {required String field}) {
+    if (value is! Map) {
+      throw FormatException('Campo $field ausente ou inválido.');
+    }
+
+    final result = <String, dynamic>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String) {
+        throw FormatException('Campo $field inválido.');
+      }
+      result[entry.key as String] = entry.value;
+    }
+    return result;
   }
 
   ApiFailure _mapFailure(http.Response response) {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_flutter/core/network/api_failure.dart';
-import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_creation.dart';
 import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
 import 'package:mobile_flutter/features/tasks/presentation/task_form_dialog.dart';
@@ -29,12 +28,17 @@ class CreateTaskDialog extends StatelessWidget {
       details: 'Ativa · Criada por $creatorName',
       initialDescription: '',
       initialScore: null,
-      initialCategory: TaskCategory.operational,
+      initialCategory: null,
       initialSchedule: null,
       scheduleSubtitle: 'Ative para informar a frequência e as datas.',
       submitLabel: 'Criar tarefa',
       submittingLabel: 'Criando...',
       submitIcon: Icons.add_task_rounded,
+      searchCategories: (name) => tasksRepository.searchTaskCategories(
+        accessToken: accessToken,
+        spaceId: spaceId,
+        name: name,
+      ),
       creationOutcomeCanBeUncertain: true,
       onSessionExpired: onSessionExpired,
       failureMessage: _creationFailureMessage,

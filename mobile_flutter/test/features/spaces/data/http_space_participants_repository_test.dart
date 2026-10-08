@@ -41,6 +41,8 @@ void main() {
     });
 
     test('envia filtros, categorias repetidas e ordenação segura', () async {
+      final household = TaskCategory.fromApiValue('HOUSEHOLD');
+      final errands = TaskCategory.fromApiValue('ERRANDS');
       final client = MockClient((request) async {
         expect(request.url.path, '/api/spaces/42/participants');
         expect(request.url.queryParametersAll, <String, List<String>>{
@@ -48,7 +50,12 @@ void main() {
           'size': <String>['25'],
           'name': <String>['Joice Laet'],
           'spaceUserRole': <String>['ROLE_SPACE_MANAGER'],
-          'taskCategories': <String>['OPERATIONAL', 'FINANCIAL', 'PERSONAL'],
+          'taskCategories': <String>[
+            'OPERATIONAL',
+            'FINANCIAL',
+            'ERRANDS',
+            'HOUSEHOLD',
+          ],
           'sort': <String>['score,desc'],
         });
         final body = _validPageBody();
@@ -61,12 +68,14 @@ void main() {
       await _repository(client).fetchSpaceParticipants(
         accessToken: 'access-token-test-only',
         spaceId: 42,
-        filters: const SpaceParticipantFilters(
+        filters: SpaceParticipantFilters(
           name: '  Joice Laet  ',
           role: SpaceUserRole.manager,
           taskCategories: <TaskCategory>{
+            household,
             TaskCategory.financial,
             TaskCategory.operational,
+            errands,
           },
           sort: ParticipantSort.scoreDescending,
         ),

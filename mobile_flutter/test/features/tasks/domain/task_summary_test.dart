@@ -33,6 +33,14 @@ void main() {
       expect(task.creatorName, isNull);
     });
 
+    test('aceita categoria dinâmica cadastrada no espaço', () {
+      final task = TaskSummary.fromJson(
+        _validTaskJson()..['category'] = ' HOUSEHOLD ',
+      );
+
+      expect(task.category, TaskCategory.fromApiValue('HOUSEHOLD'));
+    });
+
     test('mantém as datas da agenda imutáveis', () {
       final task = TaskSummary.fromJson(_validTaskJson());
 
@@ -49,7 +57,7 @@ void main() {
         _validTaskJson()..['description'] = '   ',
         _validTaskJson()..['score'] = 0,
         _validTaskJson()..['active'] = 'true',
-        _validTaskJson()..['category'] = 'OTHER',
+        _validTaskJson()..['category'] = '   ',
       ]) {
         expect(() => TaskSummary.fromJson(invalidJson), throwsFormatException);
       }

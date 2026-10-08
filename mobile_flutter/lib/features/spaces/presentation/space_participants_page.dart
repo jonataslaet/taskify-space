@@ -11,6 +11,8 @@ import 'package:mobile_flutter/features/spaces/domain/space_participant_filters.
 import 'package:mobile_flutter/features/spaces/domain/space_participant_page_result.dart';
 import 'package:mobile_flutter/features/spaces/domain/spaces_repository.dart';
 import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
+import 'package:mobile_flutter/features/tasks/domain/tasks_repository.dart';
+import 'package:mobile_flutter/features/tasks/presentation/task_category_search_dialog.dart';
 
 class SpaceParticipantsPage extends StatefulWidget {
   const SpaceParticipantsPage({
@@ -18,6 +20,7 @@ class SpaceParticipantsPage extends StatefulWidget {
     required this.spaceId,
     required this.spaceName,
     required this.spacesRepository,
+    required this.tasksRepository,
     this.onSessionExpired,
     this.onLogout,
     super.key,
@@ -27,6 +30,7 @@ class SpaceParticipantsPage extends StatefulWidget {
   final int spaceId;
   final String spaceName;
   final SpacesRepository spacesRepository;
+  final TasksRepository tasksRepository;
   final VoidCallback? onSessionExpired;
   final Future<void> Function()? onLogout;
 
@@ -210,14 +214,39 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
     );
   }
 
-  void _toggleCategory(TaskCategory category, bool selected) {
+  Future<void> _selectCategories() async {
+    if (_isLoading) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    final selectedCategories = await showDialog<Set<TaskCategory>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TaskCategoryMultiSelectDialog(
+        keyPrefix: 'space-participants',
+        searchCategories: (name) => widget.tasksRepository.searchTaskCategories(
+          accessToken: widget.session.accessToken,
+          spaceId: widget.spaceId,
+          name: name,
+        ),
+        initialCategories: _selectedCategories,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (!mounted || selectedCategories == null) {
+      return;
+    }
+
     setState(() {
-      if (selected) {
-        _selectedCategories.add(category);
-      } else {
-        _selectedCategories.remove(category);
-      }
+      _selectedCategories
+        ..clear()
+        ..addAll(selectedCategories);
     });
+  }
+
+  void _removeCategory(TaskCategory category) {
+    setState(() => _selectedCategories.remove(category));
   }
 
   void _goToPage(int page) {
@@ -308,7 +337,8 @@ class _SpaceParticipantsPageState extends State<SpaceParticipantsPage> {
             isExpanded: _areFiltersExpanded,
             hasActiveFilters: _hasActiveFilters,
             onRoleChanged: (role) => setState(() => _selectedRole = role),
-            onCategoryChanged: _toggleCategory,
+            onCategoriesPressed: _selectCategories,
+            onCategoryRemoved: _removeCategory,
             onSortChanged: (sort) => setState(() => _selectedSort = sort),
             onToggle: () =>
                 setState(() => _areFiltersExpanded = !_areFiltersExpanded),
@@ -404,7 +434,8 @@ class _ParticipantsFilterPanel extends StatelessWidget {
     required this.isExpanded,
     required this.hasActiveFilters,
     required this.onRoleChanged,
-    required this.onCategoryChanged,
+    required this.onCategoriesPressed,
+    required this.onCategoryRemoved,
     required this.onSortChanged,
     required this.onToggle,
     required this.onApply,
@@ -419,7 +450,8 @@ class _ParticipantsFilterPanel extends StatelessWidget {
   final bool isExpanded;
   final bool hasActiveFilters;
   final ValueChanged<SpaceUserRole?> onRoleChanged;
-  final void Function(TaskCategory category, bool selected) onCategoryChanged;
+  final VoidCallback onCategoriesPressed;
+  final ValueChanged<TaskCategory> onCategoryRemoved;
   final ValueChanged<ParticipantSort?> onSortChanged;
   final VoidCallback onToggle;
   final VoidCallback onApply;
@@ -428,6 +460,8 @@ class _ParticipantsFilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final orderedSelectedCategories = selectedCategories.toList(growable: false)
+      ..sort((first, second) => first.apiValue.compareTo(second.apiValue));
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -539,32 +573,54 @@ class _ParticipantsFilterPanel extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 14),
-                  Text(
-                    'Categorias consideradas na pontuação',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: const Color(0xFF173B38),
-                      fontWeight: FontWeight.w700,
+                  Semantics(
+                    button: true,
+                    enabled: !isLoading,
+                    child: InkWell(
+                      onTap: isLoading ? null : onCategoriesPressed,
+                      borderRadius: BorderRadius.circular(4),
+                      child: InputDecorator(
+                        key: const ValueKey(
+                          'space-participants-category-field',
+                        ),
+                        isEmpty: false,
+                        decoration: InputDecoration(
+                          labelText: 'Categorias consideradas na pontuação',
+                          suffixIcon: const Icon(Icons.search_rounded),
+                          enabled: !isLoading,
+                        ),
+                        child: Text(
+                          selectedCategories.isEmpty
+                              ? 'Nenhuma categoria selecionada'
+                              : selectedCategories.length == 1
+                              ? '1 categoria selecionada'
+                              : '${selectedCategories.length} categorias selecionadas',
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final category in TaskCategory.values)
-                        FilterChip(
-                          key: ValueKey(
-                            'space-participants-category-${category.apiValue}',
+                  if (orderedSelectedCategories.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      key: const ValueKey(
+                        'space-participants-selected-categories',
+                      ),
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final category in orderedSelectedCategories)
+                          InputChip(
+                            key: ValueKey(
+                              'space-participants-selected-category-${category.apiValue}',
+                            ),
+                            label: Text(_categoryLabel(category)),
+                            onDeleted: isLoading
+                                ? null
+                                : () => onCategoryRemoved(category),
                           ),
-                          label: Text(_categoryLabel(category)),
-                          selected: selectedCategories.contains(category),
-                          onSelected: isLoading
-                              ? null
-                              : (selected) =>
-                                    onCategoryChanged(category, selected),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Wrap(
                     alignment: WrapAlignment.end,
@@ -866,6 +922,7 @@ String _categoryLabel(TaskCategory category) {
     TaskCategory.operational => 'Operacional',
     TaskCategory.financial => 'Financeira',
     TaskCategory.personal => 'Pessoal',
+    _ => category.apiValue,
   };
 }
 

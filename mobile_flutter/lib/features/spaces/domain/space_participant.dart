@@ -63,17 +63,10 @@ final class SpaceParticipant {
   }
 
   static TaskCategory _taskCategory(Object? value, int index) {
-    if (value is! String) {
+    if (value is! String || value.trim().isEmpty) {
       throw FormatException('Campo taskCategories[$index] inválido.');
     }
-
-    final normalizedValue = value.trim();
-    for (final category in TaskCategory.values) {
-      if (category.apiValue == normalizedValue) {
-        return category;
-      }
-    }
-    throw FormatException('Campo taskCategories[$index] inválido.');
+    return TaskCategory.fromApiValue(value);
   }
 
   static num _requiredNonNegativeNumber(Map<String, dynamic> json, String key) {

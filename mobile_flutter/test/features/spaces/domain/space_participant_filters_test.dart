@@ -6,7 +6,7 @@ import 'package:mobile_flutter/features/tasks/domain/task_category.dart';
 void main() {
   group('SpaceParticipantFilters', () {
     test('mantém todos os filtros suportados', () {
-      const filters = SpaceParticipantFilters(
+      final filters = SpaceParticipantFilters(
         name: 'Joice',
         role: SpaceUserRole.manager,
         taskCategories: <TaskCategory>{
