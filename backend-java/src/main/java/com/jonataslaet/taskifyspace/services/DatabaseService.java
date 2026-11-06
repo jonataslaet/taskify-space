@@ -361,9 +361,9 @@ public class DatabaseService {
             getTaskRecordResolver10QuestoesConcursosDTO(personalCategory)
         );
 
-        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO1.id());
-        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO2.id());
-        taskService.toggleActiveTask(userJoiceLaet, taskRecordDTO3.id());
+        taskService.toggleActiveTask(userJoiceLaet, spaceResidenciaCasalLaet.id(), taskRecordDTO1.id());
+        taskService.toggleActiveTask(userJoiceLaet, spaceResidenciaCasalLaet.id(), taskRecordDTO2.id());
+        taskService.toggleActiveTask(userJoiceLaet, spaceResidenciaCasalLaet.id(), taskRecordDTO3.id());
 
         spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), adminJonatasLaet);
 //        spaceService.requestParticipation(spaceResidenciaCasalLaet.id(), userRalphLaet);

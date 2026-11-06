@@ -155,7 +155,7 @@ public class FeatureAccessService {
                     user.getId(), periodStart, periodEnd);
 
             case CREATE_TASK ->
-                taskRepository.countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                taskRepository.countByCreatorIdAndActiveTrueAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                     user.getId(), periodStart, periodEnd);
 
             case CREATE_TASK_CATEGORY ->

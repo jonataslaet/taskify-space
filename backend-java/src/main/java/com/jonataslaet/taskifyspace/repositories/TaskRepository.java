@@ -15,7 +15,7 @@ import java.time.Instant;
 public interface TaskRepository extends JpaRepository<@NonNull Task, @NonNull Long>, JpaSpecificationExecutor<@NonNull Task> {
     boolean existsBySpaceIdAndDescriptionIgnoreCase(Long spaceId, String description);
 
-    long countByCreatorIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+    long countByCreatorIdAndActiveTrueAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
         Long creatorId,
         Instant periodStart,
         Instant periodEnd);

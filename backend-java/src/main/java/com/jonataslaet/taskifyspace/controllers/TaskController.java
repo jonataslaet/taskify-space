@@ -112,21 +112,12 @@ public class TaskController {
         return ResponseEntity.ok(updatedTask);
     }
 
-    @DeleteMapping("/{taskId}")
-    public ResponseEntity<@NonNull Void> deleteTask(
-        @PathVariable("taskId") Long taskId,
-        @AuthenticationPrincipal User authenticatedUser) {
-
-        taskService.deleteTask(authenticatedUser, taskId);
-        return ResponseEntity.noContent().build();
-    }
-
     @PatchMapping("/{taskId}")
-    public ResponseEntity<@NonNull Void> toggleActiveTask(
+    public ResponseEntity<@NonNull Void> toggleActiveTask(@PathVariable("spaceId") Long spaceId,
         @PathVariable("taskId") Long taskId,
         @AuthenticationPrincipal User authenticatedUser) {
 
-        taskService.toggleActiveTask(authenticatedUser, taskId);
+        taskService.toggleActiveTask(authenticatedUser, spaceId, taskId);
         return ResponseEntity.noContent().build();
     }
 }

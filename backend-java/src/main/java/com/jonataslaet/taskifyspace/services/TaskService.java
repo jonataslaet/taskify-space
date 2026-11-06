@@ -74,7 +74,7 @@ public class TaskService {
         Task task = TaskMapper.toEntity(taskRecordDTO, space, authenticatedUser);
         task.setCategory(taskCategory);
         taskSchedulerValidator.validate(task.getSchedule());
-        task.setActive(false);
+        task.setActive(true);
         return TaskMapper.toDTO(taskRepository.save(task));
     }
 
@@ -182,8 +182,13 @@ public class TaskService {
     }
 
     @Transactional
-    public void toggleActiveTask(User authenticatedUser, Long taskId) {
+    public void toggleActiveTask(User authenticatedUser, Long spaceId, Long taskId) {
+        Space space = spaceService.getSpaceEntity(spaceId);
         Task task = getTaskEntity(taskId);
+        if (!task.isActive()) {
+            featureAccessService.requireFeatureWithUsageLock(authenticatedUser, FeatureEnum.CREATE_TASK, space);
+        }
+
         spaceService.validateActiveParticipation(authenticatedUser, task.getSpace(), Set.of(ROLE_SPACE_ADMIN, ROLE_SPACE_MANAGER));
         task.setActive(!task.isActive());
         taskRepository.save(task);
