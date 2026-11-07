@@ -1071,33 +1071,44 @@ class _ParticipantsChip extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: Material(
-            color: const Color(0xFFF1F6F5),
-            borderRadius: BorderRadius.circular(999),
+            color: Colors.transparent,
             child: InkWell(
               onTap: enabled ? onPressed : null,
               borderRadius: BorderRadius.circular(999),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.group_outlined,
-                        size: 16,
-                        color: Color(0xFF37615E),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: const Color(0xFF37615E),
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F6F5),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.group_outlined,
+                          size: 16,
+                          color: Color(0xFF37615E),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: const Color(0xFF37615E),
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

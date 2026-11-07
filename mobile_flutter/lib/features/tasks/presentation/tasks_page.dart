@@ -1182,42 +1182,58 @@ class _TaskStatusChip extends StatelessWidget {
         child: Tooltip(
           message: tooltip,
           child: Material(
-            color: const Color(0xFFF1F6F5),
-            borderRadius: BorderRadius.circular(999),
+            color: Colors.transparent,
             child: InkWell(
               onTap: onPressed,
               borderRadius: BorderRadius.circular(999),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isToggling)
-                        const SizedBox.square(
-                          key: ValueKey('task-status-progress'),
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else
-                        Icon(
-                          active
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 16,
-                          color: const Color(0xFF37615E),
-                        ),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: const Color(0xFF37615E),
-                              fontWeight: FontWeight.w600,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  widthFactor: 1,
+                  heightFactor: 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F6F5),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isToggling)
+                          const SizedBox.square(
+                            key: ValueKey('task-status-progress'),
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          SizedBox.square(
+                            dimension: 16,
+                            child: Center(
+                              child: Icon(
+                                active
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 14,
+                                color: const Color(0xFF37615E),
+                              ),
                             ),
-                      ),
-                    ],
+                          ),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: const Color(0xFF37615E),
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

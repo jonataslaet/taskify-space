@@ -45,6 +45,26 @@ void main() {
     expect(find.byKey(const ValueKey('space-card-1')), findsOneWidget);
     expect(find.text('Residência do Casal Laet'), findsOneWidget);
     expect(find.text('Participante'), findsOneWidget);
+    final participantsPill = find
+        .ancestor(
+          of: find.byIcon(Icons.group_outlined),
+          matching: find.byType(Container),
+        )
+        .first;
+    final rolePill = find
+        .ancestor(
+          of: find.byIcon(Icons.verified_outlined),
+          matching: find.byType(Container),
+        )
+        .first;
+    expect(
+      tester.getTopLeft(participantsPill).dy,
+      tester.getTopLeft(rolePill).dy,
+    );
+    expect(
+      tester.getSize(participantsPill).height,
+      tester.getSize(rolePill).height,
+    );
 
     await tester.pump();
     expect(repository.fetchSpacesCalls, 1);

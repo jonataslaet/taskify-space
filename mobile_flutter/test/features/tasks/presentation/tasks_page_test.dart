@@ -68,6 +68,20 @@ void main() {
     expect(find.text('Ativa'), findsOneWidget);
     expect(find.text('Criada por: Joice Laet'), findsOneWidget);
     expect(find.text('Semanal · 03/08/2026'), findsOneWidget);
+    final statusPill = find
+        .ancestor(
+          of: find.byIcon(Icons.visibility_outlined),
+          matching: find.byType(Container),
+        )
+        .first;
+    final scorePill = find
+        .ancestor(
+          of: find.byIcon(Icons.stars_outlined),
+          matching: find.byType(Container),
+        )
+        .first;
+    expect(tester.getTopLeft(statusPill).dy, tester.getTopLeft(scorePill).dy);
+    expect(tester.getSize(statusPill).height, tester.getSize(scorePill).height);
   });
 
   testWidgets('abre as execuções ao tocar no nome da tarefa', (tester) async {
