@@ -63,6 +63,14 @@ void main() {
     expect(find.text('Residência do Casal'), findsOneWidget);
     expect(find.byKey(const ValueKey('task-card-1')), findsOneWidget);
     expect(find.text('Tarefa 1'), findsOneWidget);
+    expect(find.text('10.5 pontos'), findsNothing);
+    expect(find.text('Operacional'), findsNothing);
+    expect(find.text('Ativa'), findsNothing);
+    expect(find.text('Criada por: Joice Laet'), findsNothing);
+    expect(find.text('Semanal · 03/08/2026'), findsNothing);
+
+    await _expandTask(tester, 1);
+
     expect(find.text('10.5 pontos'), findsOneWidget);
     expect(find.text('Operacional'), findsOneWidget);
     expect(find.text('Ativa'), findsOneWidget);
@@ -82,6 +90,13 @@ void main() {
         .first;
     expect(tester.getTopLeft(statusPill).dy, tester.getTopLeft(scorePill).dy);
     expect(tester.getSize(statusPill).height, tester.getSize(scorePill).height);
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('task-expand-details-1')),
+    );
+    expect(find.text('10.5 pontos'), findsNothing);
+    expect(find.text('Operacional'), findsNothing);
   });
 
   testWidgets('abre as execuções ao tocar no nome da tarefa', (tester) async {
@@ -852,6 +867,7 @@ void main() {
     await tester.pumpWidget(_testApp(repository));
     await tester.pumpAndSettle();
 
+    await _expandTask(tester, 1);
     final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
     expect(statusChip, findsOneWidget);
     expect(
@@ -900,6 +916,7 @@ void main() {
         await tester.pumpWidget(_testApp(repository, canEditTasks: true));
         await tester.pumpAndSettle();
 
+        await _expandTask(tester, 1);
         final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
         expect(tester.getSize(statusChip).height, greaterThanOrEqualTo(48));
         expect(
@@ -952,6 +969,7 @@ void main() {
     await tester.pumpWidget(_testApp(repository, canEditTasks: true));
     await tester.pumpAndSettle();
 
+    await _expandTask(tester, 1);
     final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
     await tester.tap(statusChip);
     await tester.pump();
@@ -1010,6 +1028,7 @@ void main() {
       find.byKey(const ValueKey('tasks-apply-filters')),
     );
     await _scrollToAndTap(tester, find.byKey(const ValueKey('tasks-page-1')));
+    await _expandTask(tester, 1);
     await _scrollToAndTap(
       tester,
       find.byKey(const ValueKey('task-active-toggle-1')),
@@ -1047,6 +1066,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _expandTask(tester, 1);
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('task-active-toggle-1')),
@@ -1083,6 +1103,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _expandTask(tester, 1);
     await _tapVisible(
       tester,
       find.byKey(const ValueKey('task-active-toggle-1')),
@@ -1116,6 +1137,7 @@ void main() {
     await tester.pumpWidget(_testApp(repository, canEditTasks: true));
     await tester.pumpAndSettle();
 
+    await _expandTask(tester, 1);
     final statusChip = find.byKey(const ValueKey('task-active-toggle-1'));
     await _tapVisible(tester, statusChip);
 
@@ -1272,6 +1294,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await _expandTask(tester, 1);
         expect(
           find.byKey(const ValueKey('task-edit-button-1')),
           editCase.matcher,
@@ -1323,6 +1346,8 @@ void main() {
       );
       await _scrollToAndTap(tester, find.byKey(const ValueKey('tasks-page-1')));
 
+      await _scrollTo(tester, find.byKey(const ValueKey('task-card-1')));
+      await _expandTask(tester, 1);
       await _scrollToAndTap(
         tester,
         find.byKey(const ValueKey('task-edit-button-1')),
@@ -1733,6 +1758,13 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
   await tester.tap(finder);
   await tester.pumpAndSettle();
+}
+
+Future<void> _expandTask(WidgetTester tester, int taskId) async {
+  await _tapVisible(
+    tester,
+    find.byKey(ValueKey('task-expand-details-$taskId')),
+  );
 }
 
 Future<void> _scrollToAndTap(WidgetTester tester, Finder finder) async {

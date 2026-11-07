@@ -620,6 +620,7 @@ class _TasksPageState extends State<TasksPage> {
             else
               for (final task in result.content) ...[
                 _TaskCard(
+                  key: ValueKey('task-card-${task.id}'),
                   task: task,
                   canEdit: widget.canEditTasks,
                   isToggling: _togglingTaskId == task.id,
@@ -989,7 +990,7 @@ class _ScoreField extends StatelessWidget {
   }
 }
 
-class _TaskCard extends StatelessWidget {
+class _TaskCard extends StatefulWidget {
   const _TaskCard({
     required this.task,
     required this.canEdit,
@@ -998,6 +999,7 @@ class _TaskCard extends StatelessWidget {
     required this.onShowExecutions,
     required this.onToggleActive,
     required this.onEdit,
+    super.key,
   });
 
   final TaskSummary task;
@@ -1009,10 +1011,16 @@ class _TaskCard extends StatelessWidget {
   final VoidCallback? onEdit;
 
   @override
+  State<_TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<_TaskCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      key: ValueKey('task-card-${task.id}'),
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
@@ -1028,20 +1036,22 @@ class _TaskCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Semantics(
-                  key: ValueKey('task-confirm-execution-button-${task.id}'),
-                  label: task.active
-                      ? 'Confirmar execução de ${task.description}'
-                      : 'Tarefa ${task.description} inativa',
+                  key: ValueKey(
+                    'task-confirm-execution-button-${widget.task.id}',
+                  ),
+                  label: widget.task.active
+                      ? 'Confirmar execução de ${widget.task.description}'
+                      : 'Tarefa ${widget.task.description} inativa',
                   container: true,
                   button: true,
-                  enabled: task.active,
+                  enabled: widget.task.active,
                   excludeSemantics: true,
-                  onTap: onConfirmExecution,
+                  onTap: widget.onConfirmExecution,
                   child: IconButton(
-                    tooltip: task.active
+                    tooltip: widget.task.active
                         ? 'Confirmar execução'
                         : 'Tarefa inativa',
-                    onPressed: onConfirmExecution,
+                    onPressed: widget.onConfirmExecution,
                     style: IconButton.styleFrom(
                       minimumSize: const Size.square(48),
                       backgroundColor: const Color(0xFFE3F2EF),
@@ -1051,10 +1061,10 @@ class _TaskCard extends StatelessWidget {
                       ),
                     ),
                     icon: Icon(
-                      task.active
+                      widget.task.active
                           ? Icons.task_alt_rounded
                           : Icons.pause_circle_outline_rounded,
-                      color: task.active
+                      color: widget.task.active
                           ? const Color(0xFF006C67)
                           : const Color(0xFF81908E),
                     ),
@@ -1066,14 +1076,16 @@ class _TaskCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Semantics(
-                        key: ValueKey('task-executions-button-${task.id}'),
-                        label: 'Ver execuções de ${task.description}',
+                        key: ValueKey(
+                          'task-executions-button-${widget.task.id}',
+                        ),
+                        label: 'Ver execuções de ${widget.task.description}',
                         container: true,
                         button: true,
                         excludeSemantics: true,
-                        onTap: onShowExecutions,
+                        onTap: widget.onShowExecutions,
                         child: TextButton(
-                          onPressed: onShowExecutions,
+                          onPressed: widget.onShowExecutions,
                           style: TextButton.styleFrom(
                             alignment: Alignment.centerLeft,
                             minimumSize: const Size(48, 48),
@@ -1081,7 +1093,7 @@ class _TaskCard extends StatelessWidget {
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: Text(
-                            task.description,
+                            widget.task.description,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: const Color(0xFF173B38),
                               fontWeight: FontWeight.w800,
@@ -1089,57 +1101,90 @@ class _TaskCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (task.creatorName != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Criada por: ${task.creatorName}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF5D716F),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
-                if (canEdit) ...[
-                  const SizedBox(width: 8),
-                  IconButton(
-                    key: ValueKey('task-edit-button-${task.id}'),
-                    tooltip: 'Editar tarefa',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_outlined),
+                IconButton(
+                  key: ValueKey('task-expand-details-${widget.task.id}'),
+                  tooltip: _isExpanded
+                      ? 'Recolher detalhes'
+                      : 'Expandir detalhes',
+                  onPressed: () => setState(() => _isExpanded = !_isExpanded),
+                  icon: Icon(
+                    _isExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
                   ),
-                ],
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _TaskInfoChip(
-                  icon: Icons.stars_outlined,
-                  label: '${_scoreLabel(task.score)} pontos',
-                ),
-                _TaskInfoChip(
-                  icon: task.category == TaskCategory.financial
-                      ? Icons.payments_outlined
-                      : Icons.build_outlined,
-                  label: _categoryLabel(task.category),
-                ),
-                _TaskStatusChip(
-                  key: ValueKey('task-active-toggle-${task.id}'),
-                  active: task.active,
-                  canToggle: canEdit,
-                  isToggling: isToggling,
-                  onPressed: onToggleActive,
-                ),
-                if (task.schedule case final schedule?)
-                  _TaskInfoChip(
-                    icon: Icons.event_repeat_outlined,
-                    label: _scheduleLabel(schedule),
-                  ),
-              ],
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: _isExpanded
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (widget.task.creatorName case final creatorName?)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Text(
+                                'Criada por: $creatorName',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: const Color(0xFF5D716F),
+                                ),
+                              ),
+                            ),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.start,
+                            children: [
+                              _TaskInfoChip(
+                                icon: Icons.stars_outlined,
+                                label:
+                                    '${_scoreLabel(widget.task.score)} pontos',
+                              ),
+                              _TaskInfoChip(
+                                icon:
+                                    widget.task.category ==
+                                        TaskCategory.financial
+                                    ? Icons.payments_outlined
+                                    : Icons.build_outlined,
+                                label: _categoryLabel(widget.task.category),
+                              ),
+                              _TaskStatusChip(
+                                key: ValueKey(
+                                  'task-active-toggle-${widget.task.id}',
+                                ),
+                                active: widget.task.active,
+                                canToggle: widget.canEdit,
+                                isToggling: widget.isToggling,
+                                onPressed: widget.onToggleActive,
+                              ),
+                              if (widget.task.schedule case final schedule?)
+                                _TaskInfoChip(
+                                  icon: Icons.event_repeat_outlined,
+                                  label: _scheduleLabel(schedule),
+                                ),
+                              if (widget.canEdit)
+                                IconButton(
+                                  key: ValueKey(
+                                    'task-edit-button-${widget.task.id}',
+                                  ),
+                                  tooltip: 'Editar tarefa',
+                                  onPressed: widget.onEdit,
+                                  icon: const Icon(Icons.edit_outlined),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox(width: 0, height: 0),
             ),
           ],
         ),
